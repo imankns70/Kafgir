@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import './App.css'
+import { BrandLogo } from './design-system/BrandLogo'
+import { Icon } from './design-system/Icon'
 import { CartPage } from './features/cart/CartPage'
 import { MenuPage } from './features/menu/MenuPage'
 import { OrderSuccess } from './features/orders/OrderSuccess'
@@ -36,6 +38,7 @@ function App() {
   const [order, setOrder] = useState<OrderDto | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [menuError, setMenuError] = useState<string | null>(null)
+  const [shouldScrollToCategories, setShouldScrollToCategories] = useState(false)
 
   const loadMenu = async () => {
     setIsLoading(true)
@@ -79,6 +82,21 @@ function App() {
         setPage('menu')
       }), [page])
 
+  useEffect(() => {
+    if (page !== 'menu' || !shouldScrollToCategories) return
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      document.getElementById('menu-categories')?.scrollIntoView({
+        block: 'start',
+        behavior: prefersReducedMotion ? 'auto' : 'smooth',
+      })
+      setShouldScrollToCategories(false)
+    })
+
+    return () => window.cancelAnimationFrame(animationFrame)
+  }, [page, shouldScrollToCategories])
+
   const addToCart = (item: DailyMenuDto['items'][number]) => {
     setCart((current) => {
       const existing = current.find((cartItem) => cartItem.dailyMenuItemId === item.id)
@@ -111,27 +129,28 @@ function App() {
     setPage('success')
   }
 
+  const showCategories = () => {
+    setShouldScrollToCategories(true)
+    setPage('menu')
+  }
+
   return (
     <div className="app-shell" dir="rtl">
       <header className="app-header">
-        <div className="brand-lockup">
-          <div className="brand-mark" aria-hidden="true">ک</div>
-          <div>
-            <p className="brand">کفگیر</p>
-            <p className="tagline">غذای خونگی، با عشق</p>
-          </div>
-        </div>
+        <BrandLogo variant="horizontal" className="header-logo-desktop" />
+        <BrandLogo variant="compact" className="header-logo-mobile" />
         {page === 'menu' && (
-          <button className="cart-button" onClick={() => setPage('cart')}>
+          <button className="cart-button" onClick={() => setPage('cart')} aria-label={`سبد خرید، ${cart.reduce((sum, item) => sum + item.quantity, 0)} قلم`}>
+            <Icon name="cart" size="md" />
             <span className="cart-label">سبد خرید</span>
-            <span className="cart-count">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>
+            <span className="cart-count" aria-live="polite">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>
           </button>
         )}
       </header>
 
       {page === 'menu' && (
         <MenuPage menu={menu} isLoading={isLoading} error={menuError}
-          onRetry={loadMenu} onAdd={addToCart} />
+          cartItems={cart} onRetry={loadMenu} onAdd={addToCart} onQuantityChange={updateQuantity} />
       )}
       {page === 'cart' && (
         <CartPage items={cart} onQuantityChange={updateQuantity}
@@ -139,6 +158,21 @@ function App() {
       )}
       {page === 'success' && order && (
         <OrderSuccess order={order} onBack={() => { setOrder(null); setPage('menu') }} />
+      )}
+
+      {page !== 'success' && (
+        <nav className="mobile-bottom-nav" aria-label="پیمایش اصلی">
+          <button className={page === 'menu' ? 'active' : ''} onClick={() => setPage('menu')} aria-current={page === 'menu' ? 'page' : undefined}>
+            <Icon name="home" size="lg" /><span>منوی امروز</span>
+          </button>
+          <button onClick={showCategories}>
+            <Icon name="categories" size="lg" /><span>دسته‌ها</span>
+          </button>
+          <button className={page === 'cart' ? 'active' : ''} onClick={() => setPage('cart')} aria-current={page === 'cart' ? 'page' : undefined}>
+            <span className="nav-icon-wrap"><Icon name="cart" size="lg" />{cart.length > 0 && <span className="nav-count">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>}</span>
+            <span>سبد خرید</span>
+          </button>
+        </nav>
       )}
     </div>
   )

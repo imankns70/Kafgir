@@ -16,7 +16,7 @@ public sealed class DailyMenuViewModel : ObservableObject
     private readonly IDailyMenusApiClient _menusApiClient;
     private readonly IFoodsApiClient _foodsApiClient;
     private DateTime _currentDate = DateTime.Today;
-    private bool _isOpen = true;
+    private bool _isOpen;
     private string? _note;
     private FoodDto? _selectedFoodToAdd;
     private decimal _priceToAdd;
@@ -193,7 +193,7 @@ public sealed class DailyMenuViewModel : ObservableObject
     private void ApplyMenu(DailyMenuDto? menu)
     {
         ClearMenuItems();
-        SetProperty(ref _isOpen, menu?.IsOpen ?? true, nameof(IsOpen));
+        SetProperty(ref _isOpen, menu?.IsOpen ?? false, nameof(IsOpen));
         _note = menu?.Note;
         if (menu is null)
         {

@@ -31,6 +31,12 @@ public sealed class AdminOrdersController(IOrderService orderService) : Controll
     public async Task<ActionResult<IReadOnlyList<OrderSummaryDto>>> GetByDate(
         [FromQuery] DateOnly? date,
         [FromQuery] OrderStatus? status,
+        [FromQuery] string? orderNumber,
+        [FromQuery] string? customerName,
+        [FromQuery] string? phoneNumber,
+        [FromQuery] DeliveryMethod? deliveryMethod,
+        [FromQuery] PaymentMethod? paymentMethod,
+        [FromQuery] string? foodName,
         CancellationToken cancellationToken)
     {
         if (!date.HasValue)
@@ -40,10 +46,19 @@ public sealed class AdminOrdersController(IOrderService orderService) : Controll
 
         try
         {
-            return Ok(await orderService.GetByDateAsync(
-                date.Value,
-                status,
-                cancellationToken));
+            var query = new OrderReportQuery
+            {
+                Date = date.Value,
+                Status = status,
+                OrderNumber = orderNumber,
+                CustomerName = customerName,
+                PhoneNumber = phoneNumber,
+                DeliveryMethod = deliveryMethod,
+                PaymentMethod = paymentMethod,
+                FoodName = foodName
+            };
+
+            return Ok(await orderService.SearchAsync(query, cancellationToken));
         }
         catch (ArgumentException exception)
         {

@@ -1,0 +1,81 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Colors.xaml" />
+        <ResourceDictionary Source="Dimensions.xaml" />
+        <ResourceDictionary Source="Typography.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <Style x:Key="SurfaceCard" TargetType="{x:Type Border}">
+        <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusLarge}" />
+        <Setter Property="Padding" Value="18" />
+        <Setter Property="Effect" Value="{DynamicResource CardShadow}" />
+    </Style>
+    <Style x:Key="InformationCard" TargetType="Border" BasedOn="{StaticResource SurfaceCard}">
+        <Setter Property="Background" Value="{StaticResource InfoSoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource InfoBrush}" />
+    </Style>
+    <Style x:Key="SummaryCard" TargetType="Border" BasedOn="{StaticResource SurfaceCard}">
+        <Setter Property="MinWidth" Value="145" />
+        <Setter Property="Padding" Value="16" />
+    </Style>
+    <Style x:Key="StatusBadge" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource BrandPrimarySoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrandPrimaryBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusSmall}" />
+        <Setter Property="Padding" Value="8,4" />
+        <Setter Property="MinWidth" Value="86" />
+        <Setter Property="HorizontalAlignment" Value="Center" />
+    </Style>
+    <Style x:Key="CategoryChip" TargetType="Border" BasedOn="{StaticResource StatusBadge}">
+        <Setter Property="Background" Value="{StaticResource BrandSecondarySoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BrandSecondaryBrush}" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusPill}" />
+        <Setter Property="MinWidth" Value="0" />
+    </Style>
+    <Style x:Key="MessagePanel" TargetType="Border">
+        <Setter Property="Background" Value="{StaticResource InfoSoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource InfoBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusMedium}" />
+        <Setter Property="Padding" Value="12" />
+    </Style>
+    <Style x:Key="SuccessPanel" TargetType="Border" BasedOn="{StaticResource MessagePanel}">
+        <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource SuccessBrush}" />
+    </Style>
+    <Style x:Key="WarningPanel" TargetType="Border" BasedOn="{StaticResource MessagePanel}">
+        <Setter Property="Background" Value="{StaticResource WarningSoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource WarningBrush}" />
+    </Style>
+    <Style x:Key="ErrorPanel" TargetType="Border" BasedOn="{StaticResource MessagePanel}">
+        <Setter Property="Background" Value="{StaticResource ErrorSoftBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
+    </Style>
+    <Style x:Key="DialogCard" TargetType="Border" BasedOn="{StaticResource SurfaceCard}">
+        <Setter Property="CornerRadius" Value="{StaticResource RadiusExtraLarge}" />
+        <Setter Property="Padding" Value="24" />
+        <Setter Property="Effect" Value="{DynamicResource DialogShadow}" />
+    </Style>
+    <Style x:Key="EmptyStateCard" TargetType="Border" BasedOn="{StaticResource SurfaceCard}">
+        <Setter Property="Background" Value="{StaticResource BackgroundSecondaryBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource BorderStrongBrush}" />
+        <Setter Property="Padding" Value="28" />
+    </Style>
+    <Style TargetType="{x:Type TabControl}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style TargetType="{x:Type ListView}">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style TargetType="{x:Type ListBoxItem}">
+        <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+        <Setter Property="FontSize" Value="15" />
+    </Style>
+</ResourceDictionary>

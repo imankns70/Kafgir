@@ -90,7 +90,7 @@ export function CheckoutForm({ items, onSuccess }: { items: CartItem[]; onSucces
     {isLoadingProfile && <p className="muted">در حال بررسی اطلاعات قبلی شما…</p>}
     {profileMessage && <div className="form-hint">{profileMessage}</div>}
     <label className="field">نام و نام خانوادگی<input value={form.fullName} onChange={(e) => setField('fullName', e.target.value)} autoComplete="name" /></label>
-    <label className="field">شماره موبایل<input value={form.phoneNumber} onChange={(e) => setField('phoneNumber', e.target.value)} inputMode="tel" autoComplete="tel" /></label>
+    <label className="field">شماره موبایل<input className="ltr-value" dir="ltr" value={form.phoneNumber} onChange={(e) => setField('phoneNumber', e.target.value)} inputMode="tel" autoComplete="tel" /></label>
     <div className="form-grid two-columns">
       <label className="field">روش دریافت<select value={form.deliveryMethod} onChange={(e) => setField('deliveryMethod', Number(e.target.value) as DeliveryMethod)}>
         <option value={DeliveryMethod.Delivery}>ارسال</option><option value={DeliveryMethod.Pickup}>تحویل حضوری</option>

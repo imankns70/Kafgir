@@ -114,7 +114,7 @@ public partial class PersianDatePicker : UserControl
         var daysInMonth = _calendar.GetDaysInMonth(year, month);
         DayBox.ItemsSource = Enumerable
             .Range(1, daysInMonth)
-            .Select(day => new PersianDatePart(day, ToPersianDigits(day.ToString("00", CultureInfo.InvariantCulture))))
+            .Select(day => new PersianDatePart(day, day.ToString("00", CultureInfo.InvariantCulture)))
             .ToList();
         DayBox.SelectedValue = Math.Clamp(selectedDay, 1, daysInMonth);
     }
@@ -127,7 +127,7 @@ public partial class PersianDatePicker : UserControl
 
         return Enumerable
             .Range(startYear, endYear - startYear + 1)
-            .Select(year => new PersianDatePart(year, ToPersianDigits(year.ToString(CultureInfo.InvariantCulture))))
+            .Select(year => new PersianDatePart(year, year.ToString(CultureInfo.InvariantCulture)))
             .ToList();
     }
 
@@ -136,19 +136,8 @@ public partial class PersianDatePicker : UserControl
             .Select((monthName, index) => new PersianDatePart(index + 1, monthName))
             .ToList();
 
-    private static string ToPersianDigits(string value)
+    private sealed record PersianDatePart(int Value, string Display)
     {
-        var chars = value.ToCharArray();
-        for (var index = 0; index < chars.Length; index++)
-        {
-            if (chars[index] is >= '0' and <= '9')
-            {
-                chars[index] = (char)('۰' + chars[index] - '0');
-            }
-        }
-
-        return new string(chars);
+        public override string ToString() => Display;
     }
-
-    private sealed record PersianDatePart(int Value, string Display);
 }

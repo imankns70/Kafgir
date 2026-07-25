@@ -2,7 +2,7 @@
 
 Customer-facing React, TypeScript, and Vite application for viewing today's menu, managing a cart, loading saved customer details, and submitting orders.
 
-The UI loads the Yekan Persian webfont from `https://v1.fontapi.ir/css/Yekan`, with Tahoma and Arial as offline fallbacks.
+The UI bundles the repository's licensed Vazir Regular, Medium, and Bold files locally. It does not require a remote font service. Shared Kafgir tokens, components, icons, and RTL rules live under `src/styles` and `src/design-system`.
 
 ## Local development
 

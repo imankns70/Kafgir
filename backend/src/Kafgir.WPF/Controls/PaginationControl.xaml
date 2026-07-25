@@ -27,7 +27,7 @@
                 <TextBlock Text="{Binding PageText}"
                            Foreground="{StaticResource TextBrush}"
                            FontSize="12"
-                           FontWeight="SemiBold"
+                           FontWeight="Medium"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center" />
             </Border>

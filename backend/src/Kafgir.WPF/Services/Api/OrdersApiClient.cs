@@ -24,6 +24,36 @@ public sealed class OrdersApiClient(HttpClient httpClient) : IOrdersApiClient
         return await response.Content.ReadFromJsonAsync<List<OrderSummaryDto>>(cancellationToken) ?? [];
     }
 
+    public async Task<IReadOnlyList<OrderSummaryDto>> SearchOrdersAsync(
+        OrderReportQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        var route = $"api/admin/orders?date={FormatApiDate(query.Date)}";
+        if (query.Status.HasValue)
+        {
+            route += $"&status={(int)query.Status.Value}";
+        }
+
+        if (query.DeliveryMethod.HasValue)
+        {
+            route += $"&deliveryMethod={(int)query.DeliveryMethod.Value}";
+        }
+
+        if (query.PaymentMethod.HasValue)
+        {
+            route += $"&paymentMethod={(int)query.PaymentMethod.Value}";
+        }
+
+        route = AppendQuery(route, "orderNumber", query.OrderNumber);
+        route = AppendQuery(route, "customerName", query.CustomerName);
+        route = AppendQuery(route, "phoneNumber", query.PhoneNumber);
+        route = AppendQuery(route, "foodName", query.FoodName);
+
+        using var response = await httpClient.GetAsync(route, cancellationToken);
+        await ApiResponseHandler.EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadFromJsonAsync<List<OrderSummaryDto>>(cancellationToken) ?? [];
+    }
+
     public async Task<OrderDto?> GetOrderAsync(int id, CancellationToken cancellationToken = default)
     {
         using var response = await httpClient.GetAsync($"api/admin/orders/{id}", cancellationToken);
@@ -59,4 +89,14 @@ public sealed class OrdersApiClient(HttpClient httpClient) : IOrdersApiClient
 
     private static string FormatApiDate(DateOnly date) =>
         date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private static string AppendQuery(string route, string name, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return route;
+        }
+
+        return $"{route}&{name}={Uri.EscapeDataString(value.Trim())}";
+    }
 }

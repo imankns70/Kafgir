@@ -9,6 +9,10 @@ public interface IOrdersApiClient
         OrderStatus? status = null,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<OrderSummaryDto>> SearchOrdersAsync(
+        OrderReportQuery query,
+        CancellationToken cancellationToken = default);
+
     Task<OrderDto?> GetOrderAsync(int id, CancellationToken cancellationToken = default);
 
     Task<OrderDto> CreateOrderAsync(

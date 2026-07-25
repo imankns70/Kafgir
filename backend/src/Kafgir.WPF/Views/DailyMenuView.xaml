@@ -10,26 +10,19 @@
         <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter" />
         <converters:ThousandsSeparatorConverter x:Key="ThousandsSeparatorConverter" />
 
-        <Style x:Key="DailyMenuOperationButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Style x:Key="DailyMenuOperationButton" TargetType="Button" BasedOn="{StaticResource OutlineButton}">
             <Setter Property="MinWidth" Value="76" />
             <Setter Property="MinHeight" Value="34" />
             <Setter Property="Padding" Value="10,5" />
             <Setter Property="Margin" Value="3,0" />
-            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontSize" Value="16" />
         </Style>
-        <Style x:Key="DailyMenuDeleteButton" TargetType="Button" BasedOn="{StaticResource DailyMenuOperationButton}">
+        <Style x:Key="DailyMenuDeleteButton" TargetType="Button" BasedOn="{StaticResource DangerButton}">
             <Setter Property="MinWidth" Value="58" />
             <Setter Property="Background" Value="{StaticResource DangerBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
         </Style>
-        <Style x:Key="DailyMenuBodyCell" TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
-            <Setter Property="FontSize" Value="16" />
-        </Style>
-        <Style x:Key="SummaryCard" TargetType="Border">
-            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="9" />
+        <Style x:Key="DailyMenuSummaryCard" TargetType="Border" BasedOn="{StaticResource SummaryCard}">
             <Setter Property="Padding" Value="14,11" />
             <Setter Property="Margin" Value="0,0,10,0" />
         </Style>
@@ -68,7 +61,7 @@
                     <TextBlock Text="مدیریت امروز"
                                Foreground="{StaticResource BrandBrush}"
                                FontSize="12"
-                               FontWeight="SemiBold" />
+                               FontWeight="Medium" />
                     <TextBlock Text="منوی روزانه"
                                Style="{StaticResource PageTitle}"
                                Margin="0,2,0,0" />
@@ -82,14 +75,14 @@
                            HorizontalAlignment="Left"
                            VerticalAlignment="Center">
                     <Border Background="{StaticResource BrandSoftBrush}"
-                            BorderBrush="#BFDBFE"
+                            BorderBrush="{StaticResource BrandPrimaryBrush}"
                             BorderThickness="1"
-                            CornerRadius="10"
+                            CornerRadius="{StaticResource RadiusMedium}"
                             Padding="12,8"
                             Margin="4">
                         <CheckBox Content="سفارش‌گیری امروز باز است"
                                   IsChecked="{Binding IsOpen, Mode=TwoWay}"
-                                  FontWeight="SemiBold"
+                                  FontWeight="Medium"
                                   Margin="0" />
                     </Border>
                     <TextBlock Text="ذخیره نشده"
@@ -116,25 +109,25 @@
         </Border>
 
         <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,12">
-            <Border Style="{StaticResource SummaryCard}">
+            <Border Style="{StaticResource DailyMenuSummaryCard}">
                 <StackPanel>
                     <TextBlock Text="غذاهای منو" Style="{StaticResource SummaryLabel}" />
                     <TextBlock Text="{Binding Items.Count, TargetNullValue=0}" Style="{StaticResource SummaryValue}" />
                 </StackPanel>
             </Border>
-            <Border Style="{StaticResource SummaryCard}">
+            <Border Style="{StaticResource DailyMenuSummaryCard}">
                 <StackPanel>
                     <TextBlock Text="ظرفیت کل" Style="{StaticResource SummaryLabel}" />
                     <TextBlock Text="{Binding TotalCapacity, TargetNullValue=0}" Style="{StaticResource SummaryValue}" />
                 </StackPanel>
             </Border>
-            <Border Style="{StaticResource SummaryCard}">
+            <Border Style="{StaticResource DailyMenuSummaryCard}">
                 <StackPanel>
                     <TextBlock Text="فروخته‌شده" Style="{StaticResource SummaryLabel}" />
                     <TextBlock Text="{Binding TotalSold, TargetNullValue=0}" Style="{StaticResource SummaryValue}" Foreground="{StaticResource BrandBrush}" />
                 </StackPanel>
             </Border>
-            <Border Style="{StaticResource SummaryCard}" Margin="0">
+            <Border Style="{StaticResource DailyMenuSummaryCard}" Margin="0">
                 <StackPanel>
                     <TextBlock Text="باقی‌مانده" Style="{StaticResource SummaryLabel}" />
                     <TextBlock Text="{Binding TotalRemaining, TargetNullValue=0}" Style="{StaticResource SummaryValue}" Foreground="{StaticResource SageBrush}" />
@@ -143,20 +136,12 @@
         </UniformGrid>
 
         <StackPanel Grid.Row="2" Margin="0,0,0,10">
-            <Border Background="{StaticResource DangerSoftBrush}"
-                    BorderBrush="#FECACA"
-                    BorderThickness="1"
-                    CornerRadius="9"
-                    Padding="12,8"
+            <Border Style="{StaticResource ErrorPanel}"
                     Margin="0,0,0,6"
                     Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}">
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
             </Border>
-            <Border Background="{StaticResource SuccessSoftBrush}"
-                    BorderBrush="#BBF7D0"
-                    BorderThickness="1"
-                    CornerRadius="9"
-                    Padding="12,8"
+            <Border Style="{StaticResource SuccessPanel}"
                     Visibility="{Binding SuccessMessage, Converter={StaticResource StringToVisibilityConverter}}">
                 <TextBlock Text="{Binding SuccessMessage}" Foreground="{StaticResource SageBrush}" TextWrapping="Wrap" />
             </Border>
@@ -178,7 +163,6 @@
                               IsReadOnly="True"
                               CanUserAddRows="False"
                               RowHeight="50"
-                              CellStyle="{StaticResource DailyMenuBodyCell}"
                               BorderThickness="0"
                               VerticalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
@@ -220,13 +204,15 @@
                                 </Style.Triggers>
                             </Style>
                         </StackPanel.Style>
-                        <Border Width="48" Height="48" CornerRadius="24" Background="{StaticResource BrandSoftBrush}" Margin="0,0,0,10">
-                            <TextBlock Text="+" Foreground="{StaticResource BrandBrush}" FontSize="24"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
+                        <Path Data="{StaticResource IconFood}"
+                              Style="{StaticResource OutlineIcon}"
+                              Width="{StaticResource IconXl}"
+                              Height="{StaticResource IconXl}"
+                              Stroke="{StaticResource BrandSecondaryBrush}"
+                              Margin="0,0,0,8" />
                         <TextBlock Text="هنوز غذایی برای امروز اضافه نشده است."
                                    Foreground="{StaticResource TextBrush}"
-                                   FontWeight="SemiBold"
+                                   FontWeight="Medium"
                                    HorizontalAlignment="Center" />
                         <TextBlock Text="از دکمه «افزودن غذا» استفاده کنید."
                                    Foreground="{StaticResource MutedTextBrush}"

@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="title">
+  <title id="title">Kafgir brand badge</title>
+  <circle cx="120" cy="120" r="106" fill="#6F7F4E"/>
+  <circle cx="120" cy="120" r="96" fill="#FFF3E2"/>
+  <circle cx="120" cy="120" r="83" fill="none" stroke="#EADCC0" stroke-width="3"/>
+  <g transform="translate(43 22) scale(.7)">
+    <g transform="rotate(11 108 121)">
+      <path d="M56 13Q60 4 74 7l86 22q14 4 10 18l-22 82q-4 14-18 10l-84-21q-13-4-9-17Z" fill="#2B2B2B"/>
+      <g fill="#FFF3E2">
+        <rect x="62" y="31" width="10" height="64" rx="5"/>
+        <rect x="84" y="29" width="10" height="72" rx="5"/>
+        <rect x="106" y="33" width="10" height="72" rx="5"/>
+        <rect x="128" y="39" width="10" height="64" rx="5"/>
+      </g>
+      <path d="m78 121 31 8-6 24-31-8Z" fill="#2B2B2B"/>
+      <path d="m73 139 32 8-17 84q-3 15-17 13-15-3-12-18Z" fill="#B8793D"/>
+      <circle cx="74" cy="225" r="5" fill="#FFF3E2"/>
+    </g>
+    <path d="M104 221c28-8 55-28 75-58" fill="none" stroke="#6F7F4E" stroke-width="5" stroke-linecap="round"/>
+    <g fill="#6F7F4E">
+      <path d="M126 208c3-20 13-31 29-34 0 17-10 29-29 34Z"/>
+      <path d="M145 195c17-3 29 1 37 13-15 6-28 2-37-13Z"/>
+      <path d="M160 177c1-18 9-29 23-34 3 15-5 27-23 34Z"/>
+    </g>
+  </g>
+  <g fill="#E46A4A"><path d="m36 118 5 5-5 5-5-5Z"/><path d="m204 118 5 5-5 5-5-5Z"/></g>
+</svg>

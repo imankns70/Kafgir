@@ -13,6 +13,8 @@ public sealed class AdminDashboardSummaryDto
     public int ActiveOrders { get; init; }
     public int TotalPortions { get; init; }
     public decimal GrossSales { get; init; }
+    public decimal ConfirmedSales { get; init; }
+    public decimal DeliveredSales { get; init; }
     public int TodayMenuItems { get; init; }
     public bool IsTodayMenuOpen { get; init; }
 }

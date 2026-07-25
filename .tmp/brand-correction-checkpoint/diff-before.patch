@@ -1,0 +1,350 @@
+diff --git a/.ai/DECISIONS.md b/.ai/DECISIONS.md
+index 4c3b781..aaba4f7 100644
+--- a/.ai/DECISIONS.md
++++ b/.ai/DECISIONS.md
+@@ -67,6 +67,7 @@
+ - Order status actions on the WPF orders page are presented beside the order details title so confirmation/delivery/cancel actions stay visible without taking space at the bottom of the details panel.
+ - WPF ComboBox templates must keep their internal popup toggle style private; implicit ToggleButton styling is reserved for real standalone toggles.
+ - WPF presentation select options override `ToString()` with `DisplayName` as a defensive fallback for custom ComboBox templates.
++- WPF page-level filter input styles must be typed to the concrete control and based on the shared implicit control style, so local sizing does not bypass branded ComboBox selection rendering.
+ - WPF status badges use a rectangular small-radius shape in dense operational grids; pill radius is reserved for category chips.
+ - The current WPF operation uses only Pending Confirmation, Confirmed, Delivered, and Cancelled; Preparing and Ready stay in shared contracts but are not required admin actions.
+ - Orders polling refreshes the currently selected order details after replacing list summaries, keeping list and detail state synchronized.
+@@ -89,4 +90,5 @@
+ - Payment method (`روش پرداخت`) remains an enum for now, not a database lookup table.
+ - Local Mini App testing uses host-derived API URLs and explicit CORS origins instead of hard-coded localhost, because phones resolve localhost to themselves.
+ - Mini App brand introductions should lead with food and the readable Persian wordmark; isolated leaf marks and mostly empty gradients are not sufficient translations of the `ka-2` reference.
++- Mini App categories remain presentation-only for now and are inferred on the client from menu item names/descriptions, because the current menu API contract does not expose a category field.
+ - Food images will be AI-generated later for Telegram channel posts and Mini App cards.
+diff --git a/.ai/PROJECT_STATE.md b/.ai/PROJECT_STATE.md
+index 379d0e8..3500f18 100644
+--- a/.ai/PROJECT_STATE.md
++++ b/.ai/PROJECT_STATE.md
+@@ -100,6 +100,7 @@
+ - The WPF order details panel shows items, status history, and same-size status action buttons through the API, with status actions placed beside the details title.
+ - WPF ComboBox dropdowns use a private template toggle and branded item template so order/report filters do not inherit unrelated ToggleButton chrome.
+ - WPF select-option ComboBoxes display their `DisplayName` value instead of record/object text in manual order and report filters.
++- WPF report filters use control-specific ComboBox/TextBox styles, and the Persian date picker date parts stringify to their display labels so filter dropdowns do not leak object record text.
+ - WPF status values in order and report grids render as compact rounded rectangles, while category chips keep the pill shape.
+ - WPF order details grids center both headers and row values for order items and status history.
+ - WPF order details uses larger local typography for labels, values, section headings, and detail-grid rows than the main operational grids.
+@@ -115,7 +116,8 @@
+ - Customer can view menu, manage cart, and submit order.
+ - The Mini App loads Telegram's Web App SDK, calls `ready()` and `expand()`, and uses Telegram's native Back button for Cart and Success navigation.
+ - The Mini App embeds the same licensed Vazir Regular, Medium, and Bold weights locally and has no font-CDN dependency.
+-- The Mini App uses the Kafgir terracotta/olive/saffron identity, reusable vector components, semantic status badges, branded food-image fallbacks, and a safe-area Menu/Cart mobile navigation.
++- The Mini App uses the Kafgir terracotta/olive/saffron identity, reusable vector components, semantic status badges, branded food-image fallbacks, and a safe-area Menu/Categories/Cart mobile navigation.
++- The Mini App menu page exposes a presentation-only category chip strip for today's available foods; categories are inferred from food names/descriptions until the backend has a category field.
+ - The Mini App menu landing now uses the repository's warm Persian food photography as an optimized hero image, a legible compact Kafgir wordmark, and a plate-based branded fallback for menu items without photos.
+ - The Mini App persists the cart locally and reconciles restored items, prices, and quantities against the latest open daily menu before checkout.
+ - API CORS origins are configuration-driven; local development allows Vite from localhost and `http://192.168.70.176:5173`.
+diff --git a/.ai/TASKS.md b/.ai/TASKS.md
+index 2cfc935..dc4d03b 100644
+--- a/.ai/TASKS.md
++++ b/.ai/TASKS.md
+@@ -110,9 +110,11 @@
+ - [x] Default Daily Menu ordering to closed
+ - [x] Fix WPF order/report ComboBox dropdown rendering
+ - [x] Fix WPF SelectOption ComboBoxes showing record text
++- [x] Fix WPF report filter dropdowns leaking object text
+ - [x] Replace circular-looking WPF grid status badges with rectangular badges
+ - [x] Fix Mini App menu loading from phone over LAN
+ - [x] Rework the Mini App header logo, menu hero, and missing-food-image treatment to match the `ka-2` brand direction
++- [x] Add Categories to the Mini App mobile bottom navigation
+ - [x] Rename brand to Kafgir
+ - [x] Configure development connection strings for Docker SQL Server
+ - [x] Add per-machine local connection string override support for API and Worker
+diff --git a/backend/src/Kafgir.WPF/Controls/PersianDatePicker.xaml.cs b/backend/src/Kafgir.WPF/Controls/PersianDatePicker.xaml.cs
+index 32af24f..f05a7b5 100644
+--- a/backend/src/Kafgir.WPF/Controls/PersianDatePicker.xaml.cs
++++ b/backend/src/Kafgir.WPF/Controls/PersianDatePicker.xaml.cs
+@@ -136,5 +136,8 @@ public partial class PersianDatePicker : UserControl
+             .Select((monthName, index) => new PersianDatePart(index + 1, monthName))
+             .ToList();
+ 
+-    private sealed record PersianDatePart(int Value, string Display);
++    private sealed record PersianDatePart(int Value, string Display)
++    {
++        public override string ToString() => Display;
++    }
+ }
+diff --git a/backend/src/Kafgir.WPF/Views/OrderReportView.xaml b/backend/src/Kafgir.WPF/Views/OrderReportView.xaml
+index 4d0a98c..70fa736 100644
+--- a/backend/src/Kafgir.WPF/Views/OrderReportView.xaml
++++ b/backend/src/Kafgir.WPF/Views/OrderReportView.xaml
+@@ -14,7 +14,12 @@
+         <converters:OrderStatusToPersianConverter x:Key="OrderStatusConverter" />
+         <converters:DeliveryMethodToPersianConverter x:Key="DeliveryMethodConverter" />
+         <converters:PaymentMethodToPersianConverter x:Key="PaymentMethodConverter" />
+-        <Style x:Key="ReportFilterInput" TargetType="Control">
++        <Style x:Key="ReportFilterTextBox" TargetType="{x:Type TextBox}" BasedOn="{StaticResource {x:Type TextBox}}">
++            <Setter Property="Height" Value="42" />
++            <Setter Property="FontSize" Value="16" />
++            <Setter Property="Margin" Value="0,0,10,0" />
++        </Style>
++        <Style x:Key="ReportFilterComboBox" TargetType="{x:Type ComboBox}" BasedOn="{StaticResource {x:Type ComboBox}}">
+             <Setter Property="Height" Value="42" />
+             <Setter Property="FontSize" Value="16" />
+             <Setter Property="Margin" Value="0,0,10,0" />
+@@ -72,31 +77,31 @@
+                     </StackPanel>
+                     <StackPanel Margin="0,0,10,8">
+                         <TextBlock Text="وضعیت" Style="{StaticResource FormLabel}" />
+-                        <ComboBox ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding SelectedStatusFilter}" DisplayMemberPath="DisplayName" Width="165" Style="{StaticResource ReportFilterInput}" />
++                        <ComboBox ItemsSource="{Binding StatusFilters}" SelectedItem="{Binding SelectedStatusFilter}" DisplayMemberPath="DisplayName" Width="165" Style="{StaticResource ReportFilterComboBox}" />
+                     </StackPanel>
+                     <StackPanel Margin="0,0,10,8">
+                         <TextBlock Text="نوع دریافت" Style="{StaticResource FormLabel}" />
+-                        <ComboBox ItemsSource="{Binding DeliveryMethods}" SelectedItem="{Binding SelectedDeliveryMethod}" DisplayMemberPath="DisplayName" Width="165" Style="{StaticResource ReportFilterInput}" />
++                        <ComboBox ItemsSource="{Binding DeliveryMethods}" SelectedItem="{Binding SelectedDeliveryMethod}" DisplayMemberPath="DisplayName" Width="165" Style="{StaticResource ReportFilterComboBox}" />
+                     </StackPanel>
+                     <StackPanel Margin="0,0,10,8">
+                         <TextBlock Text="نوع فروش" Style="{StaticResource FormLabel}" />
+-                        <ComboBox ItemsSource="{Binding PaymentMethods}" SelectedItem="{Binding SelectedPaymentMethod}" DisplayMemberPath="DisplayName" Width="165" Style="{StaticResource ReportFilterInput}" />
++                        <ComboBox ItemsSource="{Binding PaymentMethods}" SelectedItem="{Binding SelectedPaymentMethod}" DisplayMemberPath="DisplayName" Width="165" Style="{StaticResource ReportFilterComboBox}" />
+                     </StackPanel>
+                     <StackPanel Margin="0,0,10,8">
+                         <TextBlock Text="شماره سفارش" Style="{StaticResource FormLabel}" />
+-                        <TextBox Text="{Binding OrderNumberSearch, UpdateSourceTrigger=PropertyChanged}" Width="130" Style="{StaticResource ReportFilterInput}" FlowDirection="LeftToRight" TextAlignment="Right" />
++                        <TextBox Text="{Binding OrderNumberSearch, UpdateSourceTrigger=PropertyChanged}" Width="130" Style="{StaticResource ReportFilterTextBox}" FlowDirection="LeftToRight" TextAlignment="Right" />
+                     </StackPanel>
+                     <StackPanel Margin="0,0,10,8">
+                         <TextBlock Text="نام مشتری" Style="{StaticResource FormLabel}" />
+-                        <TextBox Text="{Binding CustomerNameSearch, UpdateSourceTrigger=PropertyChanged}" Width="155" Style="{StaticResource ReportFilterInput}" />
++                        <TextBox Text="{Binding CustomerNameSearch, UpdateSourceTrigger=PropertyChanged}" Width="155" Style="{StaticResource ReportFilterTextBox}" />
+                     </StackPanel>
+                     <StackPanel Margin="0,0,10,8">
+                         <TextBlock Text="شماره تماس" Style="{StaticResource FormLabel}" />
+-                        <TextBox Text="{Binding PhoneNumberSearch, UpdateSourceTrigger=PropertyChanged}" Width="145" Style="{StaticResource ReportFilterInput}" FlowDirection="LeftToRight" TextAlignment="Right" />
++                        <TextBox Text="{Binding PhoneNumberSearch, UpdateSourceTrigger=PropertyChanged}" Width="145" Style="{StaticResource ReportFilterTextBox}" FlowDirection="LeftToRight" TextAlignment="Right" />
+                     </StackPanel>
+                     <StackPanel Margin="0,0,10,8">
+                         <TextBlock Text="غذا" Style="{StaticResource FormLabel}" />
+-                        <ComboBox ItemsSource="{Binding Foods}" SelectedItem="{Binding SelectedFood}" DisplayMemberPath="DisplayName" Width="180" Style="{StaticResource ReportFilterInput}" />
++                        <ComboBox ItemsSource="{Binding Foods}" SelectedItem="{Binding SelectedFood}" DisplayMemberPath="DisplayName" Width="180" Style="{StaticResource ReportFilterComboBox}" />
+                     </StackPanel>
+                     <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom" Margin="0,0,10,8">
+                         <Button Content="جستجو" Command="{Binding SearchCommand}" MinWidth="86" />
+diff --git a/frontend/Kafgir.MiniApp/src/App.css b/frontend/Kafgir.MiniApp/src/App.css
+index f5e8dee..13c3f8b 100644
+--- a/frontend/Kafgir.MiniApp/src/App.css
++++ b/frontend/Kafgir.MiniApp/src/App.css
+@@ -326,6 +326,53 @@ select:disabled {
+ .menu-intro-seal::after { inset-inline-end: 8px; inset-block-start: 23px; transform: rotate(-28deg) scaleX(-1); }
+ .menu-intro-seal .brand-logo-symbol > svg { width: 39px; height: 50px; margin-block-start: -12px; }
+ .menu-intro-seal > span:last-child { position: absolute; inset-block-end: 10px; font-size: .58rem; font-weight: 700; }
++.category-strip {
++  display: flex;
++  align-items: center;
++  gap: 10px;
++  margin-block: 0 var(--kafgir-space-4);
++  scroll-margin-block-start: 104px;
++}
++
++.category-strip-title {
++  display: inline-flex;
++  align-items: center;
++  gap: 5px;
++  flex: 0 0 auto;
++  color: var(--kafgir-color-secondary);
++  font-size: var(--kafgir-type-body-sm);
++  font-weight: 700;
++}
++
++.category-chips {
++  display: flex;
++  gap: 8px;
++  min-width: 0;
++  overflow-x: auto;
++  padding-block: 2px 6px;
++  scrollbar-width: none;
++}
++
++.category-chips::-webkit-scrollbar { display: none; }
++
++.category-chip {
++  flex: 0 0 auto;
++  min-height: 36px;
++  border: 1px solid var(--kafgir-color-border);
++  border-radius: var(--kafgir-radius-pill);
++  padding: 7px 13px;
++  color: var(--kafgir-color-secondary);
++  background: var(--kafgir-color-surface);
++  font-size: var(--kafgir-type-body-sm);
++  font-weight: 700;
++}
++
++.category-chip.active {
++  color: var(--kafgir-color-text-on-primary);
++  border-color: var(--kafgir-color-primary);
++  background: var(--kafgir-color-primary);
++}
++
+ .menu-grid { display: grid; gap: var(--kafgir-space-4); }
+ 
+ .menu-card,
+@@ -597,6 +644,15 @@ select:disabled {
+   .section-title { font-size: 1.12rem; }
+   .menu-intro .section-title { font-size: 1.7rem; line-height: 1.35; }
+   .menu-intro-promises { margin-block-start: 10px; }
++  .category-strip {
++    display: grid;
++    gap: 7px;
++    margin-inline: -2px;
++    scroll-margin-block-start: 88px;
++  }
++
++  .category-strip-title { padding-inline: 2px; }
++  .category-chip { min-height: 34px; padding: 6px 11px; font-size: .78rem; }
+   .menu-card h3 { font-size: 1rem; }
+   .menu-card-description { font-size: .8125rem; }
+   .food-image, .food-placeholder { min-height: 184px; }
+@@ -614,7 +670,7 @@ select:disabled {
+     inset-inline: 10px;
+     inset-block-end: max(8px, env(safe-area-inset-bottom));
+     display: grid;
+-    grid-template-columns: repeat(2, 1fr);
++    grid-template-columns: repeat(3, 1fr);
+     gap: 4px;
+     max-width: 420px;
+     margin-inline: auto;
+diff --git a/frontend/Kafgir.MiniApp/src/App.tsx b/frontend/Kafgir.MiniApp/src/App.tsx
+index 2c32b1c..04a08af 100644
+--- a/frontend/Kafgir.MiniApp/src/App.tsx
++++ b/frontend/Kafgir.MiniApp/src/App.tsx
+@@ -38,6 +38,7 @@ function App() {
+   const [order, setOrder] = useState<OrderDto | null>(null)
+   const [isLoading, setIsLoading] = useState(true)
+   const [menuError, setMenuError] = useState<string | null>(null)
++  const [shouldScrollToCategories, setShouldScrollToCategories] = useState(false)
+ 
+   const loadMenu = async () => {
+     setIsLoading(true)
+@@ -81,6 +82,21 @@ function App() {
+         setPage('menu')
+       }), [page])
+ 
++  useEffect(() => {
++    if (page !== 'menu' || !shouldScrollToCategories) return
++
++    const animationFrame = window.requestAnimationFrame(() => {
++      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
++      document.getElementById('menu-categories')?.scrollIntoView({
++        block: 'start',
++        behavior: prefersReducedMotion ? 'auto' : 'smooth',
++      })
++      setShouldScrollToCategories(false)
++    })
++
++    return () => window.cancelAnimationFrame(animationFrame)
++  }, [page, shouldScrollToCategories])
++
+   const addToCart = (item: DailyMenuDto['items'][number]) => {
+     setCart((current) => {
+       const existing = current.find((cartItem) => cartItem.dailyMenuItemId === item.id)
+@@ -113,6 +129,11 @@ function App() {
+     setPage('success')
+   }
+ 
++  const showCategories = () => {
++    setShouldScrollToCategories(true)
++    setPage('menu')
++  }
++
+   return (
+     <div className="app-shell" dir="rtl">
+       <header className="app-header">
+@@ -143,6 +164,9 @@ function App() {
+           <button className={page === 'menu' ? 'active' : ''} onClick={() => setPage('menu')} aria-current={page === 'menu' ? 'page' : undefined}>
+             <Icon name="home" size={22} /><span>منوی امروز</span>
+           </button>
++          <button onClick={showCategories}>
++            <Icon name="categories" size={22} /><span>دسته‌ها</span>
++          </button>
+           <button className={page === 'cart' ? 'active' : ''} onClick={() => setPage('cart')} aria-current={page === 'cart' ? 'page' : undefined}>
+             <span className="nav-icon-wrap"><Icon name="cart" size={22} />{cart.length > 0 && <span className="nav-count">{cart.reduce((sum, item) => sum + item.quantity, 0)}</span>}</span>
+             <span>سبد خرید</span>
+diff --git a/frontend/Kafgir.MiniApp/src/features/menu/MenuPage.tsx b/frontend/Kafgir.MiniApp/src/features/menu/MenuPage.tsx
+index 926f515..800bbcf 100644
+--- a/frontend/Kafgir.MiniApp/src/features/menu/MenuPage.tsx
++++ b/frontend/Kafgir.MiniApp/src/features/menu/MenuPage.tsx
+@@ -3,16 +3,47 @@ import { BrandedState } from '../../design-system/BrandedState'
+ import { BrandLogo } from '../../design-system/BrandLogo'
+ import { Icon } from '../../design-system/Icon'
+ import { MenuItemCard } from './MenuItemCard'
++import { useMemo, useState } from 'react'
+ 
+ type Props = { menu: DailyMenuDto | null; isLoading: boolean; error: string | null; onRetry: () => void; onAdd: (item: DailyMenuItemDto) => void }
++type MenuCategory = { key: string; label: string; keywords: string[] }
++
++const menuCategories: MenuCategory[] = [
++  { key: 'rice', label: 'پلو و خورشت', keywords: ['پلو', 'چلو', 'خورشت', 'خورش', 'برنج', 'زرشک', 'قیمه', 'قرمه'] },
++  { key: 'stew', label: 'خوراک و مرغ', keywords: ['خوراک', 'مرغ', 'گوشت', 'کباب', 'کتلت', 'کوکو'] },
++  { key: 'light', label: 'سبک و سالم', keywords: ['سالاد', 'سوپ', 'آش', 'سبزی', 'عدسی', 'لوبیا'] },
++]
++
++function getItemCategory(item: DailyMenuItemDto) {
++  const text = `${item.foodName} ${item.foodDescription ?? ''}`
++  return menuCategories.find((category) => category.keywords.some((keyword) => text.includes(keyword)))?.key ?? 'other'
++}
+ 
+ export function MenuPage({ menu, isLoading, error, onRetry, onAdd }: Props) {
++  const [selectedCategory, setSelectedCategory] = useState('all')
++  const availableItems = useMemo(
++    () => menu?.items.filter((item) => item.isAvailable && item.remainingPortions > 0) ?? [],
++    [menu],
++  )
++  const visibleCategoryOptions = useMemo(() => {
++    const keys = new Set(availableItems.map(getItemCategory))
++    return [
++      { key: 'all', label: 'همه غذاها' },
++      ...menuCategories.filter((category) => keys.has(category.key)).map(({ key, label }) => ({ key, label })),
++      ...(keys.has('other') ? [{ key: 'other', label: 'غذاهای دیگر' }] : []),
++    ]
++  }, [availableItems])
++  const selectedCategoryExists = visibleCategoryOptions.some((category) => category.key === selectedCategory)
++  const effectiveCategory = selectedCategoryExists ? selectedCategory : 'all'
++  const filteredItems = effectiveCategory === 'all'
++    ? availableItems
++    : availableItems.filter((item) => getItemCategory(item) === effectiveCategory)
++
+   if (isLoading) return <BrandedState title="در حال چیدن سفره امروز…" message="چند لحظه صبر کنید تا غذاهای تازه را بیاوریم." />
+   if (error) return <BrandedState title="دریافت منو ممکن نشد" message={error} tone="error" icon="info"><button className="outline-button" onClick={onRetry}><Icon name="refresh" size={18} />تلاش دوباره</button></BrandedState>
+   if (!menu) return <BrandedState title="امروز منویی ثبت نشده است" message="به‌زودی غذاهای خانگی تازه اینجا قرار می‌گیرند." />
+   if (!menu.isOpen) return <BrandedState title="سفارش‌گیری امروز بسته است" message="برای منوی بعدی دوباره به کفگیر سر بزنید." tone="warning" icon="clock" />
+ 
+-  const availableItems = menu.items.filter((item) => item.isAvailable && item.remainingPortions > 0)
+   return <main>
+     <section className="menu-intro">
+       <div className="menu-intro-copy">
+@@ -29,8 +60,29 @@ export function MenuPage({ menu, isLoading, error, onRetry, onAdd }: Props) {
+         <span>با مهر آماده شده</span>
+       </div>
+     </section>
++    {availableItems.length > 0 && (
++      <section id="menu-categories" className="category-strip" aria-label="دسته‌بندی غذاهای امروز">
++        <div className="category-strip-title">
++          <Icon name="categories" size={17} />
++          <span>دسته‌بندی</span>
++        </div>
++        <div className="category-chips" role="list">
++          {visibleCategoryOptions.map((category) => (
++            <button
++              key={category.key}
++              type="button"
++              className={effectiveCategory === category.key ? 'category-chip active' : 'category-chip'}
++              onClick={() => setSelectedCategory(category.key)}
++              aria-pressed={effectiveCategory === category.key}
++            >
++              {category.label}
++            </button>
++          ))}
++        </div>
++      </section>
++    )}
+     {availableItems.length === 0
+       ? <BrandedState title="غذای قابل سفارش باقی نمانده است" message="ممنون که امروز مهمان سفره کفگیر بودید." icon="food" />
+-      : <div className="menu-grid">{availableItems.map((item) => <MenuItemCard key={item.id} item={item} onAdd={onAdd} />)}</div>}
++      : <div className="menu-grid">{filteredItems.map((item) => <MenuItemCard key={item.id} item={item} onAdd={onAdd} />)}</div>}
+   </main>
+ }

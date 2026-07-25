@@ -1,7 +1,10 @@
 using Kafgir.Application.Interfaces;
+using Kafgir.Contracts.Orders;
 using Kafgir.Domain.Entities;
-using Kafgir.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using DomainDeliveryMethod = Kafgir.Domain.Enums.DeliveryMethod;
+using DomainOrderStatus = Kafgir.Domain.Enums.OrderStatus;
+using DomainPaymentMethod = Kafgir.Domain.Enums.PaymentMethod;
 
 namespace Kafgir.Infrastructure.Persistence.Repositories;
 
@@ -29,7 +32,7 @@ public sealed class OrderRepository(KafgirDbContext dbContext) : IOrderRepositor
 
     public async Task<IReadOnlyList<Order>> GetByDateAsync(
         DateOnly date,
-        OrderStatus? status = null,
+        DomainOrderStatus? status = null,
         CancellationToken cancellationToken = default)
     {
         var start = ToUtcBusinessDateBoundary(date);
@@ -44,6 +47,66 @@ public sealed class OrderRepository(KafgirDbContext dbContext) : IOrderRepositor
         if (status.HasValue)
         {
             query = query.Where(order => order.Status == status.Value);
+        }
+
+        return await query
+            .OrderByDescending(order => order.CreatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Order>> SearchAsync(
+        OrderReportQuery reportQuery,
+        CancellationToken cancellationToken = default)
+    {
+        var start = ToUtcBusinessDateBoundary(reportQuery.Date);
+        var end = ToUtcBusinessDateBoundary(reportQuery.Date.AddDays(1));
+
+        var query = dbContext.Orders
+            .AsNoTracking()
+            .Include(order => order.CustomerProfile)
+            .Include(order => order.Items)
+            .Where(order => order.CreatedAt >= start && order.CreatedAt < end);
+
+        if (reportQuery.Status.HasValue)
+        {
+            var status = (DomainOrderStatus)reportQuery.Status.Value;
+            query = query.Where(order => order.Status == status);
+        }
+
+        if (reportQuery.DeliveryMethod.HasValue)
+        {
+            var deliveryMethod = (DomainDeliveryMethod)reportQuery.DeliveryMethod.Value;
+            query = query.Where(order => order.DeliveryMethod == deliveryMethod);
+        }
+
+        if (reportQuery.PaymentMethod.HasValue)
+        {
+            var paymentMethod = (DomainPaymentMethod)reportQuery.PaymentMethod.Value;
+            query = query.Where(order => order.PaymentMethod == paymentMethod);
+        }
+
+        var orderNumber = NormalizeSearch(reportQuery.OrderNumber);
+        if (orderNumber is not null)
+        {
+            query = query.Where(order => order.OrderNumber.Contains(orderNumber));
+        }
+
+        var customerName = NormalizeSearch(reportQuery.CustomerName);
+        if (customerName is not null)
+        {
+            query = query.Where(order => order.DeliveryFullName.Contains(customerName));
+        }
+
+        var phoneNumber = NormalizeSearch(reportQuery.PhoneNumber);
+        if (phoneNumber is not null)
+        {
+            query = query.Where(order => order.DeliveryPhoneNumber.Contains(phoneNumber));
+        }
+
+        var foodName = NormalizeSearch(reportQuery.FoodName);
+        if (foodName is not null)
+        {
+            query = query.Where(order => order.Items.Any(item => item.FoodName.Contains(foodName)));
         }
 
         return await query
@@ -77,6 +140,9 @@ public sealed class OrderRepository(KafgirDbContext dbContext) : IOrderRepositor
         var localDateTime = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified);
         return TimeZoneInfo.ConvertTimeToUtc(localDateTime, BusinessTimeZone);
     }
+
+    private static string? NormalizeSearch(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private static TimeZoneInfo BusinessTimeZone { get; } = ResolveBusinessTimeZone();
 

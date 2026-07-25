@@ -12,12 +12,15 @@
 - Admin: WPF desktop application communicating only with the API
 - WPF project location: `backend/src/Kafgir.WPF`, beside the other source projects
 - WPF embeds and uses Vazir as the default UI font.
-- WPF uses a centralized modern light theme in `App.xaml`: `#F6F8FC` canvas, white surfaces, slate text, cobalt-blue primary actions, blue focus, and semantic green/amber/red states.
-- Shared WPF resources provide compact 38px controls, 6-10px radii, primary/secondary/ghost/danger buttons, rounded inputs, restrained borders/shadows, and neutral compact DataGrids.
-- The WPF admin shell uses a compact 232px medium-cobalt right sidebar with a white selected item and no gradients. It has no shared top panel; each page owns its heading and uses the full workspace height.
+- WPF applies Vazir explicitly to common text, input, combo/dropdown, and DataGrid surfaces for consistent typography.
+- WPF uses a centralized Kafgir theme split under `Themes/Kafgir`: cream backgrounds, warm surfaces, charcoal text, accessible terracotta actions, olive navigation, saffron accents, and semantic feedback colors.
+- WPF Kafgir theme dictionaries declare their resource dependencies explicitly, and cross-dictionary shadow effects use deferred resource lookup so compiled XAML constructs all windows and controls reliably at startup.
+- Shared WPF resources provide 16px/44px text entry controls, 8-20px radii, primary/secondary/outline/ghost/danger/icon buttons, rounded inputs, warm borders/shadows, status badges, and consistent 16px DataGrid rows.
+- Multiline WPF input areas such as descriptions, addresses, and customer notes use larger typing text and slightly taller fields for readability.
+- The WPF admin shell uses a compact 248px deep-olive right sidebar with the vector Kafgir logo, outline icons, a cream selected item, and a saffron selection marker. It has no shared top panel; each page owns its heading and uses the full workspace height.
 - Sidebar navigation labels bind explicitly to each item foreground so global text styling cannot override their contextual contrast.
 - The global WPF `TextBlock` style controls typography only and does not force a foreground, allowing buttons, selected rows, badges, and semantic containers to provide readable contextual text colors.
-- Daily Menu grid body cells use larger typography for readability while headers and operation buttons retain compact sizing.
+- All WPF DataGrid row cells use the shared Vazir 16px row typography; page-specific grids should not override row font size or weight unless a concrete exception is approved.
 - All WPF DataGrids use a shared client-side pager; main lists use larger page sizes and compact cart/detail grids use smaller page sizes without changing API contracts.
 - Orders searches the current date by status and order number without a date picker. Foods has a single name-search toolbar, and the Daily Menu grid no longer has a redundant title/guide strip.
 - Dashboard, Orders, Order Details, Manual Order, Foods, Daily Menu, inline forms, and Login share consistent title, section, card, toolbar, message, and action patterns.
@@ -28,9 +31,15 @@
 - WPF provides a sidebar logout action that clears the in-memory JWT, stops order polling, resets order-entry state, and returns to login without restarting.
 - WPF checks API reachability through `/api/health` when the login screen opens and shows a retryable message if the server is unavailable.
 - WPF uses `fa-IR` with `PersianCalendar` for date/time display and a custom Persian date picker for admin date inputs.
+- WPF keeps numeric output as regular Latin digits and leaves visual digit shaping to the selected Persian font.
 - WPF API clients serialize date route/query values with invariant Gregorian `yyyy-MM-dd` formatting so Persian UI culture does not leak into backend filters.
 - WPF admin navigation uses a right sidebar shell instead of top tabs.
 - WPF admin includes a manual order page for admin-entered phone/in-person orders.
+- WPF admin includes a read-only `گزارش کل` page after Daily Menu for daily order reporting.
+- The WPF `گزارش کل` page filters orders by date, status, order number, customer name, phone number, receive type, sell/payment type, and a food dropdown loaded from all defined foods.
+- The WPF `گزارش کل` grid uses the full page width; its details action opens a separate in-page detail view with a back button.
+- WPF `گزارش کل` report and report-detail grid row values are centered to align with centered column headers.
+- WPF `گزارش کل` fills missing report-grid food summaries from order details when an API summary response has no food text.
 - WPF manual ordering shows active menu foods even when capacity is zero, but prevents adding quantities above remaining capacity.
 - WPF manual ordering uses today's menu without exposing a menu date picker.
 - WPF manual ordering uses `+` and `−` quantity controls for adding foods and editing order-line quantities.
@@ -42,15 +51,16 @@
 - Admin/manual order phone numbers are normalized before customer/order storage.
 - WPF Foods manages dish identity only: name, description, image, and active status.
 - WPF Daily Menu owns daily selling price and portion capacity for each food.
+- New Daily Menu records and empty WPF Daily Menu screens default `سفارش‌گیری امروز` to closed/off.
 - WPF Daily Menu `افزودن به منو` persists the new menu item immediately through the API and reloads the stored menu.
-- WPF daily-menu price inputs support thousands separators.
-- WPF daily-menu price fields display comma separators such as `150,000` consistently.
+- WPF daily-menu inline price input keeps thousands separators while using the same font and regular-digit policy as capacity.
+- WPF daily-menu inline price input shows a live Persian words preview under `قیمت امروز`, ending with `تومان`.
 - WPF daily-menu settings save applies the stored menu returned by the API so the grid reflects persisted items and IDs.
 - WPF Daily Menu is a current-day-only operations screen; its view model resolves today internally and does not expose a date picker or historical-menu search.
 - WPF Daily Menu no longer exposes menu-note editing. Existing note data is preserved when saving the current open/closed state.
 - WPF Daily Menu uses a focused today header, open-state control, add/save actions, capacity/sold/remaining summary cards, contextual messages, a clear empty state, and one framed vertically scrollable food grid.
 - WPF Daily Menu opens add and edit operations in a compact inline food form directly above the grid instead of a modal or separate page.
-- The inline daily-menu food form keeps the menu grid visible, formats `قیمت امروز` with thousands separators, and collapses after Save or Cancel.
+- The inline daily-menu food form keeps the menu grid visible, formats `قیمت امروز` with thousands separators, keeps numeric output as regular digits, and collapses after Save or Cancel.
 - WPF Daily Menu edit mode locks food selection and updates daily price, capacity, and active state through the single-item API.
 - WPF Daily Menu no longer has a row-level `تغییر وضعیت` button; active state is changed only through the inline edit form checkbox.
 - WPF Daily Menu grid shows a read-only `فعال` column for item active state.
@@ -62,7 +72,8 @@
 - Backend exposes an explicit daily-menu item add route so WPF does not rely on local draft rows for adding foods.
 - Payment method is currently a contracts enum, not a database table; no payment gateway exists yet.
 - Customer: React + TypeScript + Vite Telegram Mini App
-- The Mini App shares the WPF slate/cobalt/neutral design system, adapted to touch with a compact sticky white header, simple blue brand mark, restrained menu introduction, availability badges, clean cards, and two-column checkout on wide screens.
+- The Mini App shares the warm Kafgir design system, adapted to touch with a compact sticky logo header, terracotta actions, olive navigation, a restrained handmade menu introduction, availability badges, clean food cards, and two-column checkout on wide screens.
+- The Mini App uses a smaller mobile typography scale for better phone readability and denser menu/order screens.
 - Mini App motion uses 150-220ms transitions and restrained page/card entrance, with `prefers-reduced-motion` support.
 - Architecture: Pragmatic Clean Architecture with the API as the central integration point
 - API Swagger UI is the default Development landing page at the API root.
@@ -75,6 +86,7 @@
 - Daily menu admin APIs have been implemented with additive item upserts, settings-only updates, and single-item deletion.
 - Customer order submission has been implemented.
 - Admin order listing, details, and status management have been implemented.
+- Admin order query supports combined report filters over date, status, order number, customer name, phone number, delivery method, payment method, and ordered food name.
 - Order numbers use Persian business year plus yearly counter, e.g. `14051`, `14052`, then `14061` for the next Persian year.
 - Admin order date filters use Iran business-day boundaries against UTC order timestamps.
 - WPF refreshes the Orders page whenever admins navigate back to it, so newly created manual orders are shown without waiting for stale navigation state.
@@ -85,7 +97,15 @@
 - The WPF orders screen supports date/status filtering, automatic refresh, and order selection.
 - The WPF orders page keeps a compact, vertically scrollable grid with a row-number column.
 - The WPF orders row-number column is one-based and displays `1, 2, 3, ...`.
-- The WPF order details panel shows items, status history, and same-size status action buttons through the API.
+- The WPF order details panel shows items, status history, and same-size status action buttons through the API, with status actions placed beside the details title.
+- WPF ComboBox dropdowns use a private template toggle and branded item template so order/report filters do not inherit unrelated ToggleButton chrome.
+- WPF select-option ComboBoxes display their `DisplayName` value instead of record/object text in manual order and report filters.
+- WPF report filters use control-specific ComboBox/TextBox styles, and the Persian date picker date parts stringify to their display labels so filter dropdowns do not leak object record text.
+- WPF status values in order and report grids render as compact rounded rectangles, while category chips keep the pill shape.
+- WPF order details grids center both headers and row values for order items and status history.
+- WPF order details uses larger local typography for labels, values, section headings, and detail-grid rows than the main operational grids.
+- WPF order date/time columns show time before date in compact operational grids.
+- WPF reloads the changed order details after a status action even when the order leaves the current list filter, so the new status history remains visible.
 - Orders auto-refresh preserves the selected row and reloads its details so status history and other detail fields do not remain stale.
 - New orders no longer add a synthetic "created" entry to status history; the grid shows only actual status changes.
 - Investigated and removed the optional ASP.NET Core OpenAPI dependency that introduced the `Microsoft.OpenApi` vulnerability warning.
@@ -95,9 +115,26 @@
 - Telegram Mini App MVP customer UI added.
 - Customer can view menu, manage cart, and submit order.
 - The Mini App loads Telegram's Web App SDK, calls `ready()` and `expand()`, and uses Telegram's native Back button for Cart and Success navigation.
-- The Mini App loads the Yekan Persian font from the online FontAPI/FontCDN stylesheet and falls back to Tahoma or Arial if unavailable.
+- The Mini App embeds the same licensed Vazir Regular, Medium, and Bold weights locally and has no font-CDN dependency.
+- The Mini App uses the Kafgir terracotta/olive/saffron identity, reusable vector components, semantic status badges, neutral food-image placeholders, and a safe-area Menu/Categories/Cart mobile navigation.
+- The Mini App menu page exposes a presentation-only category chip strip for today's available foods; categories are inferred from food names/descriptions until the backend has a category field.
+- Kafgir brand assets are generated from `scripts/generate-kafgir-icons.ps1`; symbol-only SVG/PNG/ICO assets contain no Persian wordmark, while React and WPF compose the wordmark with real text using the local Vazir font.
+- The corrected canonical symbol now follows `final-de.png` more closely: a wide tapered flat head, four slots, angled wooden handle, olive branch, and saffron accents. WPF packages a high-resolution transparent rendering generated from the same script.
+- The final polish widens the canonical head and slots slightly while retaining the same handle, leaves, and small-size silhouette across generated SVG, PNG, favicon, and ICO variants.
+- WPF icon resources merge their own dimension tokens so `OutlineIcon` width/height resolve correctly at runtime instead of producing `DependencyProperty.UnsetValue`.
+- The Mini App menu landing now uses the repository's warm Persian food photography as an optimized hero image, a legible Kafgir wordmark, and a neutral plate-based fallback for menu items without photos.
+- The focused Mini App correction constrains food cards to 340px, uses a 16:9 real-image/placeholder region, and supports up to three desktop columns without stretching a single item.
+- Mini App food cards follow the approved guide hierarchy using only available menu data: image, title and optional one-line description, a compact freshness/stock strip, then a shared row with price and a right-aligned terracotta cart action.
+- The final isolated React logo pass uses a 198×68px desktop lockup with a 54×56px canonical symbol and readable 12px real-text subtitle; mobile uses a 128×44px subtitle-free lockup with a 40×42px symbol.
+- The canonical React symbol now uses a custom 100×112 SVG: a broad 52×48 head, four 4×29 slots with 6-unit gaps, a 14×44 rounded wooden handle, 8° rotation, one connected two-leaf olive sprig, and one saffron accent. The compatibility small-symbol output reuses this same SVG.
+- WPF now receives its `Assets/Brand/kafgir.ico` and `Assets/Brand/kafgir-symbol.png` from the corrected canonical raster generator, so the app icon/titlebar mark uses the same compact flat slotted spatula proportions as the approved brand symbol.
+- WPF order status filter options now override `ToString()` so branded ComboBox templates display the Persian `DisplayName` instead of record/object text in the selected status field.
+- WPF login logo container height now matches the horizontal brand template height so the full Kafgir logo is visible instead of being clipped.
+- Mini App desktop food-card footers keep the price and `تومان` on one line and use a non-stretched cart button so three-card desktop layouts do not look cramped.
+- Mini App food cards now switch the add-to-cart CTA into an inline minus/count/plus control after the item is added, using the existing cart state and remaining-portions cap.
 - The Mini App persists the cart locally and reconciles restored items, prices, and quantities against the latest open daily menu before checkout.
-- API CORS origins are configuration-driven; Development allows the Vite origin `http://localhost:5173`.
+- API CORS origins are configuration-driven; local development allows Vite from localhost and `http://192.168.70.176:5173`.
+- The Mini App derives its default API base URL from the current browser host for LAN testing, so phones opening `http://192.168.70.176:5173` call `http://192.168.70.176:5038`.
 - ASP.NET Core Identity with integer keys manages users and roles.
 - `ApplicationUser` and roles `Customer`, `Owner`, `KitchenAdmin`, and `OrderManager` were added.
 - `CustomerProfile` and reusable `CustomerAddress` business entities were added.
@@ -106,7 +143,7 @@
 - Admin API login returns a JWT.
 - WPF stores the admin JWT in memory after login and attaches it to admin API requests as a bearer token.
 - Admin food, daily-menu, and order routes require an authenticated admin role (`Owner`, `KitchenAdmin`, or `OrderManager`).
-- The WPF admin dashboard loads after login and shows today's order counts, active orders, portions, gross non-cancelled sales, and menu state through `/api/admin/dashboard/today`.
+- The WPF admin dashboard loads after login and shows today's order counts, active orders, portions, delivered sales, confirmed sales, separate pending/confirmed/delivered/cancelled counts, and menu state through `/api/admin/dashboard/today`.
 - The dashboard refreshes whenever admins navigate to it, and its backend determines today using Iran business time before querying orders and the daily menu.
 - The Mini App reads today's menu from the public `/api/menus/today` endpoint.
 - Telegram Mini App order submissions send raw `Telegram.WebApp.initData`; the backend validates the HMAC signature and freshness before trusting Telegram user identity. Missing `initData` is allowed only for development fallback when validation is not required.

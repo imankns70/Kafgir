@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 140" role="img" aria-labelledby="title">
+  <title id="title">Food image placeholder</title>
+  <ellipse cx="120" cy="101" rx="87" ry="25" fill="#FFF3E2" stroke="#CBB997" stroke-width="3"/>
+  <ellipse cx="120" cy="99" rx="61" ry="16" fill="none" stroke="#EADCC0" stroke-width="2.5"/>
+  <path d="M64 96c8-48 104-48 112 0" fill="#FFF3E2" stroke="#CBB997" stroke-width="3"/>
+  <path d="M120 46v7" fill="none" stroke="#CBB997" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="120" cy="43" r="4" fill="#CBB997"/>
+  <path d="M83 67c-9-12-4-23 6-31M120 62c-8-12-3-22 7-29M157 67c-9-12-4-23 6-31"
+        fill="none" stroke="#B8793D" stroke-width="3" stroke-linecap="round"/>
+  <path d="M47 105c-19 1-33 11-40 28 18-2 32-11 40-28Z" fill="#6F7F4E" opacity=".82"/>
+  <path d="M188 106c15-6 29-3 39 8-15 7-29 4-39-8Z" fill="#6F7F4E" opacity=".72"/>
+</svg>

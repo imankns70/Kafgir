@@ -6,63 +6,13 @@
         Title="کفگیر - پنل مدیریت"
         Width="1450" Height="850" MinWidth="1100" MinHeight="650"
         WindowStartupLocation="CenterScreen"
+        Icon="pack://application:,,,/Assets/Brand/kafgir.ico"
         FlowDirection="RightToLeft">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter" />
         <converters:SelectedIndexToVisibilityConverter x:Key="SelectedIndexToVisibilityConverter" />
 
-        <Style x:Key="SidebarListBox" TargetType="ListBox">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="0" />
-        </Style>
-        <Style x:Key="LogoutButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderBrush" Value="#93C5FD" />
-            <Setter Property="HorizontalContentAlignment" Value="Center" />
-            <Setter Property="Margin" Value="0,16,0,0" />
-        </Style>
-        <Style x:Key="SidebarItem" TargetType="ListBoxItem">
-            <Setter Property="Padding" Value="14,11" />
-            <Setter Property="Margin" Value="0,0,0,5" />
-            <Setter Property="Foreground" Value="#DBEAFE" />
-            <Setter Property="FontSize" Value="14" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ListBoxItem">
-                        <Border x:Name="ItemBorder"
-                                Background="Transparent"
-                                CornerRadius="7"
-                                Padding="{TemplateBinding Padding}">
-                            <TextBlock Text="{TemplateBinding Content}"
-                                       Foreground="{TemplateBinding Foreground}"
-                                       FontSize="{TemplateBinding FontSize}"
-                                       FontWeight="{TemplateBinding FontWeight}"
-                                       VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource SidebarHoverBrush}" />
-                                <Setter Property="Foreground" Value="White" />
-                            </Trigger>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="ItemBorder" Property="Background" Value="White" />
-                                <Setter Property="Foreground" Value="#1E40AF" />
-                            </Trigger>
-                            <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{StaticResource FocusBrush}" />
-                                <Setter TargetName="ItemBorder" Property="BorderThickness" Value="1" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
 
     <Grid Background="{StaticResource CanvasBrush}">
@@ -75,47 +25,56 @@
               FlowDirection="LeftToRight">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="232" />
+                <ColumnDefinition Width="248" />
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="1"
                     Background="{StaticResource SidebarBrush}"
-                    CornerRadius="12"
-                    Padding="16"
+                    CornerRadius="20"
+                    Padding="18"
                     Margin="14,0,0,0"
                     FlowDirection="RightToLeft">
                 <DockPanel LastChildFill="True">
                     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,28">
-                        <StackPanel Orientation="Horizontal">
-                            <Border Width="42" Height="42" CornerRadius="9" Background="White" Margin="0,0,10,0">
-                                <TextBlock Text="ک" Foreground="#1E40AF" FontSize="23" FontWeight="Bold"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                            </Border>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="کفگیر" Foreground="White" FontSize="21" FontWeight="Bold" />
-                                <TextBlock Text="پنل مدیریت" Foreground="{StaticResource SidebarMutedBrush}" FontSize="11" Margin="0,1,0,0" />
-                            </StackPanel>
-                        </StackPanel>
+                        <ContentControl Height="58" HorizontalAlignment="Right"
+                                        Template="{StaticResource KafgirLightLogoTemplate}" />
                     </StackPanel>
 
                     <StackPanel DockPanel.Dock="Bottom">
-                        <Border Height="1" Background="#60A5FA" Margin="0,0,0,14" />
+                        <Border Height="1" Background="{StaticResource BrandSaffronBrush}" Opacity="0.7" Margin="0,0,0,14" />
                         <TextBlock Text="مدیریت سفارش‌های روزانه"
                                    Foreground="{StaticResource SidebarMutedBrush}"
-                                   FontSize="11" />
-                        <Button Content="خروج از حساب"
-                                Command="{Binding LogoutCommand}"
-                                Style="{StaticResource LogoutButton}" />
+                                   FontSize="12" />
+                        <Button Command="{Binding LogoutCommand}" Style="{StaticResource LogoutButton}">
+                            <StackPanel Orientation="Horizontal">
+                                <Path Data="{StaticResource IconLogout}" Style="{StaticResource OutlineIcon}"
+                                      Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Margin="0,0,8,0" />
+                                <TextBlock Text="خروج از حساب" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
 
                     <ListBox Style="{StaticResource SidebarListBox}"
                              ItemContainerStyle="{StaticResource SidebarItem}"
                              SelectedIndex="{Binding SelectedNavigationIndex, Mode=TwoWay}">
-                        <ListBoxItem Content="داشبورد" />
-                        <ListBoxItem Content="سفارش‌ها" />
-                        <ListBoxItem Content="ثبت سفارش" />
-                        <ListBoxItem Content="غذاها" />
-                        <ListBoxItem Content="منوی روزانه" />
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconHome}" Style="{StaticResource OutlineIcon}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,0,10,0" /><TextBlock Text="داشبورد" VerticalAlignment="Center" /></StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconOrders}" Style="{StaticResource OutlineIcon}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,0,10,0" /><TextBlock Text="سفارش‌ها" VerticalAlignment="Center" /></StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconAdd}" Style="{StaticResource OutlineIcon}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,0,10,0" /><TextBlock Text="ثبت سفارش" VerticalAlignment="Center" /></StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconFood}" Style="{StaticResource OutlineIcon}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,0,10,0" /><TextBlock Text="غذاها" VerticalAlignment="Center" /></StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconCalendar}" Style="{StaticResource OutlineIcon}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,0,10,0" /><TextBlock Text="منوی روزانه" VerticalAlignment="Center" /></StackPanel>
+                        </ListBoxItem>
+                        <ListBoxItem>
+                            <StackPanel Orientation="Horizontal"><Path Data="{StaticResource IconReport}" Style="{StaticResource OutlineIcon}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Margin="0,0,10,0" /><TextBlock Text="گزارش کل" VerticalAlignment="Center" /></StackPanel>
+                        </ListBoxItem>
                     </ListBox>
                 </DockPanel>
             </Border>
@@ -131,6 +90,8 @@
                                  Visibility="{Binding DataContext.SelectedNavigationIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SelectedIndexToVisibilityConverter}, ConverterParameter=3}" />
                 <views:DailyMenuView DataContext="{Binding DailyMenu}"
                                      Visibility="{Binding DataContext.SelectedNavigationIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SelectedIndexToVisibilityConverter}, ConverterParameter=4}" />
+                <views:OrderReportView DataContext="{Binding OrderReport}"
+                                       Visibility="{Binding DataContext.SelectedNavigationIndex, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource SelectedIndexToVisibilityConverter}, ConverterParameter=5}" />
             </Grid>
         </Grid>
     </Grid>

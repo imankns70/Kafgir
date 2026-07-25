@@ -32,7 +32,7 @@
                     <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" VerticalAlignment="Center">
                         <TextBlock Text="در حال دریافت..."
                                    Foreground="{StaticResource BrandBrush}"
-                                   FontWeight="SemiBold"
+                                   FontWeight="Medium"
                                    Margin="0,0,10,0"
                                    VerticalAlignment="Center">
                             <TextBlock.Style>
@@ -51,11 +51,7 @@
                 </DockPanel>
             </Border>
 
-            <Border Background="{StaticResource DangerSoftBrush}"
-                    BorderBrush="#FECACA"
-                    BorderThickness="1"
-                    CornerRadius="8"
-                    Padding="10,7"
+            <Border Style="{StaticResource ErrorPanel}"
                     Margin="0,0,0,10"
                     Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}">
                 <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
@@ -65,11 +61,12 @@
                 <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="کل سفارش‌های امروز" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.TotalOrders, TargetNullValue=0}" /></StackPanel></Border>
                 <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="سفارش‌های فعال" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.ActiveOrders, TargetNullValue=0}" Foreground="{StaticResource BrandBrush}" /></StackPanel></Border>
                 <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="تعداد پرس‌ها" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.TotalPortions, TargetNullValue=0}" /></StackPanel></Border>
-                <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="فروش ناخالص غیرلغوشده" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.GrossSales, StringFormat={}{0:N0}, TargetNullValue=0}" /></StackPanel></Border>
+                <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="فروش تحویل داده شده" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.DeliveredSales, StringFormat={}{0:N0}, TargetNullValue=0}" Foreground="{StaticResource SuccessBrush}" /></StackPanel></Border>
+                <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="فروش تایید شده" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.ConfirmedSales, StringFormat={}{0:N0}, TargetNullValue=0}" Foreground="{StaticResource BrandBrush}" /></StackPanel></Border>
                 <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="در انتظار تایید" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.PendingOrders, TargetNullValue=0}" Foreground="{StaticResource WarningBrush}" /></StackPanel></Border>
-                <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="در حال آماده‌سازی" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.PreparingOrders, TargetNullValue=0}" /></StackPanel></Border>
-                <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="آماده تحویل" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.ReadyOrders, TargetNullValue=0}" /></StackPanel></Border>
-                <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="تحویل‌شده / لغوشده" /><TextBlock Style="{StaticResource MetricValue}"><TextBlock.Text><MultiBinding StringFormat="{}{0:N0} / {1:N0}"><Binding Path="Summary.DeliveredOrders" TargetNullValue="0" /><Binding Path="Summary.CancelledOrders" TargetNullValue="0" /></MultiBinding></TextBlock.Text></TextBlock></StackPanel></Border>
+                <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="تایید شده" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.ConfirmedOrders, TargetNullValue=0}" Foreground="{StaticResource BrandBrush}" /></StackPanel></Border>
+                <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="تحویل شده" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.DeliveredOrders, TargetNullValue=0}" Foreground="{StaticResource SuccessBrush}" /></StackPanel></Border>
+                <Border Style="{StaticResource MetricCard}"><StackPanel><TextBlock Style="{StaticResource MetricTitle}" Text="لغو شده" /><TextBlock Style="{StaticResource MetricValue}" Text="{Binding Summary.CancelledOrders, TargetNullValue=0}" Foreground="{StaticResource DangerBrush}" /></StackPanel></Border>
             </UniformGrid>
 
             <Border Style="{StaticResource SurfaceCard}" Margin="0,2,10,0">
@@ -79,11 +76,11 @@
                         <TextBlock Text="وضعیت سفارش‌گیری و تعداد غذاهای فعال" Style="{StaticResource MutedText}" Margin="0,3,0,0" />
                     </StackPanel>
                     <WrapPanel DockPanel.Dock="Left" VerticalAlignment="Center">
-                        <Border Background="{StaticResource SuccessSoftBrush}" CornerRadius="7" Padding="10,6" Margin="0,0,10,0">
-                            <TextBlock Text="{Binding MenuStatusText}" Foreground="{StaticResource SuccessBrush}" FontWeight="SemiBold" />
+                        <Border Style="{StaticResource StatusBadge}" Background="{StaticResource SuccessSoftBrush}" BorderBrush="{StaticResource SuccessBrush}" Margin="0,0,10,0">
+                            <TextBlock Text="{Binding MenuStatusText}" Foreground="{StaticResource SuccessBrush}" FontWeight="Medium" />
                         </Border>
-                        <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="7" Padding="10,6">
-                            <TextBlock Text="{Binding Summary.TodayMenuItems, StringFormat=تعداد غذا: {0}, TargetNullValue=تعداد غذا: 0}" FontWeight="SemiBold" />
+                        <Border Style="{StaticResource CategoryChip}">
+                            <TextBlock Text="{Binding Summary.TodayMenuItems, StringFormat=تعداد غذا: {0}, TargetNullValue=تعداد غذا: 0}" FontWeight="Medium" />
                         </Border>
                     </WrapPanel>
                 </DockPanel>

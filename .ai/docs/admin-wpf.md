@@ -6,9 +6,9 @@ The WPF app project lives at `backend/src/Kafgir.WPF` so it sits beside the othe
 
 The WPF app embeds the Vazir font from `backend/src/Kafgir.WPF/Fonts/Vazir` and applies it as the default app font for Persian UI readability.
 
-The desktop theme is centralized in `App.xaml`. Its active palette uses a cool `#F6F8FC` canvas, white surfaces, `#0F172A` text, `#64748B` secondary text, `#E2E8F0` borders, `#2563EB` primary actions, and semantic green/amber/red states. Shared styles define compact primary, secondary, ghost, and danger buttons; rounded inputs; labels; cards; focus states; and neutral DataGrids. New screens should use these resources instead of one-off colors.
+The desktop theme is merged by `App.xaml` from `Themes/Kafgir`. It uses warm cream backgrounds, light food-paper surfaces, charcoal text, terracotta primary actions, olive secondary/navigation actions, saffron accents, and dedicated success/warning/error/info colors. Shared styles define primary, secondary, outline, ghost, danger and icon buttons; rounded inputs; cards; feedback panels; status badges; and warm DataGrids.
 
-The shell uses a compact solid medium-cobalt right sidebar with a white active navigation item and no gradients or decorative shadow. It intentionally has no shared top panel. Each page owns its heading and actions, while the shared content host supplies a consistent top inset. Dashboard, Orders, Manual Order, Foods, Daily Menu, Order Details, inline forms, and Login use the same compact title/card/toolbar/message hierarchy.
+The shell uses a compact deep-olive right sidebar with the real compact Kafgir logo, outline navigation icons, a cream active item, and a saffron selection marker. It intentionally has no shared top panel. Each page owns its heading and actions, while the shared content host supplies a consistent top inset.
 
 Desktop styling intentionally stays denser than the customer Mini App: admin tables and forms optimize for daily operation, while rounded surfaces, consistent control heights, row hover/selection states, and visible keyboard focus keep the interface readable and predictable.
 

@@ -11,6 +11,7 @@ public sealed class MainViewModel(
     ManualOrderViewModel manualOrder,
     FoodsViewModel foods,
     DailyMenuViewModel dailyMenu,
+    OrderReportViewModel orderReport,
     IAdminSession adminSession) : ObservableObject
 {
     private bool _isAuthenticated;
@@ -24,6 +25,7 @@ public sealed class MainViewModel(
     public ManualOrderViewModel ManualOrder { get; } = manualOrder;
     public FoodsViewModel Foods { get; } = foods;
     public DailyMenuViewModel DailyMenu { get; } = dailyMenu;
+    public OrderReportViewModel OrderReport { get; } = orderReport;
     public IRelayCommand LogoutCommand => _logoutCommand ??= new RelayCommand(Logout);
 
     public bool IsAuthenticated
@@ -56,6 +58,7 @@ public sealed class MainViewModel(
         adminSession.Clear();
         Orders.ResetForLogout();
         ManualOrder.ResetForLogout();
+        OrderReport.ResetForLogout();
         _foodsLoaded = false;
         IsAuthenticated = false;
         SelectedNavigationIndex = 0;
@@ -85,6 +88,9 @@ public sealed class MainViewModel(
                 break;
             case 4:
                 DailyMenu.LoadMenuCommand.Execute(null);
+                break;
+            case 5:
+                _ = OrderReport.LoadAsync();
                 break;
         }
     }

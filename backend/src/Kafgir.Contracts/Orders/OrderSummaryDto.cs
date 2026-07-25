@@ -8,7 +8,9 @@ public sealed class OrderSummaryDto
     public string CustomerPhoneNumber { get; set; } = string.Empty;
     public OrderStatus Status { get; set; }
     public decimal TotalAmount { get; set; }
+    public PaymentMethod PaymentMethod { get; set; }
     public DeliveryMethod DeliveryMethod { get; set; }
     public DateTime CreatedAt { get; set; }
     public int TotalQuantity { get; set; }
+    public string FoodSummary { get; set; } = string.Empty;
 }

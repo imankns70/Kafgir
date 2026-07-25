@@ -32,6 +32,12 @@ public sealed class AdminDashboardService(
             GrossSales = orders
                 .Where(order => order.Status != OrderStatus.Cancelled)
                 .Sum(order => order.TotalAmount),
+            ConfirmedSales = orders
+                .Where(order => order.Status == OrderStatus.Confirmed)
+                .Sum(order => order.TotalAmount),
+            DeliveredSales = orders
+                .Where(order => order.Status == OrderStatus.Delivered)
+                .Sum(order => order.TotalAmount),
             TodayMenuItems = menu?.Items.Count ?? 0,
             IsTodayMenuOpen = menu?.IsOpen ?? false
         };

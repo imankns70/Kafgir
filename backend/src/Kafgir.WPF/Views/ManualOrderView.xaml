@@ -11,7 +11,8 @@
         <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource FormLabel}">
         </Style>
         <Style x:Key="FormInput" TargetType="Control">
-            <Setter Property="Height" Value="38" />
+            <Setter Property="Height" Value="42" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="Margin" Value="0,0,0,10" />
         </Style>
         <Style x:Key="QuantityButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
@@ -31,7 +32,7 @@
             <Setter Property="Padding" Value="10,4" />
             <Setter Property="Margin" Value="2" />
             <Setter Property="FontSize" Value="14" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontWeight" Value="Medium" />
         </Style>
     </UserControl.Resources>
 
@@ -71,7 +72,7 @@
                             <TextBox Text="{Binding FullName, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormInput}" />
 
                             <TextBlock Text="شماره تماس" Style="{StaticResource FieldLabel}" />
-                            <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormInput}" />
+                            <TextBox Text="{Binding PhoneNumber, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource FormInput}" FlowDirection="LeftToRight" TextAlignment="Right" />
 
                             <TextBlock Text="روش دریافت" Style="{StaticResource FieldLabel}" />
                             <ComboBox ItemsSource="{Binding DeliveryMethods}"
@@ -88,7 +89,7 @@
                             <TextBlock Text="آدرس" Style="{StaticResource FieldLabel}" />
                             <TextBox Text="{Binding AddressLine, UpdateSourceTrigger=PropertyChanged}"
                                      Padding="8"
-                                     Height="76"
+                                     Height="86"
                                      TextWrapping="Wrap"
                                      AcceptsReturn="True"
                                      Margin="0,0,0,12" />
@@ -96,7 +97,7 @@
                             <TextBlock Text="یادداشت مشتری" Style="{StaticResource FieldLabel}" />
                             <TextBox Text="{Binding CustomerNote}"
                                      Padding="8"
-                                     Height="76"
+                                     Height="86"
                                      TextWrapping="Wrap"
                                      AcceptsReturn="True"
                                      Margin="0,0,0,16" />
@@ -139,7 +140,8 @@
                                 <ComboBox ItemsSource="{Binding MenuItems}"
                                           SelectedItem="{Binding SelectedMenuItem}"
                                           DisplayMemberPath="DisplayName"
-                                          Height="38" />
+                                          Height="42"
+                                          FontSize="16" />
                             </StackPanel>
 
                             <StackPanel Grid.Column="1" Margin="12,0">
@@ -151,7 +153,7 @@
                                                    VerticalAlignment="Center"
                                                    HorizontalAlignment="Center"
                                                    FontSize="16"
-                                                   FontWeight="SemiBold"
+                                                   FontWeight="Medium"
                                                    Foreground="{StaticResource TextBrush}" />
                                     </Border>
                                     <Button Content="+" Style="{StaticResource QuantityButton}" Command="{Binding IncreaseQuantityToAddCommand}" />
@@ -195,7 +197,7 @@
                                                     <TextBlock Text="{Binding Quantity}"
                                                                VerticalAlignment="Center"
                                                                HorizontalAlignment="Center"
-                                                               FontWeight="SemiBold"
+                                                               FontWeight="Medium"
                                                                Foreground="{StaticResource TextBrush}" />
                                                 </Border>
                                                 <Button Content="+"
@@ -223,7 +225,7 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="2" Background="{StaticResource BrandSoftBrush}" CornerRadius="10" Padding="14" BorderBrush="#BFDBFE" BorderThickness="1">
+                <Border Grid.Row="2" Background="{StaticResource BrandPrimarySoftBrush}" CornerRadius="{StaticResource RadiusMedium}" Padding="14" BorderBrush="{StaticResource BrandPrimaryBrush}" BorderThickness="1">
                     <DockPanel>
                         <TextBlock Text="جمع کل سفارش" Style="{StaticResource SectionTitle}" />
                         <TextBlock Text="{Binding TotalAmount, StringFormat={}{0:N0} تومان}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BrandBrush}" HorizontalAlignment="Left" />

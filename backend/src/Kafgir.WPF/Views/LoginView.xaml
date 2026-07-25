@@ -13,53 +13,52 @@
         <Grid.Background>
             <ImageBrush ImageSource="pack://application:,,,/Assets/login-food-background.png" Stretch="UniformToFill" Opacity="0.22" />
         </Grid.Background>
-        <Rectangle Fill="#EAF2FF" Opacity="0.72" />
+        <Rectangle Fill="{StaticResource BackgroundBrush}" Opacity="0.78" />
 
         <Border Width="402"
                 Padding="26"
-                Background="{StaticResource SurfaceBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1"
-                CornerRadius="10"
+                Style="{StaticResource DialogCard}"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center">
             <StackPanel>
-                <Border Width="44" Height="44" CornerRadius="9" Background="{StaticResource BrandBrush}" HorizontalAlignment="Right" Margin="0,0,0,14">
-                    <TextBlock Text="ک" Foreground="White" FontSize="23" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
+                <ContentControl Height="116" HorizontalAlignment="Right" Margin="0,0,0,14"
+                                Template="{StaticResource KafgirHorizontalLogoTemplate}" />
                 <TextBlock Text="ورود به پنل مدیریت" Style="{StaticResource PageTitle}" />
                 <TextBlock Text="نام کاربری و رمز عبور خود را وارد کنید."
                            Style="{StaticResource MutedText}"
                            Margin="0,4,0,20" />
 
-                <Border Background="{StaticResource WarningSoftBrush}"
-                        BorderBrush="#FDE68A"
-                        BorderThickness="1"
-                        CornerRadius="8"
-                        Padding="10"
+                <Border Style="{StaticResource WarningPanel}"
                         Margin="0,0,0,14"
                         Visibility="{Binding ConnectionMessage, Converter={StaticResource StringToVisibilityConverter}}">
                     <StackPanel>
-                        <TextBlock Text="{Binding ConnectionMessage}" Foreground="{StaticResource WarningBrush}" FontWeight="SemiBold" TextWrapping="Wrap" />
-                        <Button Content="بررسی دوباره اتصال" Command="{Binding CheckConnectionCommand}" Style="{StaticResource SecondaryButton}" Margin="0,9,0,0" HorizontalAlignment="Left" />
+                        <TextBlock Text="{Binding ConnectionMessage}" Foreground="{StaticResource WarningBrush}" FontWeight="Medium" TextWrapping="Wrap" />
+                        <Button Content="بررسی دوباره اتصال" Command="{Binding CheckConnectionCommand}" Style="{StaticResource OutlineButton}" Margin="0,9,0,0" HorizontalAlignment="Left" />
                     </StackPanel>
                 </Border>
 
                 <TextBlock Text="نام کاربری" Style="{StaticResource FormLabel}" />
-                <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}" KeyDown="LoginInput_OnKeyDown" Margin="0,0,0,12" />
+                <TextBox Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                         KeyDown="LoginInput_OnKeyDown"
+                         FlowDirection="LeftToRight"
+                         TextAlignment="Left"
+                         Margin="0,0,0,12" />
 
                 <TextBlock Text="رمز عبور" Style="{StaticResource FormLabel}" />
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <PasswordBox x:Name="PasswordInput" Grid.Column="0" KeyDown="LoginInput_OnKeyDown" PasswordChanged="PasswordInput_OnPasswordChanged"
+                                 FlowDirection="LeftToRight"
                                  Visibility="{Binding IsPasswordVisible, Converter={StaticResource InverseBooleanToVisibilityConverter}}" />
                     <TextBox x:Name="VisiblePasswordInput" Grid.Column="0" KeyDown="LoginInput_OnKeyDown"
                              Text="{Binding Password, UpdateSourceTrigger=PropertyChanged}"
+                             FlowDirection="LeftToRight"
+                             TextAlignment="Left"
                              Visibility="{Binding IsPasswordVisible, Converter={StaticResource BooleanToVisibilityConverter}}" />
                     <ToggleButton Grid.Column="1" Width="70" Margin="8,0,0,0" IsChecked="{Binding IsPasswordVisible, Mode=TwoWay}"
                                   Checked="PasswordVisibilityToggle_OnChanged" Unchecked="PasswordVisibilityToggle_OnChanged">
                         <ToggleButton.Style>
-                            <Style TargetType="ToggleButton">
+                            <Style TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
                                 <Setter Property="Content" Value="نمایش" />
                                 <Setter Property="Padding" Value="9,6" />
                                 <Style.Triggers><Trigger Property="IsChecked" Value="True"><Setter Property="Content" Value="مخفی" /></Trigger></Style.Triggers>

@@ -226,6 +226,7 @@ public sealed class OrderServiceTests
         public Task<Order?> GetByIdAsync(int id, CancellationToken cancellationToken = default) => Task.FromResult(order);
         public Task<Order?> GetByIdWithDetailsAsync(int id, CancellationToken cancellationToken = default) => Task.FromResult(order);
         public Task<IReadOnlyList<Order>> GetByDateAsync(DateOnly date, DomainOrderStatus? status = null, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Order>>(order is null ? [] : [order]);
+        public Task<IReadOnlyList<Order>> SearchAsync(OrderReportQuery query, CancellationToken cancellationToken = default) => Task.FromResult<IReadOnlyList<Order>>(order is null ? [] : [order]);
         public Task<int> GetMaxOrderNumberCounterAsync(string persianYearPrefix, CancellationToken cancellationToken = default)
         {
             LastOrderNumberPrefix = persianYearPrefix;

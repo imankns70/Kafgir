@@ -6,12 +6,13 @@
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <converters:ThousandsSeparatorConverter x:Key="ThousandsSeparatorConverter" />
+        <converters:PersianMoneyWordsConverter x:Key="PersianMoneyWordsConverter" />
         <Style x:Key="DailyMenuFormLabel" TargetType="TextBlock" BasedOn="{StaticResource FormLabel}">
         </Style>
         <Style x:Key="FormInput" TargetType="Control">
-            <Setter Property="Height" Value="40" />
+            <Setter Property="Height" Value="42" />
             <Setter Property="Padding" Value="8" />
-            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontSize" Value="16" />
         </Style>
     </UserControl.Resources>
 
@@ -48,7 +49,11 @@
                 <StackPanel Grid.Column="2">
                     <TextBlock Text="قیمت امروز" Style="{StaticResource DailyMenuFormLabel}" />
                     <TextBox Text="{Binding PriceToAdd, Converter={StaticResource ThousandsSeparatorConverter}, UpdateSourceTrigger=PropertyChanged}"
-                             Style="{StaticResource FormInput}" FlowDirection="LeftToRight" TextAlignment="Right" />
+                             Style="{StaticResource FormInput}" />
+                    <TextBlock Text="{Binding PriceToAdd, Converter={StaticResource PersianMoneyWordsConverter}}"
+                               Style="{StaticResource MutedText}"
+                               Margin="0,5,0,0"
+                               TextWrapping="Wrap" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="4">

@@ -1,4 +1,9 @@
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || 'https://localhost:7279').replace(/\/$/, '')
+const defaultApiBaseUrl =
+  typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    ? `${window.location.protocol}//${window.location.hostname}:5038`
+    : 'http://localhost:5038'
+
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || defaultApiBaseUrl).replace(/\/$/, '')
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status: number) {

@@ -19,7 +19,7 @@ public partial class App : Application
         ConfigurePersianCulture();
     }
 
-    protected override async void OnStartup(StartupEventArgs e)
+    protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
@@ -61,6 +61,7 @@ public partial class App : Application
                 services.AddSingleton<ManualOrderViewModel>();
                 services.AddSingleton<FoodsViewModel>();
                 services.AddSingleton<DailyMenuViewModel>();
+                services.AddSingleton<OrderReportViewModel>();
                 services.AddSingleton(provider =>
                 {
                     var mainViewModel = new MainViewModel(
@@ -70,6 +71,7 @@ public partial class App : Application
                         provider.GetRequiredService<ManualOrderViewModel>(),
                         provider.GetRequiredService<FoodsViewModel>(),
                         provider.GetRequiredService<DailyMenuViewModel>(),
+                        provider.GetRequiredService<OrderReportViewModel>(),
                         provider.GetRequiredService<IAdminSession>());
                     mainViewModel.Login.LoginSucceeded += (_, _) => mainViewModel.MarkAuthenticated();
                     return mainViewModel;
@@ -78,17 +80,20 @@ public partial class App : Application
             })
             .Build();
 
-        await _host.StartAsync();
-        _host.Services.GetRequiredService<MainWindow>().Show();
+        _host.Start();
+
+        var mainWindow = _host.Services.GetRequiredService<MainWindow>();
+        MainWindow = mainWindow;
+        mainWindow.Show();
         _host.Services.GetRequiredService<LoginViewModel>().StartConnectionCheck();
     }
 
-    protected override async void OnExit(ExitEventArgs e)
+    protected override void OnExit(ExitEventArgs e)
     {
         if (_host is not null)
         {
             _host.Services.GetService<OrdersViewModel>()?.Dispose();
-            await _host.StopAsync();
+            _host.StopAsync().GetAwaiter().GetResult();
             _host.Dispose();
         }
 
@@ -98,6 +103,10 @@ public partial class App : Application
     private static void ConfigurePersianCulture()
     {
         var culture = (CultureInfo)CultureInfo.GetCultureInfo("fa-IR").Clone();
+        var numberFormat = (NumberFormatInfo)culture.NumberFormat.Clone();
+        numberFormat.NativeDigits = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+        numberFormat.DigitSubstitution = DigitShapes.None;
+        culture.NumberFormat = numberFormat;
         culture.DateTimeFormat.Calendar = new PersianCalendar();
         culture.DateTimeFormat.ShortDatePattern = "yyyy/MM/dd";
         culture.DateTimeFormat.LongDatePattern = "dddd d MMMM yyyy";

@@ -4,9 +4,9 @@ The Mini App is the customer-facing ordering experience.
 
 The page loads Telegram's Web App SDK, signals `ready()`, expands to the available viewport, and uses Telegram's native Back button when the customer is viewing the cart or order-success page. Outside Telegram, these integrations safely become no-ops so local browser development still works.
 
-Persian UI typography uses the online Yekan stylesheet from FontAPI/FontCDN, with Tahoma and Arial as fallbacks when the font CDN is unavailable.
+Persian UI typography uses local licensed Vazir WOFF2 files in Regular, Medium, and Bold weights. The Mini App has no font-CDN dependency.
 
-The customer theme reuses the WPF crisp-blue design language while remaining mobile-first: cool neutral canvas, white surfaces, slate typography, cobalt actions and focus, and semantic status colors. The UI uses a compact sticky white header, square blue brand mark, restrained light-blue menu introduction, simple food cards with remaining-portion badges, clear cart quantity controls, responsive checkout panels, and visible focus states. Decorative gradients, oversized seals, asymmetric shapes, and heavy shadows are not part of the active theme.
+The customer theme reuses the WPF Kafgir identity while remaining mobile-first: warm cream canvas, food-paper surfaces, charcoal typography, accessible terracotta actions, olive navigation, saffron accents, and semantic status colors. It uses a sticky branded header, flat slotted-turner mark, warm menu introduction, consistent food cards and fallbacks, responsive checkout, and a safe-area Menu/Cart bottom navigation on phones.
 
 Entrance motion is intentionally restrained to 150-220ms and disabled through `prefers-reduced-motion` when requested by the device. Shared colors, spacing, shadows, and responsive rules live in `src/App.css` and `src/index.css`; components should reuse those tokens rather than defining isolated visual systems.
 

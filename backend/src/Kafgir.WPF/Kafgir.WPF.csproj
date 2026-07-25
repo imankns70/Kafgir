@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <ApplicationIcon>Assets\Brand\kafgir.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +22,8 @@
   <ItemGroup>
     <Resource Include="Fonts\Vazir\*.ttf" />
     <Resource Include="Assets\login-food-background.png" />
+    <Resource Include="Assets\Brand\kafgir.ico" />
+    <Resource Include="Assets\Brand\kafgir-symbol.png" />
   </ItemGroup>
 
   <ItemGroup>

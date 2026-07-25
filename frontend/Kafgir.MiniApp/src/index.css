@@ -1,24 +1,62 @@
+@import './styles/tokens.css';
+
+@font-face {
+  font-family: 'Vazir';
+  src: url('./assets/fonts/Vazir-Regular.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazir';
+  src: url('./assets/fonts/Vazir-Medium.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazir';
+  src: url('./assets/fonts/Vazir-Bold.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
 :root {
-  font-family: "Yekan", Tahoma, Arial, sans-serif;
-  color: #0f172a;
-  background: #f6f8fc;
+  font-family: 'Vazir', Tahoma, Arial, sans-serif;
+  color: var(--kafgir-color-text-primary);
+  background: var(--kafgir-color-background);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
-* { box-sizing: border-box; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
 
 html {
   min-width: 320px;
   min-height: 100%;
-  background: #f6f8fc;
+  color-scheme: light;
+  direction: rtl;
+  background: var(--kafgir-color-background);
 }
 
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background: #f6f8fc;
+  color: var(--kafgir-color-text-primary);
+  background:
+    radial-gradient(circle at 8% 12%, rgba(242, 178, 51, .13), transparent 24rem),
+    radial-gradient(circle at 92% 30%, rgba(111, 127, 78, .10), transparent 25rem),
+    var(--kafgir-color-background);
+  font-size: var(--kafgir-type-body);
+  line-height: 1.7;
 }
 
 button,
@@ -28,9 +66,16 @@ select {
   font: inherit;
 }
 
-button { cursor: pointer; }
+button {
+  cursor: pointer;
+}
+
+img,
+svg {
+  display: block;
+}
 
 ::selection {
-  color: #0f172a;
-  background: #bfdbfe;
+  color: var(--kafgir-color-text-primary);
+  background: var(--kafgir-color-accent-soft);
 }

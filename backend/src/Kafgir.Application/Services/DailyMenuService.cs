@@ -244,7 +244,6 @@ public sealed class DailyMenuService(
             menu = new DailyMenu
             {
                 MenuDate = date,
-                IsOpen = true,
                 CreatedAt = DateTime.UtcNow
             };
             await dailyMenuRepository.AddAsync(menu, cancellationToken);

@@ -1,0 +1,106 @@
+:root {
+  --kafgir-color-terracotta: #e46a4a;
+  --kafgir-color-olive: #6f7f4e;
+  --kafgir-color-saffron: #f2b233;
+
+  --kafgir-color-primary: #c44d31;
+  --kafgir-color-primary-hover: #b9472d;
+  --kafgir-color-primary-pressed: #a53d26;
+  --kafgir-color-primary-soft: #fbe1d8;
+  --kafgir-color-secondary: #617044;
+  --kafgir-color-secondary-hover: #53613b;
+  --kafgir-color-secondary-pressed: #465431;
+  --kafgir-color-secondary-soft: #e5eadb;
+  --kafgir-color-accent: #f2b233;
+  --kafgir-color-accent-soft: #fff0c8;
+
+  --kafgir-color-background: #fff3e2;
+  --kafgir-color-background-secondary: #f8e9d3;
+  --kafgir-color-surface: #fffaf3;
+  --kafgir-color-surface-elevated: #fff;
+  --kafgir-color-surface-muted: #eadcc0;
+  --kafgir-color-surface-glass: rgba(255, 250, 243, .94);
+  --kafgir-color-border: #e5d5bb;
+  --kafgir-color-border-strong: #cbb997;
+  --kafgir-color-text-primary: #2b2b2b;
+  --kafgir-color-text-secondary: #626057;
+  --kafgir-color-text-muted: #68645b;
+  --kafgir-color-text-on-primary: #fffdf9;
+  --kafgir-color-text-on-secondary: #fffdf9;
+
+  --kafgir-color-success: #4f6f3a;
+  --kafgir-color-success-soft: #e5ebd9;
+  --kafgir-color-warning: #8b5e00;
+  --kafgir-color-warning-soft: #fff0c8;
+  --kafgir-color-error: #b33a32;
+  --kafgir-color-error-soft: #fbe2de;
+  --kafgir-color-info: #496a70;
+  --kafgir-color-info-soft: #e2eef0;
+  --kafgir-color-disabled: #b9b0a2;
+  --kafgir-color-focus: #a7432e;
+  --kafgir-color-overlay: rgba(43, 43, 43, .58);
+
+  --kafgir-space-1: 4px;
+  --kafgir-space-2: 8px;
+  --kafgir-space-3: 12px;
+  --kafgir-space-4: 16px;
+  --kafgir-space-5: 20px;
+  --kafgir-space-6: 24px;
+  --kafgir-space-8: 32px;
+  --kafgir-space-10: 40px;
+  --kafgir-space-12: 48px;
+  --kafgir-space-16: 64px;
+
+  --kafgir-icon-xs: 14px;
+  --kafgir-icon-sm: 16px;
+  --kafgir-icon-md: 20px;
+  --kafgir-icon-lg: 24px;
+  --kafgir-icon-xl: 32px;
+  --kafgir-brand-symbol-sm: 32px;
+  --kafgir-brand-symbol-md: 48px;
+  --kafgir-brand-symbol-lg: 72px;
+  --kafgir-logo-desktop-width: 198px;
+  --kafgir-logo-desktop-height: 68px;
+  --kafgir-logo-mobile-width: 128px;
+  --kafgir-logo-mobile-height: 44px;
+  --kafgir-logo-symbol-width: 54px;
+  --kafgir-logo-symbol-height: 56px;
+  --kafgir-logo-mobile-symbol-width: 40px;
+  --kafgir-logo-mobile-symbol-height: 42px;
+  --kafgir-logo-wordmark-size: 3rem;
+  --kafgir-logo-mobile-wordmark-size: 2rem;
+  --kafgir-logo-subtitle-size: .75rem;
+  --kafgir-logo-gap: 5px;
+  --kafgir-food-media-aspect-ratio: 16 / 9;
+  --kafgir-food-card-max-width: 340px;
+
+  --kafgir-radius-sm: 8px;
+  --kafgir-radius-md: 12px;
+  --kafgir-radius-lg: 16px;
+  --kafgir-radius-xl: 20px;
+  --kafgir-radius-pill: 999px;
+
+  --kafgir-shadow-card: 0 2px 10px rgba(93, 61, 42, .08);
+  --kafgir-shadow-floating: 0 8px 24px rgba(93, 61, 42, .12);
+  --kafgir-shadow-dialog: 0 18px 48px rgba(93, 61, 42, .18);
+  --kafgir-shadow-navigation: 0 -4px 16px rgba(93, 61, 42, .09);
+
+  --kafgir-type-brand: 2rem;
+  --kafgir-type-hero: 1.875rem;
+  --kafgir-type-display: 1.75rem;
+  --kafgir-type-page: 1.5rem;
+  --kafgir-type-section: 1.1875rem;
+  --kafgir-type-card: 1.0625rem;
+  --kafgir-type-body-lg: 1rem;
+  --kafgir-type-body: .9375rem;
+  --kafgir-type-body-sm: .8125rem;
+  --kafgir-type-caption: .75rem;
+  --kafgir-type-price-lg: 1.5rem;
+  --kafgir-type-price: 1.125rem;
+
+  --kafgir-motion-fast: 140ms;
+  --kafgir-motion-normal: 200ms;
+  --kafgir-ease: cubic-bezier(.2, .8, .2, 1);
+  --kafgir-z-header: 20;
+  --kafgir-z-navigation: 30;
+}

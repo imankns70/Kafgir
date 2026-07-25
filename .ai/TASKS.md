@@ -15,18 +15,36 @@
 - [x] Implement Order API endpoints
 - [x] Implement WPF API client
 - [x] Implement WPF dashboard screen
+- [x] Split WPF dashboard delivered/confirmed sales and confirmed/delivered/cancelled order counts
+- [x] Hide unused Preparing and Ready cards from the WPF dashboard
+- [x] Create the canonical flat slotted-turner Kafgir logo and application icon system
+- [x] Split and apply the centralized terracotta/olive/saffron WPF theme
+- [x] Apply local Vazir typography, Kafgir components, and responsive mobile navigation to the Mini App
+- [x] Add shared semantic order-status visuals to WPF and React
+- [x] Document the complete Kafgir brand and theme system
+- [x] Fix WPF startup crashes from unresolved cross-dictionary Kafgir theme resources
 - [x] Fix dashboard order statistics refresh and Iran business-date calculation
 - [x] Implement WPF order list screen
 - [x] Implement WPF order detail/status screen
 - [x] Move WPF order-list action buttons out of the grid into the order details panel
+- [x] Move WPF order detail action buttons beside the detail title
 - [x] Add WPF order-grid row numbers and explicit vertical scrolling
 - [x] Refresh selected order details during WPF order auto-refresh
+- [x] Keep WPF order history visible after status changes
+- [x] Center WPF order-details grid row values
+- [x] Increase WPF order-details typography
+- [x] Show order-grid time before date
 - [x] Make WPF order-grid row numbers one-based
 - [x] Remove synthetic order-created history entries and polish order-page spacing/history width
 - [x] Preserve entered manual-order address text in the saved order snapshot
 - [x] Remove Microsoft.OpenApi dependency/warning
 - [x] Implement WPF Foods screen
 - [x] Implement WPF Daily Menu screen
+- [x] Implement WPF total order report page after Daily Menu
+- [x] Add admin order report filters for customer, phone, receive type, sell type, food, date, status, and order number
+- [x] Move WPF total-report order details to a separate page and make the report grid full width
+- [x] Align WPF total-report grid row values with column headers
+- [x] Change WPF total-report food search to a dropdown
 - [x] Expose WPF Daily Menu open state, note, and settings save controls
 - [x] Move WPF Daily Menu open-state and save controls into the top action bar
 - [x] Replace the WPF Daily Menu add/edit modal with an inline form above the grid
@@ -35,7 +53,7 @@
 - [x] Implement Mini App cart
 - [x] Implement Mini App order submission
 - [x] Initialize the Telegram Web App SDK and native Back button navigation
-- [x] Apply the online Yekan CDN font to the React Mini App
+- [x] Apply the online Yekan CDN font to the React Mini App (superseded by bundled Vazir)
 - [x] Persist and reconcile the Mini App cart against the latest daily menu
 - [x] Configure local Mini App API URL and API CORS allowlist
 - [x] Repair the Mini App npm lockfile for reproducible installs
@@ -59,17 +77,20 @@
 - [x] Configure WPF Persian calendar display
 - [x] Change WPF admin layout to right sidebar navigation
 - [x] Apply Vazir font to WPF admin
+- [x] Normalize WPF font inheritance and numeric digit output
 - [x] Apply a shared polished Kafgir theme to WPF and the responsive Mini App
 - [x] Remove the shared WPF top panel and give pages the full content workspace
 - [x] Apply consistent top spacing across all authenticated WPF pages
-- [x] Replace the earthy theme with a modern crisp-blue WPF and Mini App design system
+- [x] Replace the earthy theme with a modern crisp-blue WPF and Mini App design system (superseded by the approved Kafgir identity)
 - [x] Normalize WPF page headers, cards, toolbars, forms, grids, and semantic actions
 - [x] Fix WPF sidebar navigation contrast under global TextBlock styling
 - [x] Restore contextual foreground inheritance across all WPF text
-- [x] Increase Daily Menu grid body typography without resizing headers or operation buttons
+- [x] Increase WPF input typing font sizes
+- [x] Normalize WPF DataGrid row typography across all grids
 - [x] Lighten the WPF sidebar and simplify Orders, Foods, and Daily Menu grid toolbars
 - [x] Add reusable client-side pagination to every WPF DataGrid
 - [x] Simplify Mini App header, menu cards, cart, checkout, and responsive styling
+- [x] Reduce Mini App mobile font sizes
 - [x] Fix daily menu save/delete behavior for unsold items
 - [x] Add WPF manual order page
 - [x] Fix WPF manual order food selection and city/price input polish
@@ -82,7 +103,31 @@
 - [x] Guard repeated Daily Menu save clicks from crashing WPF
 - [x] Preserve unsaved Daily Menu rows during sidebar navigation
 - [x] Make Daily Menu price separator formatting deterministic
+- [x] Match Daily Menu price input behavior to capacity input
+- [x] Restore Daily Menu price input thousands separators
+- [x] Add live Persian words preview under Daily Menu price input
 - [x] Change WPF Daily Menu add flow to immediate API persistence
+- [x] Default Daily Menu ordering to closed
+- [x] Fix WPF order/report ComboBox dropdown rendering
+- [x] Fix WPF SelectOption ComboBoxes showing record text
+- [x] Fix WPF order status filter ComboBox selected value showing record text
+- [x] Fix WPF report filter dropdowns leaking object text
+- [x] Replace circular-looking WPF grid status badges with rectangular badges
+- [x] Fix Mini App menu loading from phone over LAN
+- [x] Rework the Mini App header logo, menu hero, and missing-food-image treatment to match the `ka-2` brand direction
+- [x] Add Categories to the Mini App mobile bottom navigation
+- [x] Correct Kafgir logo assets, real-text wordmark composition, neutral food placeholders, and icon size tokens
+- [x] Reimplement the Kafgir symbol proportions, desktop/mobile header hierarchy, hero treatment, and WPF generated-symbol integration
+- [x] Complete the Mini App final visual-polish pass for logo balance, hero spacing, placeholder height, food-card proportions, and responsive grid behavior
+- [x] Correct the Mini App logo presence and rebuild the menu card hierarchy against the approved `final-de.png` food-card example
+- [x] Complete the focused React header-lockup and compact food-card correction pass
+- [x] Fix Mini App desktop food-card footer price/button wrapping
+- [x] Show plus/minus quantity controls on Mini App food cards after adding to basket
+- [x] Complete the final isolated React header-logo balance and sizing pass
+- [x] Replace the canonical Kafgir spatula with the final broad handcrafted symbol and validate 16–48px rendering
+- [x] Apply the corrected Kafgir brand icon to WPF generated ICO and symbol PNG assets
+- [x] Fix clipped WPF login logo container height
+- [x] Fix WPF runtime resolution of shared icon dimension resources
 - [x] Rename brand to Kafgir
 - [x] Configure development connection strings for Docker SQL Server
 - [x] Add per-machine local connection string override support for API and Worker

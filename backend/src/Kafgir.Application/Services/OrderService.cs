@@ -135,6 +135,34 @@ public sealed class OrderService(
         return orders.Select(MapSummary).ToList();
     }
 
+    public async Task<IReadOnlyList<OrderSummaryDto>> SearchAsync(
+        OrderReportQuery query,
+        CancellationToken cancellationToken = default)
+    {
+        if (query.Date == default)
+        {
+            throw new ArgumentException("Date is required.");
+        }
+
+        if (query.Status.HasValue && !Enum.IsDefined(query.Status.Value))
+        {
+            throw new ArgumentException("Order status is invalid.");
+        }
+
+        if (query.DeliveryMethod.HasValue && !Enum.IsDefined(query.DeliveryMethod.Value))
+        {
+            throw new ArgumentException("Delivery method is invalid.");
+        }
+
+        if (query.PaymentMethod.HasValue && !Enum.IsDefined(query.PaymentMethod.Value))
+        {
+            throw new ArgumentException("Payment method is invalid.");
+        }
+
+        var orders = await orderRepository.SearchAsync(query, cancellationToken);
+        return orders.Select(MapSummary).ToList();
+    }
+
     public async Task<OrderDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
     {
         var order = await orderRepository.GetByIdAsync(id, cancellationToken);
@@ -408,9 +436,13 @@ public sealed class OrderService(
         CustomerPhoneNumber = order.DeliveryPhoneNumber,
         Status = (OrderStatus)order.Status,
         TotalAmount = order.TotalAmount,
+        PaymentMethod = (PaymentMethod)order.PaymentMethod,
         DeliveryMethod = (DeliveryMethod)order.DeliveryMethod,
         CreatedAt = order.CreatedAt,
-        TotalQuantity = order.Items.Sum(item => item.Quantity)
+        TotalQuantity = order.Items.Sum(item => item.Quantity),
+        FoodSummary = string.Join("، ", order.Items
+            .OrderBy(item => item.Id)
+            .Select(item => $"{item.FoodName} × {item.Quantity.ToString(CultureInfo.InvariantCulture)}"))
     };
 
     private static OrderDto Map(Order order) => new()

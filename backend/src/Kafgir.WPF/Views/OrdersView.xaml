@@ -8,27 +8,6 @@
     <UserControl.Resources>
         <converters:AlternationIndexToRowNumberConverter x:Key="RowNumberConverter" />
         <converters:OrderStatusToPersianConverter x:Key="OrderStatusConverter" />
-        <Style x:Key="SwitchToggleStyle" TargetType="ToggleButton">
-            <Setter Property="Width" Value="46" />
-            <Setter Property="Height" Value="24" />
-            <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="Track" Background="#CBD5E1" CornerRadius="12" Padding="3">
-                            <Ellipse x:Name="Thumb" Width="18" Height="18" Fill="White" HorizontalAlignment="Left" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Track" Property="Background" Value="{StaticResource BrandBrush}" />
-                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Track" Property="Opacity" Value="0.5" /></Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </UserControl.Resources>
 
     <Grid>
@@ -70,10 +49,10 @@
                         </StackPanel>
                         <StackPanel Margin="0,0,10,0">
                             <TextBlock Text="شماره سفارش" Style="{StaticResource FormLabel}" />
-                            <TextBox Text="{Binding OrderNumberSearch, UpdateSourceTrigger=PropertyChanged}" Width="125" />
+                            <TextBox Text="{Binding OrderNumberSearch, UpdateSourceTrigger=PropertyChanged}" Width="125" FlowDirection="LeftToRight" TextAlignment="Right" />
                         </StackPanel>
                         <Button Content="جستجو" Command="{Binding RefreshCommand}" MinWidth="88" VerticalAlignment="Bottom" />
-                        <TextBlock Text="در حال دریافت..." Foreground="{StaticResource BrandBrush}" FontWeight="SemiBold" Margin="10,0" VerticalAlignment="Center">
+                        <TextBlock Text="در حال دریافت..." Foreground="{StaticResource BrandBrush}" FontWeight="Medium" Margin="10,0" VerticalAlignment="Center">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -100,8 +79,20 @@
                     <DataGridTemplateColumn Header="ردیف" Width="52" IsReadOnly="True"><DataGridTemplateColumn.CellTemplate><DataTemplate><TextBlock HorizontalAlignment="Center" Text="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=AlternationIndex, Converter={StaticResource RowNumberConverter}}" /></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
                     <DataGridTextColumn Header="شماره سفارش" Binding="{Binding OrderNumber}" Width="135" />
                     <DataGridTextColumn Header="نام مشتری" Binding="{Binding CustomerFullName}" Width="*" />
-                    <DataGridTextColumn Header="وضعیت" Binding="{Binding Status, Converter={StaticResource OrderStatusConverter}}" Width="115" />
-                    <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat={}{0:g}}" Width="145" />
+                    <DataGridTemplateColumn Header="وضعیت" Width="125">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource StatusBadge}"
+                                        Background="{Binding Status, Converter={StaticResource OrderStatusBackgroundConverter}}"
+                                        BorderBrush="{Binding Status, Converter={StaticResource OrderStatusForegroundConverter}}">
+                                    <TextBlock Text="{Binding Status, Converter={StaticResource OrderStatusConverter}}"
+                                               Foreground="{Binding Status, Converter={StaticResource OrderStatusForegroundConverter}}"
+                                               Style="{StaticResource StatusText}" />
+                                </Border>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat={}{0:HH:mm yyyy/MM/dd}}" Width="160" />
                     <DataGridTextColumn Header="مبلغ" Binding="{Binding TotalAmount, StringFormat={}{0:N0}}" Width="115" />
                 </DataGrid.Columns>
             </DataGrid>

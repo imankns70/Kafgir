@@ -9,7 +9,7 @@ public sealed class DailyMenuConfiguration : IEntityTypeConfiguration<DailyMenu>
     public void Configure(EntityTypeBuilder<DailyMenu> builder)
     {
         builder.Property(x => x.MenuDate).HasColumnType("date");
-        builder.Property(x => x.IsOpen).HasDefaultValue(true);
+        builder.Property(x => x.IsOpen).HasDefaultValue(false);
         builder.Property(x => x.Note).HasMaxLength(1000);
         builder.HasIndex(x => x.MenuDate).IsUnique();
 

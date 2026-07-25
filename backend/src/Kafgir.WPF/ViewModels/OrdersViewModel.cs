@@ -254,11 +254,21 @@ public sealed class OrdersViewModel : ObservableObject, IDisposable
             return;
         }
 
+        await LoadOrderDetailsByIdAsync(SelectedOrder.Id);
+    }
+
+    private async Task LoadOrderDetailsByIdAsync(int orderId)
+    {
+        if (IsBusy)
+        {
+            return;
+        }
+
         IsBusy = true;
         ErrorMessage = null;
         try
         {
-            Details.Order = await _apiClient.GetOrderAsync(SelectedOrder.Id);
+            Details.Order = await _apiClient.GetOrderAsync(orderId);
             OnPropertyChanged(nameof(SelectedOrderDetails));
             if (Details.Order is null)
             {
@@ -307,6 +317,7 @@ public sealed class OrdersViewModel : ObservableObject, IDisposable
         }
 
         await LoadOrdersAsync();
+        await LoadOrderDetailsByIdAsync(orderId);
     }
 
     private bool CanUseSelectedOrder() => SelectedOrder is not null && !IsBusy;

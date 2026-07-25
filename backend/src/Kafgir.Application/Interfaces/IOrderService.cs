@@ -16,6 +16,10 @@ public interface IOrderService
         OrderStatus? status = null,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<OrderSummaryDto>> SearchAsync(
+        OrderReportQuery query,
+        CancellationToken cancellationToken = default);
+
     Task<OrderDto?> GetByIdAsync(int id, CancellationToken cancellationToken = default);
 
     Task<bool> UpdateStatusAsync(

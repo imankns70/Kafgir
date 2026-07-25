@@ -1,5 +1,6 @@
 using Kafgir.Domain.Entities;
-using Kafgir.Domain.Enums;
+using Kafgir.Contracts.Orders;
+using DomainOrderStatus = Kafgir.Domain.Enums.OrderStatus;
 
 namespace Kafgir.Application.Interfaces;
 
@@ -9,7 +10,10 @@ public interface IOrderRepository
     Task<Order?> GetByIdWithDetailsAsync(int id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Order>> GetByDateAsync(
         DateOnly date,
-        OrderStatus? status = null,
+        DomainOrderStatus? status = null,
+        CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<Order>> SearchAsync(
+        OrderReportQuery query,
         CancellationToken cancellationToken = default);
     Task<int> GetMaxOrderNumberCounterAsync(string persianYearPrefix, CancellationToken cancellationToken = default);
     Task AddAsync(Order order, CancellationToken cancellationToken = default);

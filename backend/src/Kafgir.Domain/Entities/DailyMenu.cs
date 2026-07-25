@@ -4,7 +4,7 @@ public sealed class DailyMenu
 {
     public int Id { get; init; }
     public DateOnly MenuDate { get; set; }
-    public bool IsOpen { get; set; } = true;
+    public bool IsOpen { get; set; }
     public string? Note { get; set; }
     public DateTime CreatedAt { get; init; }
 

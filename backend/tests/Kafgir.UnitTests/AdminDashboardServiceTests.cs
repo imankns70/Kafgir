@@ -47,6 +47,8 @@ public sealed class AdminDashboardServiceTests
         Assert.Equal(3, summary.ActiveOrders);
         Assert.Equal(20, summary.TotalPortions);
         Assert.Equal(1_270_000, summary.GrossSales);
+        Assert.Equal(300_000, summary.ConfirmedSales);
+        Assert.Equal(420_000, summary.DeliveredSales);
         Assert.True(summary.IsTodayMenuOpen);
         Assert.Equal(2, summary.TodayMenuItems);
     }
@@ -102,6 +104,11 @@ public sealed class AdminDashboardServiceTests
                 ? orders.Where(order => order.Status == status.Value).ToList()
                 : orders);
         }
+
+        public Task<IReadOnlyList<Order>> SearchAsync(
+            Kafgir.Contracts.Orders.OrderReportQuery query,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(orders);
 
         public Task<int> GetMaxOrderNumberCounterAsync(string persianYearPrefix, CancellationToken cancellationToken = default) =>
             Task.FromResult(0);

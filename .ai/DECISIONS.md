@@ -11,17 +11,21 @@
 - Embedded WPF image resources use explicit `pack://application:,,,/` URIs to avoid runtime resource-resolution differences.
 - A Telegram Mini App is selected for the customer application.
 - The Mini App initializes through Telegram's official Web App SDK and integrates Telegram's native Back button for in-app navigation.
-- The Mini App uses the online Yekan webfont for Persian UI typography, with local system-font fallbacks for CDN failures.
-- WPF and the Mini App share one modern crisp-blue visual language: cool neutral canvas, white surfaces, slate text, cobalt primary actions, blue focus, semantic green/amber/red states, small radii, and restrained depth. Platform-specific density and interaction patterns remain separate.
-- Decorative gradients, asymmetric brand shapes, oversized seals, heavy shadows, and earthy teal/clay/gold colors are excluded from the active design system.
+- WPF and the Mini App use the repository's licensed local Vazir files in Regular, Medium, and Bold weights; no commercial or remote Persian font is required.
+- The approved Kafgir identity supersedes the earlier crisp-blue theme: both apps use cream backgrounds, terracotta actions, olive navigation/natural accents, restrained saffron highlights, charcoal text, warm borders, and semantic feedback colors.
+- The primary brand symbol is always a flat rectangular slotted cooking turner with long vertical slots and a wooden handle. Ladles, soup spoons, rounded serving spoons, and slotted spoons are prohibited.
+- Decorative leaves, saffron dots, curves, and floral separators are limited to branding, welcome, promotional, and empty-state areas so operational screens remain calm.
 - WPF uses compact operational density and shared resource styles; the Mini App uses touch-friendly sizing and responsive CSS without adding a UI package.
+- Mini App typography should stay compact on phones, with a reduced base size and restrained heading clamps instead of oversized mobile titles.
+- WPF should not manually emit Persian digit characters for numbers; numeric output stays as `0-9` and the Persian font controls glyph appearance.
 - Global WPF typography styles must not set `TextBlock.Foreground`; normal text inherits the window color and contextual containers remain responsible for contrast.
-- Keep the Daily Menu readability adjustment scoped to its grid body cells rather than increasing every WPF DataGrid or its headers and operation buttons.
+- WPF DataGrid row typography is centralized in the shared application resources so Orders, Foods, Manual Order, Daily Menu, and order-details grids use the same row font family, size, and weight.
 - WPF grid pagination is client-side because current API endpoints return complete MVP collections; source collections remain authoritative for editing, totals, selection, and submission.
 - Without a visible Orders date picker, each Orders load explicitly targets the current local date. Food list search is limited to a case-insensitive food-name match.
 - The authenticated WPF shell provides navigation only and does not render a shared top panel; page-specific context and actions belong inside each page.
 - Shared WPF page-edge spacing belongs on the shell content host, not as duplicated margins inside individual views.
 - WPF design tokens and shared control styles belong in application resources; Mini App design tokens and responsive behavior belong in global CSS rather than being duplicated per component.
+- WPF theme dictionaries must explicitly merge the base dictionaries they consume; sibling entries in a parent `MergedDictionaries` collection are not treated as a dependable `StaticResource` scope during dictionary construction. Cross-dictionary effects use `DynamicResource`.
 - Customer-facing motion must remain subtle and respect `prefers-reduced-motion`; operational WPF screens prioritize immediate readability over decorative animation.
 - Mini App carts persist in browser storage but are always reconciled with the latest server menu before use.
 - Browser access to the API uses an explicit configurable CORS origin allowlist, never an unrestricted production policy.
@@ -45,9 +49,12 @@
 - A food can appear only once in a given daily menu.
 - Existing daily menus with items cannot be cleared by an empty save; this guards against UI load failures wiping unsold items.
 - Daily-menu item creation is an immediate API operation in WPF; the full-menu save flow is reserved for editing already-loaded rows/menu metadata.
+- Daily Menu inline price entry should keep thousands separators, while font and digit policy stay consistent with portion capacity entry.
+- Daily Menu price-entry helper text may spell the price in Persian words for operator confirmation, without changing the stored numeric value.
 - Daily-menu food creation and editing use a compact inline WPF form above the grid rather than a modal or separate page, while sharing the daily-menu view model and API operations.
 - Daily-menu open state and settings save stay in the top operational header for quick access, while per-food editing remains in the compact inline form above the grid.
 - The WPF Daily Menu screen manages only the current local date. Date selection, historical search, and menu-note editing are intentionally absent from this operational page; existing stored note data is retained when open-state settings are saved.
+- Daily Menu ordering defaults to closed; admins explicitly open `سفارش‌گیری امروز` when ready to accept customer orders.
 - The Mini App reads today's menu from the public `/api/menus/today` endpoint; admin daily-menu routes are reserved for authenticated WPF/admin use.
 - Telegram WebApp user data is trusted only after backend `initData` HMAC validation succeeds.
 - ASP.NET Core Identity replaces custom user, role, and admin tables.
@@ -55,11 +62,21 @@
 - WPF admin authentication uses API login and JWT, never direct database access. The desktop client keeps the bearer token in memory and attaches it to admin API requests.
 - WPF logout is a client-side session operation: clear the in-memory JWT and sensitive screen state, stop protected polling, and return to the login view.
 - Dashboard statistics use the Iran business date and refresh on every WPF navigation to avoid stale or timezone-shifted order counts.
-- Order status actions on the WPF orders page are presented at the bottom of the order details panel so the grid can stay focused on key columns.
+- Dashboard sales cards separate delivered sales from confirmed sales; the previous gross non-cancelled sales label is not shown in the WPF dashboard.
+- WPF dashboard hides Preparing and Ready cards while the current admin workflow skips those statuses.
+- Order status actions on the WPF orders page are presented beside the order details title so confirmation/delivery/cancel actions stay visible without taking space at the bottom of the details panel.
+- WPF ComboBox templates must keep their internal popup toggle style private; implicit ToggleButton styling is reserved for real standalone toggles.
+- WPF presentation select options override `ToString()` with `DisplayName` as a defensive fallback for custom ComboBox templates.
+- WPF page-level filter input styles must be typed to the concrete control and based on the shared implicit control style, so local sizing does not bypass branded ComboBox selection rendering.
+- WPF status badges use a rectangular small-radius shape in dense operational grids; pill radius is reserved for category chips.
 - The current WPF operation uses only Pending Confirmation, Confirmed, Delivered, and Cancelled; Preparing and Ready stay in shared contracts but are not required admin actions.
 - Orders polling refreshes the currently selected order details after replacing list summaries, keeping list and detail state synchronized.
 - The WPF orders grid includes a simple row-number column for faster scanning during daily operations.
 - The WPF orders row-number column is displayed one-based for admin readability.
+- WPF order list date/time display puts the time before the date to make same-day order scanning faster.
+- WPF order details may use larger typography than main list grids because it is a focused reading panel rather than a dense scanning table.
+- The WPF `گزارش کل` page is read-only; its detail column opens a separate report-detail page instead of sharing horizontal space with the report grid or exposing status-change actions.
+- `نوع فروش` in the current reporting UI maps to the existing payment method enum because the MVP has no separate sell-type domain concept.
 - Order status history records only real status transitions; order creation itself is not written as a pseudo-transition entry.
 - Manual-order address text is always sent into the order snapshot when provided; reusable address saving stays disabled for admin-created orders.
 - Telegram Mini App customers map to Identity users through validated Telegram `initData`; local development may fall back to raw user fields only when validation is explicitly not required.
@@ -71,4 +88,20 @@
 - Admin order-submitted notifications require `Telegram:AdminChatId`; customer notifications use the validated Telegram user ID as the Telegram chat target.
 - Public order enums live in Contracts so client projects do not depend on Domain.
 - Payment method (`روش پرداخت`) remains an enum for now, not a database lookup table.
+- Local Mini App testing uses host-derived API URLs and explicit CORS origins instead of hard-coded localhost, because phones resolve localhost to themselves.
+- Mini App brand introductions should lead with food and the readable Persian wordmark; isolated leaf marks and mostly empty gradients are not sufficient translations of the `ka-2` reference.
+- Mini App categories remain presentation-only for now and are inferred on the client from menu item names/descriptions, because the current menu API contract does not expose a category field.
+- Use `ka-2.png` for Kafgir atmosphere and food warmth, and `final-de.png` for practical logo proportions, symbol styling, placeholders, icon style, and component polish.
+- Kafgir logo components are composed from a symbol-only vector asset plus real Persian text; SVG assets must not contain the Persian wordmark as `<text>` or paths.
+- The canonical spatula favors a wide, confident flat head with four enlarged vertical slots; small decorative details remain secondary to the utensil silhouette.
+- Food cards and operational metadata must not use the complete Kafgir logo or brand symbol; missing food images use a neutral plate/steam placeholder.
+- React uses the horizontal logo in desktop headers and a dedicated compact composition in mobile headers; both keep the wordmark as real HTML text.
+- Mini App product grids use auto-fit 300–360px tracks with RTL start alignment; a single product remains a normal food-card width instead of stretching across the content area.
+- Mini App food cards must not invent cook names, ratings, or preparation times absent from `DailyMenuItemDto`; the guide hierarchy is implemented with daily freshness, homemade-food context, and real remaining portions until those fields exist.
+- The neutral food fallback SVG contains only transparent plate, steam, and leaf artwork; its surface color, spacing, and caption belong to the reusable card component so the illustration remains modest at every media size.
+- The focused React card does not display a favorite control until favorite state and behavior actually exist; a decorative nonfunctional heart would violate the current interaction contract.
+- The compact card action row follows the approved RTL composition: terracotta add-to-cart action on the right and price on the opposite side.
+- The final React header lockup uses only stable flex/grid alignment: no absolutely positioned wordmark accents or negative logo margins. The canonical symbol is simplified to one two-leaf olive branch and one attached saffron accent.
+- WPF may consume the canonical symbol as a generated transparent PNG when native SVG display is unavailable; the wordmark must remain a real local-font `TextBlock`.
+- WPF application icons are generated from the same canonical spatula geometry instead of a separate legacy raster drawing, keeping the shell icon and in-app symbol visually aligned.
 - Food images will be AI-generated later for Telegram channel posts and Mini App cards.

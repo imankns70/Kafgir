@@ -8,24 +8,63 @@
         <converters:OrderStatusToPersianConverter x:Key="OrderStatusConverter" />
         <converters:PaymentMethodToPersianConverter x:Key="PaymentMethodConverter" />
         <converters:OrderStatusActionVisibilityConverter x:Key="OrderStatusActionVisibilityConverter" />
+        <Style x:Key="OrderDetailSectionTitle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitle}">
+            <Setter Property="FontSize" Value="19" />
+        </Style>
+        <Style x:Key="OrderDetailMutedText" TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+            <Setter Property="FontSize" Value="14" />
+        </Style>
         <Style x:Key="DetailLabel" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource MutedTextBrush}" />
-            <Setter Property="FontSize" Value="12" />
-            <Setter Property="Margin" Value="0,4" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Margin" Value="0,5" />
         </Style>
         <Style x:Key="DetailValue" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
-            <Setter Property="Margin" Value="8,4" />
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontWeight" Value="Medium" />
+            <Setter Property="Margin" Value="8,5" />
+        </Style>
+        <Style x:Key="CenteredGridText" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}" />
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Center" />
         </Style>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel>
-            <TextBlock Text="جزئیات سفارش" Style="{StaticResource SectionTitle}" />
-            <TextBlock Text="اطلاعات مشتری، اقلام و تاریخچه وضعیت" Style="{StaticResource MutedText}" Margin="0,3,0,12" />
+            <Grid Margin="0,0,0,12"
+                  FlowDirection="LeftToRight">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
 
-            <Border Background="{StaticResource SurfaceAltBrush}" CornerRadius="8" Padding="12">
+                <UniformGrid Columns="3"
+                             Grid.Column="0"
+                             HorizontalAlignment="Left"
+                             VerticalAlignment="Center"
+                             Width="230">
+                    <Button Content="تایید" Background="{StaticResource SuccessBrush}" BorderBrush="{StaticResource SuccessBrush}"
+                            Visibility="{Binding SelectedOrder.Status, Converter={StaticResource OrderStatusActionVisibilityConverter}, ConverterParameter=Confirm}"
+                            Command="{Binding ConfirmOrderCommand}" CommandParameter="{Binding SelectedOrder}" />
+                    <Button Content="تحویل" Visibility="{Binding SelectedOrder.Status, Converter={StaticResource OrderStatusActionVisibilityConverter}, ConverterParameter=Deliver}"
+                            Command="{Binding SetDeliveredCommand}" CommandParameter="{Binding SelectedOrder}" />
+                    <Button Content="لغو" Style="{StaticResource DangerButton}"
+                            Visibility="{Binding SelectedOrder.Status, Converter={StaticResource OrderStatusActionVisibilityConverter}, ConverterParameter=Cancel}"
+                            Command="{Binding CancelOrderCommand}" CommandParameter="{Binding SelectedOrder}" />
+                </UniformGrid>
+
+                <StackPanel Grid.Column="1"
+                            FlowDirection="RightToLeft"
+                            HorizontalAlignment="Right">
+                    <TextBlock Text="جزئیات سفارش" Style="{StaticResource OrderDetailSectionTitle}" />
+                </StackPanel>
+            </Grid>
+
+            <Border Background="{StaticResource BackgroundSecondaryBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource RadiusMedium}" Padding="12">
                 <Grid DataContext="{Binding Details.Order}">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                     <Grid.RowDefinitions>
@@ -39,7 +78,14 @@
                     <TextBlock Grid.Row="3" Text="آدرس" Style="{StaticResource DetailLabel}" /><TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding AddressLine}" TextWrapping="Wrap" Style="{StaticResource DetailValue}" />
                     <TextBlock Grid.Row="4" Text="توضیح مشتری" Style="{StaticResource DetailLabel}" /><TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding CustomerNote}" TextWrapping="Wrap" Style="{StaticResource DetailValue}" />
                     <TextBlock Grid.Row="5" Text="توضیح ادمین" Style="{StaticResource DetailLabel}" /><TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding AdminNote}" TextWrapping="Wrap" Style="{StaticResource DetailValue}" />
-                    <TextBlock Grid.Row="6" Text="وضعیت" Style="{StaticResource DetailLabel}" /><TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Status, Converter={StaticResource OrderStatusConverter}}" Style="{StaticResource DetailValue}" Foreground="{StaticResource BrandBrush}" />
+                    <TextBlock Grid.Row="6" Text="وضعیت" Style="{StaticResource DetailLabel}" />
+                    <Border Grid.Row="6" Grid.Column="1" Style="{StaticResource StatusBadge}" HorizontalAlignment="Right"
+                            Background="{Binding Status, Converter={StaticResource OrderStatusBackgroundConverter}}"
+                            BorderBrush="{Binding Status, Converter={StaticResource OrderStatusForegroundConverter}}">
+                        <TextBlock Text="{Binding Status, Converter={StaticResource OrderStatusConverter}}"
+                                   Foreground="{Binding Status, Converter={StaticResource OrderStatusForegroundConverter}}"
+                                   Style="{StaticResource StatusText}" />
+                    </Border>
                     <TextBlock Grid.Row="7" Text="روش پرداخت" Style="{StaticResource DetailLabel}" /><TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding PaymentMethod, Converter={StaticResource PaymentMethodConverter}}" Style="{StaticResource DetailValue}" />
                     <TextBlock Grid.Row="8" Text="مبلغ کل" Style="{StaticResource DetailLabel}" /><TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding TotalAmount, StringFormat={}{0:N0}}" Style="{StaticResource DetailValue}" />
                 </Grid>
@@ -54,38 +100,35 @@
                 </TextBlock.Style>
             </TextBlock>
 
-            <TextBlock Text="اقلام سفارش" Style="{StaticResource SectionTitle}" Margin="0,16,0,7" />
-            <DataGrid ItemsSource="{Binding Details.ItemsPagination.Items}" Height="142">
+            <TextBlock Text="اقلام سفارش" Style="{StaticResource OrderDetailSectionTitle}" Margin="0,16,0,7" />
+            <DataGrid ItemsSource="{Binding Details.ItemsPagination.Items}"
+                      Height="168"
+                      ScrollViewer.VerticalScrollBarVisibility="Hidden">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="غذا" Binding="{Binding FoodName}" Width="*" />
-                    <DataGridTextColumn Header="تعداد" Binding="{Binding Quantity}" Width="55" />
-                    <DataGridTextColumn Header="قیمت واحد" Binding="{Binding UnitPrice, StringFormat={}{0:N0}}" Width="90" />
-                    <DataGridTextColumn Header="جمع" Binding="{Binding TotalPrice, StringFormat={}{0:N0}}" Width="90" />
+                    <DataGridTextColumn Header="غذا" Binding="{Binding FoodName}" Width="*" ElementStyle="{StaticResource CenteredGridText}" />
+                    <DataGridTextColumn Header="تعداد" Binding="{Binding Quantity}" Width="55" ElementStyle="{StaticResource CenteredGridText}" />
+                    <DataGridTextColumn Header="قیمت واحد" Binding="{Binding UnitPrice, StringFormat={}{0:N0}}" Width="90" ElementStyle="{StaticResource CenteredGridText}" />
+                    <DataGridTextColumn Header="جمع" Binding="{Binding TotalPrice, StringFormat={}{0:N0}}" Width="90" ElementStyle="{StaticResource CenteredGridText}" />
                 </DataGrid.Columns>
             </DataGrid>
             <controls:PaginationControl DataContext="{Binding Details.ItemsPagination}" />
 
-            <TextBlock Text="تاریخچه وضعیت" Style="{StaticResource SectionTitle}" Margin="0,16,0,7" />
-            <DataGrid ItemsSource="{Binding Details.StatusHistoriesPagination.Items}" Height="132">
+            <TextBlock Text="تاریخچه وضعیت" Style="{StaticResource OrderDetailSectionTitle}" Margin="0,16,0,7" />
+            <DataGrid ItemsSource="{Binding Details.StatusHistoriesPagination.Items}"
+                      Height="158"
+                      ScrollViewer.VerticalScrollBarVisibility="Hidden">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="از" Binding="{Binding FromStatus, Converter={StaticResource OrderStatusConverter}}" Width="*" />
-                    <DataGridTextColumn Header="به" Binding="{Binding ToStatus, Converter={StaticResource OrderStatusConverter}}" Width="*" />
-                    <DataGridTextColumn Header="زمان" Binding="{Binding ChangedAt, StringFormat={}{0:g}}" Width="145" />
+                    <DataGridTemplateColumn Header="از" Width="*">
+                        <DataGridTemplateColumn.CellTemplate><DataTemplate><Border Style="{StaticResource StatusBadge}" Background="{Binding FromStatus, Converter={StaticResource OrderStatusBackgroundConverter}}" BorderBrush="{Binding FromStatus, Converter={StaticResource OrderStatusForegroundConverter}}"><TextBlock Text="{Binding FromStatus, Converter={StaticResource OrderStatusConverter}}" Foreground="{Binding FromStatus, Converter={StaticResource OrderStatusForegroundConverter}}" Style="{StaticResource StatusText}" /></Border></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTemplateColumn Header="به" Width="*">
+                        <DataGridTemplateColumn.CellTemplate><DataTemplate><Border Style="{StaticResource StatusBadge}" Background="{Binding ToStatus, Converter={StaticResource OrderStatusBackgroundConverter}}" BorderBrush="{Binding ToStatus, Converter={StaticResource OrderStatusForegroundConverter}}"><TextBlock Text="{Binding ToStatus, Converter={StaticResource OrderStatusConverter}}" Foreground="{Binding ToStatus, Converter={StaticResource OrderStatusForegroundConverter}}" Style="{StaticResource StatusText}" /></Border></DataTemplate></DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <DataGridTextColumn Header="زمان" Binding="{Binding ChangedAt, StringFormat={}{0:HH:mm yyyy/MM/dd}}" Width="160" ElementStyle="{StaticResource CenteredGridText}" />
                 </DataGrid.Columns>
             </DataGrid>
             <controls:PaginationControl DataContext="{Binding Details.StatusHistoriesPagination}" />
 
-            <TextBlock Text="اقدامات سفارش" Style="{StaticResource SectionTitle}" Margin="0,16,0,7" />
-            <UniformGrid Columns="3" HorizontalAlignment="Stretch">
-                <Button Content="تایید" Background="{StaticResource SuccessBrush}" BorderBrush="{StaticResource SuccessBrush}"
-                        Visibility="{Binding SelectedOrder.Status, Converter={StaticResource OrderStatusActionVisibilityConverter}, ConverterParameter=Confirm}"
-                        Command="{Binding ConfirmOrderCommand}" CommandParameter="{Binding SelectedOrder}" />
-                <Button Content="تحویل" Visibility="{Binding SelectedOrder.Status, Converter={StaticResource OrderStatusActionVisibilityConverter}, ConverterParameter=Deliver}"
-                        Command="{Binding SetDeliveredCommand}" CommandParameter="{Binding SelectedOrder}" />
-                <Button Content="لغو" Style="{StaticResource DangerButton}"
-                        Visibility="{Binding SelectedOrder.Status, Converter={StaticResource OrderStatusActionVisibilityConverter}, ConverterParameter=Cancel}"
-                        Command="{Binding CancelOrderCommand}" CommandParameter="{Binding SelectedOrder}" />
-            </UniformGrid>
         </StackPanel>
     </ScrollViewer>
 </UserControl>
