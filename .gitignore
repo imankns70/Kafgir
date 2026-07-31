@@ -1,24 +1,19 @@
-# .NET and build output
-bin/
-obj/
-artifacts/
-TestResults/
-*.user
-*.suo
-*.userosscache
-*.sln.docstates
-
 # IDEs
 .vs/
 .idea/
-*.DotSettings.user
 .vscode/
 
-# Node and Vite
+# Node and build output
 node_modules/
+.data/
 dist/
+dist-installer/
+out/
+.next/
+.turbo/
 .vite/
 coverage/
+*.tsbuildinfo
 
 # Secrets and local environment
 secrets.json

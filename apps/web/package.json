@@ -1,0 +1,43 @@
+{
+  "name": "@kafgir/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run src/server/db/postgres.integration.test.ts src/server/db/food-discovery.integration.test.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "tsx scripts/seed.ts",
+    "migrate:sqlserver": "tsx scripts/migrate-sqlserver.ts",
+    "migrate:food-images": "tsx scripts/migrate-food-images-to-object-storage.ts"
+  },
+  "dependencies": {
+    "@kafgir/contracts": "1.0.0",
+    "@kafgir/server-core": "1.0.0",
+    "drizzle-orm": "0.45.2",
+    "jose": "6.2.4",
+    "next": "16.2.12",
+    "pino": "^10.3.1",
+    "postgres": "3.4.9",
+    "react": "19.2.7",
+    "react-dom": "19.2.7",
+    "sharp": "^0.35.3",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "^3.922.0",
+    "@types/mssql": "9.1.8",
+    "@types/node": "24.13.2",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "drizzle-kit": "0.31.10",
+    "mssql": "12.7.0",
+    "tsx": "4.21.0",
+    "typescript": "6.0.2",
+    "vitest": "4.1.10"
+  }
+}

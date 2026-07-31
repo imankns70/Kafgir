@@ -1,156 +1,142 @@
 # Project state
 
-- Status: WPF admin dashboard, identity, customer profiles, and reusable addresses
-- Legacy markdown docs were moved from `docs/` into `.ai/docs/`.
-- Brand: Kafgir / کفگیر
-- City: Andimeshk / اندیمشک
-- Sales model: Per portion
-- Backend: ASP.NET Core Web API, SQL Server, EF Core, and .NET Worker Service
-- Development SQL can now be overridden per machine with ignored `appsettings.local.json` or `appsettings.Development.local.json` files in the API and Worker projects.
-- The shared Development config still defaults to Docker SQL Server on `localhost:1433` for `KafgirDb`.
-- This non-Docker development machine uses ignored API and Worker overrides for `(localdb)\\MSSQLLocalDB`; `KafgirDb` has all four current migrations applied.
-- Admin: WPF desktop application communicating only with the API
-- WPF project location: `backend/src/Kafgir.WPF`, beside the other source projects
-- WPF embeds and uses Vazir as the default UI font.
-- WPF applies Vazir explicitly to common text, input, combo/dropdown, and DataGrid surfaces for consistent typography.
-- WPF uses a centralized Kafgir theme split under `Themes/Kafgir`: cream backgrounds, warm surfaces, charcoal text, accessible terracotta actions, olive navigation, saffron accents, and semantic feedback colors.
-- WPF Kafgir theme dictionaries declare their resource dependencies explicitly, and cross-dictionary shadow effects use deferred resource lookup so compiled XAML constructs all windows and controls reliably at startup.
-- Shared WPF resources provide 16px/44px text entry controls, 8-20px radii, primary/secondary/outline/ghost/danger/icon buttons, rounded inputs, warm borders/shadows, status badges, and consistent 16px DataGrid rows.
-- Multiline WPF input areas such as descriptions, addresses, and customer notes use larger typing text and slightly taller fields for readability.
-- The WPF admin shell uses a compact 248px deep-olive right sidebar with the vector Kafgir logo, outline icons, a cream selected item, and a saffron selection marker. It has no shared top panel; each page owns its heading and uses the full workspace height.
-- Sidebar navigation labels bind explicitly to each item foreground so global text styling cannot override their contextual contrast.
-- The global WPF `TextBlock` style controls typography only and does not force a foreground, allowing buttons, selected rows, badges, and semantic containers to provide readable contextual text colors.
-- All WPF DataGrid row cells use the shared Vazir 16px row typography; page-specific grids should not override row font size or weight unless a concrete exception is approved.
-- All WPF DataGrids use a shared client-side pager; main lists use larger page sizes and compact cart/detail grids use smaller page sizes without changing API contracts.
-- Orders searches the current date by status and order number without a date picker. Foods has a single name-search toolbar, and the Daily Menu grid no longer has a redundant title/guide strip.
-- Dashboard, Orders, Order Details, Manual Order, Foods, Daily Menu, inline forms, and Login share consistent title, section, card, toolbar, message, and action patterns.
-- The authenticated WPF page host applies one consistent top inset across Dashboard, Orders, Manual Order, Foods, and Daily Menu.
-- WPF login uses a food-themed background image stored in `backend/src/Kafgir.WPF/Assets/login-food-background.png`.
-- The WPF login background uses an explicit application pack URI so the embedded image resolves consistently at runtime.
-- WPF login submits with the Enter key from username and password inputs.
-- WPF provides a sidebar logout action that clears the in-memory JWT, stops order polling, resets order-entry state, and returns to login without restarting.
-- WPF checks API reachability through `/api/health` when the login screen opens and shows a retryable message if the server is unavailable.
-- WPF uses `fa-IR` with `PersianCalendar` for date/time display and a custom Persian date picker for admin date inputs.
-- WPF keeps numeric output as regular Latin digits and leaves visual digit shaping to the selected Persian font.
-- WPF API clients serialize date route/query values with invariant Gregorian `yyyy-MM-dd` formatting so Persian UI culture does not leak into backend filters.
-- WPF admin navigation uses a right sidebar shell instead of top tabs.
-- WPF admin includes a manual order page for admin-entered phone/in-person orders.
-- WPF admin includes a read-only `گزارش کل` page after Daily Menu for daily order reporting.
-- The WPF `گزارش کل` page filters orders by date, status, order number, customer name, phone number, receive type, sell/payment type, and a food dropdown loaded from all defined foods.
-- The WPF `گزارش کل` grid uses the full page width; its details action opens a separate in-page detail view with a back button.
-- WPF `گزارش کل` report and report-detail grid row values are centered to align with centered column headers.
-- WPF `گزارش کل` fills missing report-grid food summaries from order details when an API summary response has no food text.
-- WPF manual ordering shows active menu foods even when capacity is zero, but prevents adding quantities above remaining capacity.
-- WPF manual ordering uses today's menu without exposing a menu date picker.
-- WPF manual ordering uses `+` and `−` quantity controls for adding foods and editing order-line quantities.
-- WPF manual ordering prevents duplicate `افزودن` clicks from increasing an existing food line; quantity edits happen only through the row controls.
-- WPF manual ordering was reorganized into customer, menu item selection, order lines, and total cards with more visible operation buttons.
-- WPF manual ordering hides city input and sends the default city internally.
-- WPF manual ordering defaults to pickup so admin-created orders do not require an address unless delivery is selected.
-- WPF manual ordering still persists any typed address into the saved order snapshot, even when the admin leaves delivery method on pickup.
-- Admin/manual order phone numbers are normalized before customer/order storage.
-- WPF Foods manages dish identity only: name, description, image, and active status.
-- WPF Daily Menu owns daily selling price and portion capacity for each food.
-- New Daily Menu records and empty WPF Daily Menu screens default `سفارش‌گیری امروز` to closed/off.
-- WPF Daily Menu `افزودن به منو` persists the new menu item immediately through the API and reloads the stored menu.
-- WPF daily-menu inline price input keeps thousands separators while using the same font and regular-digit policy as capacity.
-- WPF daily-menu inline price input shows a live Persian words preview under `قیمت امروز`, ending with `تومان`.
-- WPF daily-menu settings save applies the stored menu returned by the API so the grid reflects persisted items and IDs.
-- WPF Daily Menu is a current-day-only operations screen; its view model resolves today internally and does not expose a date picker or historical-menu search.
-- WPF Daily Menu no longer exposes menu-note editing. Existing note data is preserved when saving the current open/closed state.
-- WPF Daily Menu uses a focused today header, open-state control, add/save actions, capacity/sold/remaining summary cards, contextual messages, a clear empty state, and one framed vertically scrollable food grid.
-- WPF Daily Menu opens add and edit operations in a compact inline food form directly above the grid instead of a modal or separate page.
-- The inline daily-menu food form keeps the menu grid visible, formats `قیمت امروز` with thousands separators, keeps numeric output as regular digits, and collapses after Save or Cancel.
-- WPF Daily Menu edit mode locks food selection and updates daily price, capacity, and active state through the single-item API.
-- WPF Daily Menu no longer has a row-level `تغییر وضعیت` button; active state is changed only through the inline edit form checkbox.
-- WPF Daily Menu grid shows a read-only `فعال` column for item active state.
-- Daily menu delete checks whether the daily item is referenced by any order item before removal, not only whether `SoldPortions` is greater than zero.
-- The WPF Daily Menu grid is read-only for price/capacity edits in the current flow; item changes happen through explicit add, status, and delete actions.
-- The legacy full-menu replacement API rejects empty item-list saves for an existing menu with items to prevent accidental deletion.
-- Repeated Daily Menu settings-save clicks are guarded so only one save runs at a time, and save failures are shown as page errors instead of crashing WPF.
-- WPF Daily Menu uses action-based item management: add creates one item immediately, status changes are immediate, delete removes one unsold item immediately, and the top save button only persists menu-level settings.
-- Backend exposes an explicit daily-menu item add route so WPF does not rely on local draft rows for adding foods.
-- Payment method is currently a contracts enum, not a database table; no payment gateway exists yet.
-- Customer: React + TypeScript + Vite Telegram Mini App
-- The Mini App shares the warm Kafgir design system, adapted to touch with a compact sticky logo header, terracotta actions, olive navigation, a restrained handmade menu introduction, availability badges, clean food cards, and two-column checkout on wide screens.
-- The Mini App uses a smaller mobile typography scale for better phone readability and denser menu/order screens.
-- Mini App motion uses 150-220ms transitions and restrained page/card entrance, with `prefers-reduced-motion` support.
-- Architecture: Pragmatic Clean Architecture with the API as the central integration point
-- API Swagger UI is the default Development landing page at the API root.
-- Current scope: Domain and persistence foundation plus Food, Daily Menu, and Order APIs
-- MVP foods: زرشک‌پلو با مرغ، قورمه‌سبزی، ماکارونی، قیمه
-- MVP business entities cover customer profiles, reusable addresses, foods, daily menus, orders, and settings.
-- EF Core persistence foundation and the `InitialBanooPazSchema` migration have been added.
-- The four initial foods are seeded with fixed creation timestamps; selling price is configured per daily menu item.
-- Food admin APIs have been implemented.
-- Daily menu admin APIs have been implemented with additive item upserts, settings-only updates, and single-item deletion.
-- Customer order submission has been implemented.
-- Admin order listing, details, and status management have been implemented.
-- Admin order query supports combined report filters over date, status, order number, customer name, phone number, delivery method, payment method, and ordered food name.
-- Order numbers use Persian business year plus yearly counter, e.g. `14051`, `14052`, then `14061` for the next Persian year.
-- Admin order date filters use Iran business-day boundaries against UTC order timestamps.
-- WPF refreshes the Orders page whenever admins navigate back to it, so newly created manual orders are shown without waiting for stale navigation state.
-- WPF Orders has a `جستجو` button, order-number search input, switch-style auto-refresh toggle, and row-level actions for `تایید`, `تحویل`, and `لغو`; `تحویل` appears only after confirmation.
-- The current admin workflow intentionally skips `Preparing` and `Ready`; confirmed orders can move directly to delivered, while the shared enum values remain available for future expansion.
-- Daily menu capacity changes only when an order is confirmed or a confirmed order is cancelled.
-- The WPF admin now has a configured HTTP API client for order operations.
-- The WPF orders screen supports date/status filtering, automatic refresh, and order selection.
-- The WPF orders page keeps a compact, vertically scrollable grid with a row-number column.
-- The WPF orders row-number column is one-based and displays `1, 2, 3, ...`.
-- The WPF order details panel shows items, status history, and same-size status action buttons through the API, with status actions placed beside the details title.
-- WPF ComboBox dropdowns use a private template toggle and branded item template so order/report filters do not inherit unrelated ToggleButton chrome.
-- WPF select-option ComboBoxes display their `DisplayName` value instead of record/object text in manual order and report filters.
-- WPF report filters use control-specific ComboBox/TextBox styles, and the Persian date picker date parts stringify to their display labels so filter dropdowns do not leak object record text.
-- WPF status values in order and report grids render as compact rounded rectangles, while category chips keep the pill shape.
-- WPF order details grids center both headers and row values for order items and status history.
-- WPF order details uses larger local typography for labels, values, section headings, and detail-grid rows than the main operational grids.
-- WPF order date/time columns show time before date in compact operational grids.
-- WPF reloads the changed order details after a status action even when the order leaves the current list filter, so the new status history remains visible.
-- Orders auto-refresh preserves the selected row and reloads its details so status history and other detail fields do not remain stale.
-- New orders no longer add a synthetic "created" entry to status history; the grid shows only actual status changes.
-- Investigated and removed the optional ASP.NET Core OpenAPI dependency that introduced the `Microsoft.OpenApi` vulnerability warning.
-- WPF Foods management screen added.
-- WPF Daily Menu management screen added.
-- WPF navigation between Orders, Foods, and Daily Menu added.
-- Telegram Mini App MVP customer UI added.
-- Customer can view menu, manage cart, and submit order.
-- The Mini App loads Telegram's Web App SDK, calls `ready()` and `expand()`, and uses Telegram's native Back button for Cart and Success navigation.
-- The Mini App embeds the same licensed Vazir Regular, Medium, and Bold weights locally and has no font-CDN dependency.
-- The Mini App uses the Kafgir terracotta/olive/saffron identity, reusable vector components, semantic status badges, neutral food-image placeholders, and a safe-area Menu/Categories/Cart mobile navigation.
-- The Mini App menu page exposes a presentation-only category chip strip for today's available foods; categories are inferred from food names/descriptions until the backend has a category field.
-- Kafgir brand assets are generated from `scripts/generate-kafgir-icons.ps1`; symbol-only SVG/PNG/ICO assets contain no Persian wordmark, while React and WPF compose the wordmark with real text using the local Vazir font.
-- The corrected canonical symbol now follows `final-de.png` more closely: a wide tapered flat head, four slots, angled wooden handle, olive branch, and saffron accents. WPF packages a high-resolution transparent rendering generated from the same script.
-- The final polish widens the canonical head and slots slightly while retaining the same handle, leaves, and small-size silhouette across generated SVG, PNG, favicon, and ICO variants.
-- WPF icon resources merge their own dimension tokens so `OutlineIcon` width/height resolve correctly at runtime instead of producing `DependencyProperty.UnsetValue`.
-- The Mini App menu landing now uses the repository's warm Persian food photography as an optimized hero image, a legible Kafgir wordmark, and a neutral plate-based fallback for menu items without photos.
-- The focused Mini App correction constrains food cards to 340px, uses a 16:9 real-image/placeholder region, and supports up to three desktop columns without stretching a single item.
-- Mini App food cards follow the approved guide hierarchy using only available menu data: image, title and optional one-line description, a compact freshness/stock strip, then a shared row with price and a right-aligned terracotta cart action.
-- The final isolated React logo pass uses a 198×68px desktop lockup with a 54×56px canonical symbol and readable 12px real-text subtitle; mobile uses a 128×44px subtitle-free lockup with a 40×42px symbol.
-- The canonical React symbol now uses a custom 100×112 SVG: a broad 52×48 head, four 4×29 slots with 6-unit gaps, a 14×44 rounded wooden handle, 8° rotation, one connected two-leaf olive sprig, and one saffron accent. The compatibility small-symbol output reuses this same SVG.
-- WPF now receives its `Assets/Brand/kafgir.ico` and `Assets/Brand/kafgir-symbol.png` from the corrected canonical raster generator, so the app icon/titlebar mark uses the same compact flat slotted spatula proportions as the approved brand symbol.
-- WPF order status filter options now override `ToString()` so branded ComboBox templates display the Persian `DisplayName` instead of record/object text in the selected status field.
-- WPF login logo container height now matches the horizontal brand template height so the full Kafgir logo is visible instead of being clipped.
-- Mini App desktop food-card footers keep the price and `تومان` on one line and use a non-stretched cart button so three-card desktop layouts do not look cramped.
-- Mini App food cards now switch the add-to-cart CTA into an inline minus/count/plus control after the item is added, using the existing cart state and remaining-portions cap.
-- The Mini App persists the cart locally and reconciles restored items, prices, and quantities against the latest open daily menu before checkout.
-- API CORS origins are configuration-driven; local development allows Vite from localhost and `http://192.168.70.176:5173`.
-- The Mini App derives its default API base URL from the current browser host for LAN testing, so phones opening `http://192.168.70.176:5173` call `http://192.168.70.176:5038`.
-- ASP.NET Core Identity with integer keys manages users and roles.
-- `ApplicationUser` and roles `Customer`, `Owner`, `KitchenAdmin`, and `OrderManager` were added.
-- `CustomerProfile` and reusable `CustomerAddress` business entities were added.
-- The default development WPF admin is seeded through Identity with a hashed password.
-- Orders now store immutable delivery name, phone, city, and address snapshots.
-- Admin API login returns a JWT.
-- WPF stores the admin JWT in memory after login and attaches it to admin API requests as a bearer token.
-- Admin food, daily-menu, and order routes require an authenticated admin role (`Owner`, `KitchenAdmin`, or `OrderManager`).
-- The WPF admin dashboard loads after login and shows today's order counts, active orders, portions, delivered sales, confirmed sales, separate pending/confirmed/delivered/cancelled counts, and menu state through `/api/admin/dashboard/today`.
-- The dashboard refreshes whenever admins navigate to it, and its backend determines today using Iran business time before querying orders and the daily menu.
-- The Mini App reads today's menu from the public `/api/menus/today` endpoint.
-- Telegram Mini App order submissions send raw `Telegram.WebApp.initData`; the backend validates the HMAC signature and freshness before trusting Telegram user identity. Missing `initData` is allowed only for development fallback when validation is not required.
-- Telegram identity and chat metadata are stored in the dedicated `TelegramAccounts` table linked one-to-one to Identity users.
-- Returning customers can preload their profile and active saved addresses through `POST /api/customers/me`.
-- The Mini App checkout prefills saved name/phone data and lets returning customers choose a saved address or add a new one.
-- `NotificationMessages` outbox added for Telegram notifications.
-- Order submission enqueues an admin Telegram notification when `Telegram:AdminChatId` is configured.
-- Order status changes enqueue customer Telegram notifications when the customer has a Telegram user ID.
-- `Kafgir.Worker` processes pending notification messages with retry/backoff and sends them through Telegram Bot API `sendMessage`.
+- Status: Next.js, Electron, and PostgreSQL implementation complete in the repository; live database migration and Liara deployment remain operator-dependent.
+- Brand: Kafgir / کفگیر.
+- Canonical visual identity: `branding/logo.png`; generated transparent PNG, favicon/PWA sizes, and Electron ICO are derived from it.
+- Customer application and server: `apps/web`.
+- Windows admin: `apps/admin`.
+- Shared transport contracts: `packages/contracts`; shared transactional/database services: `packages/server-core`.
+- Database: PostgreSQL managed through Drizzle.
+- Local PostgreSQL at `192.168.70.127:5432` has a migrated and seeded `kafgir` database for development.
+- Local integration infrastructure: `infra/postgres.compose.yml`.
+- Customer and admin API contracts remain under `/api/...`.
+- Electron admin authentication runs in its main process against PostgreSQL and retains only an in-memory principal; compatibility Next.js admin JWT routes remain temporarily for rollback.
+- Electron renderer still exposes familiar route-shaped helper names for existing pages, but those calls are translated locally into typed IPC operations and no longer create `/api/admin/*` network traffic.
+- Local development admin credentials are defined directly in the seed script and prefilled by the Electron admin login form.
+- Telegram customer identity uses signed `initData`.
+- Notifications use a durable PostgreSQL outbox and protected processor endpoint.
+- Electron uses a sandboxed renderer and an allowlisted typed preload bridge. Only Electron main accesses PostgreSQL, using a three-connection default pool and DPAPI-encrypted configuration in packaged builds.
+- New food photos are validated and normalized to WebP by Electron main. Development stores them in `.data/uploads/foods` and references them through `/api/media/foods/...`; production stores them in Liara Object Storage and references public HTTPS URLs.
+- Food discovery now includes database categories/tags, one validated primary badge, ordered galleries, customer likes/favorites, readable food-detail routes, related-food suggestions, and server-calculated menu orderability.
+- Customer food-detail pages show admin-managed ordered food photos in a carousel with previous/next controls, thumbnails, and a position counter.
+- Customer food-detail headers use only the approved top actions: home logo, cart, favorite, and back; the confusing share/forward icon was removed, the cart and back controls were positioned as requested, and the favorite action is hidden until a customer session is authenticated.
+- Mini App basket badges count distinct food rows, not total portions; adding more of the same food increases its quantity but keeps the badge at one for that food.
+- Customer and order addresses are now one text field only. Migration `0007_mighty_kree.sql` appends legacy address notes into the address text and drops `customer_addresses.description` plus `orders.delivery_address_description`.
+- Electron now manages categories, tags, detailed food content, tag/badge assignment, and ordered food-image galleries through the existing secure API bridge.
+- The Electron food catalog list and full food editor are separate application pages; create/edit navigation returns to the refreshed list after save or cancellation.
+- Food names are now validated as unique by the admin UI and shared food service; the Electron food list shows whether each food has a photo, and the photo upload area is separated from the main food-details form.
+- The Electron food photo form is now a dedicated `food-photos` page opened from the food list or existing-food editor; the add/update food page no longer contains upload controls.
+- Electron admin labels use `عنوان انگلیسی` for slug fields, and the Daily Menu price field shows comma separators plus live Persian words below the input.
+- Daily Menu form controls reserve a consistent helper-text row so food, price, capacity, and submit button stay aligned.
+- The Electron Orders page now restores the evolved WPF operational UX: a full-width paginated grid, dedicated detail page, default 10-second auto-refresh, complete valid status actions, customer/order/note sections, and status-history badges.
+- The Electron full report now includes all operational columns and combined filters, result counts, reset/search feedback, pagination, and a dedicated read-only order-detail page.
+- Local duplicate food rows were cleaned on 2026-07-28 by preserving the menu-used rows, moving useful image data to the kept row, and deleting duplicate unreferenced rows.
+- The .NET API, Worker, WPF admin, and old Vite Mini App directories were deleted on 2026-07-28.
+- Removed source is recoverable from annotated Git tag `legacy-dotnet-final-2026-07-28` at commit `5ac841f`.
+- The one-time SQL Server-to-PostgreSQL importer remains for production data transfer.
+- Seed and SQL Server import scripts use explicit async entrypoints compatible with the current Node/tsx toolchain.
+- The supplied `branding/logo.png` remains untouched as the identity source; the generator creates runtime derivatives without modifying it.
+- The Mini App header composes the square `branding/logo.png` icon with a real Persian `کفگیر` wordmark beside it.
+- Electron admin keeps numeric values as ordinary digit text and relies on the bundled Vazir font for rendering; identifiers such as order numbers, phone numbers, and slugs remain isolated LTR.
+- Web and Electron Admin form controls explicitly apply the bundled Vazir FD font to typed values, placeholders, autofill, LTR fields, and number inputs without converting stored characters.
+- Order API timestamp serialization accepts both PostgreSQL `Date` objects and timestamp strings so manual-order creation and report/detail responses do not crash on driver return-type differences.
+- Electron admin strips the IPC wrapper from API errors before showing them in forms.
+- Electron manual ordering now follows the evolved WPF operational layout: customer/payment form on the right, menu-item add row and cart table on the left, quick menu shortcuts, and a prominent total bar.
+- Electron Orders now uses the WPF-style split operator layout: order grid and filters remain visible while the selected order's details, status actions, items, and history stay open in a side panel.
+- Electron manual-order quick menu shortcuts no longer use a dot separator between price and remaining portions.
+- Order creation and status updates pass timestamp parameters to PostgreSQL as ISO strings so Next.js dev/runtime bundling does not send raw `Date` objects into prepared query binding.
+- Electron food editor labels now use clearer customer-facing wording for portion contents and allergy materials, and the photo gallery actions use explicit primary/previous/next labels instead of ambiguous position words.
+- Electron Orders table panels keep the summary, grid, and pagination pinned to normal top-to-bottom rows so sparse results no longer float vertically in the center of a tall panel.
+- Electron dev startup now bundles `@kafgir/contracts` into the main process with `@kafgir/server-core`, and main-process runtime configuration is serialized so concurrent initial IPC calls do not close each other's PostgreSQL client.
+
+## Verification
+
+- TypeScript lint: passed.
+- Current workspace tests: Contracts 11 passed, Server Core 2 passed, Web 71 passed with 14
+  guarded PostgreSQL integration cases skipped without `TEST_DATABASE_URL`, and Electron Admin 8 passed.
+- Guarded PostgreSQL integration tests: 9/9 passed against disposable database `kafgir_food_discovery_test`.
+- Local PostgreSQL migration and seed against `kafgir`: passed.
+- Next.js production build: passed.
+- Electron production build and Windows x64 NSIS packaging: passed.
+- Direct server-core smoke test against configured PostgreSQL: connection, admin authentication, and dashboard query passed without Next.js running.
+- Canonical-logo asset generation and legacy-brand reference audit: passed.
+- Packaged Electron launch smoke test: passed.
+- Mini App responsive checks passed at 320, 360, 390, 430, 768, 1024, and 1440px.
+- Food-image validation, normalization, managed-file deletion, and upload authorization tests: passed.
+- Duplicate food-name validation and local duplicate cleanup verification: passed.
+- Local migration `0002_food_discovery.sql` and the idempotent seven-category/33-tag seed: passed.
+- Four pre-existing foods received the safe default `rice` category and require an admin category review.
+- Latest stable Next.js currently inherits three production npm advisories from PostCSS/Sharp; upgrade when a fixed stable release is available.
+## Kafgir 1.5 kitchen operations (2026-07-29)
+
+- PostgreSQL migration `0003_futuristic_praxagora.sql` adds units, ingredient categories,
+  ingredients, suppliers, purchases/items/payments, immutable inventory movements, active
+  recipes/items, order inventory consumption links, shopping lists, financial accounts,
+  POS terminals, customer payments, expense categories, immutable financial transactions,
+  and audit logs. `0004_slim_mystique.sql` adds POS to the existing order payment-method check.
+- `packages/contracts/src/v15.ts` owns the typed Zod transport contracts. Inventory quantities
+  cross the API as decimal strings; money retains the existing numeric(18,2)/number convention.
+- `packages/server-core/src/services/v15-service.ts` owns v1.5 calculations and transactions.
+  Electron main and Next.js share it; renderer code never accesses PostgreSQL.
+- Order confirmation is the inventory-consumption point. Missing recipes produce an auditable
+  warning link without fake stock transactions; eligible cancellation creates immutable reversals.
+- Electron has connected Persian RTL pages for ingredients, inventory, suppliers, purchases,
+  recipes/costing, and basic finance. Dashboard includes v1.5 operational alerts.
+- Migrations and idempotent seed were applied successfully to the configured PostgreSQL database.
+- Pino structured logging is centralized for Next.js and Electron. The authenticated Admin log
+  viewer combines protected server JSON logs with trusted-IPC desktop logs and filters by source,
+  severity, and text. Sensitive credentials and binary payloads are redacted.
+- Electron navigation is grouped into a single-open Persian accordion: Orders, Products,
+  Kitchen/Inventory, Finance, and System. Dashboard remains permanently visible, nested food
+  editor/photo pages map back to Products/Foods, and the supported 680px window height no longer
+  requires the normal sidebar scrollbar.
+- The complete sidebar can also collapse to a 64px brand rail through an accessible edge toggle.
+  Accordion state is retained while collapsed, and navigation corners use a restrained 5–7px radius.
+- Food tag assignment is now separated from the add/edit food form. Foods list rows expose a
+  `تگ‌ها` action that opens a dedicated tag/badge form while preserving the existing food payload.
+- Food tag assignment only offers active tags; inactive tags remain visible in tag management so
+  administrators can reactivate or edit them.
+- Electron admin mutating API operations emit shared toast notifications for success and failure,
+  giving all save/update/delete/status forms consistent immediate feedback.
+- Duplicate food rows caused by post-migration demo food seeding were removed on 2026-07-30.
+  The seed now creates demo foods only for an empty foods table, and PostgreSQL enforces
+  `foods_name_normalized_uidx` on `lower(btrim(name))` so duplicate display names cannot return.
+- The Mini App home hero now cycles through the existing static hero image plus the current daily
+  menu's uploaded food photos, with accessible controls, automatic pause during interaction,
+  responsive overlays, and a safe fallback to the same static hero image.
+- Customer accounts now support silent validated Telegram login and browser mobile login through
+  SMS.ir OTP. A 30-day HttpOnly customer cookie protects profile, saved-address, order-list, and
+  order-detail APIs without exposing customer tokens to React.
+- Verified Iranian mobile numbers are canonicalized to `09xxxxxxxxx`. Phone identities and the
+  matching Telegram customer profile merge transactionally only after OTP verification; submitted
+  but unverified checkout phone values do not grant access to order history.
+- The Mini App has responsive customer login/profile navigation, editable preferred name and
+  addresses, paginated personal order history, and authorized status/detail timelines.
+- The Mini App exposes a customer `تماس با ما` page from desktop header actions and mobile
+  navigation, with tap-to-call links for `09166450262` and `09163442440`.
+- PostgreSQL migration `0006_old_punisher.sql` adds verified customer-phone mappings and bounded
+  OTP challenges. It also normalizes valid existing Iranian customer phone formats.
+- Both customer web and Electron admin use the bundled Vazir Farsi-digits font build. Application
+  values remain ordinary ASCII `0-9` characters, but Vazir renders their visible glyphs in its
+  Persian style; no character-by-character Persian-digit conversion is performed. Persian/Arabic
+  keyboard digits remain accepted and normalized at numeric input boundaries.
+- The Mini App mobile bottom navigation again shows its Persian labels under the five icons.
+- Electron food-photo uploads use the shared `.data/uploads/foods` filesystem during development.
+  The returned `/api/media/foods/...` URL is served by Next.js; packaged production builds still
+  require configured Liara Object Storage.
+- Electron main now reasserts the development local food-photo adapter before each upload, so
+  repeated photo additions cannot fall through to the production Object Storage requirement.
+- The Mini App food-detail header cart badge now uses the same positioned badge treatment as the
+  mobile navigation instead of letting the count render as a separate line inside the desktop icon.
+- The Mini App mobile menu grid centers its one-column food cards instead of inheriting the
+  desktop start alignment.
+- The Mini App food-detail page now always presents four labeled information sections on desktop
+  and mobile: short description, full description, portion contents, and allergy information.
+- The Mini App food-detail purchase controls use separate placement wrappers: desktop renders
+  below the photo gallery, while mobile keeps the original sticky bottom purchase bar outside the
+  detail layout.
+- Mini App loading cards animate the serving-dish icon with a restrained settling motion and
+  terracotta steam strokes; empty, warning, and error states remain static.
+- Electron Admin form controls explicitly use the bundled Vazir Farsi-digits family, including
+  Chromium's date-input editing fields, so typed ASCII numeric values use the same visible glyphs
+  as read-only Admin content without changing their underlying characters.

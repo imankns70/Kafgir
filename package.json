@@ -1,0 +1,31 @@
+{
+  "name": "kafgir",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n web,admin -c cyan,magenta \"npm run dev:web\" \"npm run dev:admin\"",
+    "build": "npm run build --workspace @kafgir/contracts && npm run build --workspace @kafgir/server-core && npm run build --workspace @kafgir/web && npm run build --workspace @kafgir/admin",
+    "lint": "npm run lint --workspace @kafgir/contracts && npm run lint --workspace @kafgir/server-core && npm run lint --workspace @kafgir/web && npm run lint --workspace @kafgir/admin",
+    "test": "npm run test --workspace @kafgir/contracts && npm run test --workspace @kafgir/server-core && npm run test --workspace @kafgir/web && npm run test --workspace @kafgir/admin",
+    "test:integration": "npm run test:integration --workspace @kafgir/web",
+    "db:test:up": "docker compose -f infra/postgres.compose.yml up -d",
+    "db:test:down": "docker compose -f infra/postgres.compose.yml down",
+    "dev:web": "npm run dev --workspace @kafgir/web",
+    "dev:admin": "npm run dev --workspace @kafgir/admin",
+    "db:generate": "npm run db:generate --workspace @kafgir/web",
+    "db:migrate": "npm run db:migrate --workspace @kafgir/web",
+    "db:seed": "npm run db:seed --workspace @kafgir/web",
+    "migrate:sqlserver": "npm run migrate:sqlserver --workspace @kafgir/web"
+  },
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=11.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.4"
+  }
+}

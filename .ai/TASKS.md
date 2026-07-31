@@ -1,136 +1,98 @@
 # Tasks
 
-- [x] Create repository structure
-- [x] Create backend solution and projects
-- [x] Create desktop solution and WPF admin project
-- [x] Create React Mini App
-- [x] Add starter documentation
-- [x] Build backend solution
-- [x] Build desktop solution
-- [x] Design MVP database entities
-- [x] Add EF Core DbContext
-- [x] Add seed foods
-- [x] Implement Food API endpoints
-- [x] Implement Daily Menu API endpoints
-- [x] Implement Order API endpoints
-- [x] Implement WPF API client
-- [x] Implement WPF dashboard screen
-- [x] Split WPF dashboard delivered/confirmed sales and confirmed/delivered/cancelled order counts
-- [x] Hide unused Preparing and Ready cards from the WPF dashboard
-- [x] Create the canonical flat slotted-turner Kafgir logo and application icon system
-- [x] Split and apply the centralized terracotta/olive/saffron WPF theme
-- [x] Apply local Vazir typography, Kafgir components, and responsive mobile navigation to the Mini App
-- [x] Add shared semantic order-status visuals to WPF and React
-- [x] Document the complete Kafgir brand and theme system
-- [x] Fix WPF startup crashes from unresolved cross-dictionary Kafgir theme resources
-- [x] Fix dashboard order statistics refresh and Iran business-date calculation
-- [x] Implement WPF order list screen
-- [x] Implement WPF order detail/status screen
-- [x] Move WPF order-list action buttons out of the grid into the order details panel
-- [x] Move WPF order detail action buttons beside the detail title
-- [x] Add WPF order-grid row numbers and explicit vertical scrolling
-- [x] Refresh selected order details during WPF order auto-refresh
-- [x] Keep WPF order history visible after status changes
-- [x] Center WPF order-details grid row values
-- [x] Increase WPF order-details typography
-- [x] Show order-grid time before date
-- [x] Make WPF order-grid row numbers one-based
-- [x] Remove synthetic order-created history entries and polish order-page spacing/history width
-- [x] Preserve entered manual-order address text in the saved order snapshot
-- [x] Remove Microsoft.OpenApi dependency/warning
-- [x] Implement WPF Foods screen
-- [x] Implement WPF Daily Menu screen
-- [x] Implement WPF total order report page after Daily Menu
-- [x] Add admin order report filters for customer, phone, receive type, sell type, food, date, status, and order number
-- [x] Move WPF total-report order details to a separate page and make the report grid full width
-- [x] Align WPF total-report grid row values with column headers
-- [x] Change WPF total-report food search to a dropdown
-- [x] Expose WPF Daily Menu open state, note, and settings save controls
-- [x] Move WPF Daily Menu open-state and save controls into the top action bar
-- [x] Replace the WPF Daily Menu add/edit modal with an inline form above the grid
-- [x] Simplify WPF Daily Menu to a current-day-only screen and redesign its operational UI
-- [x] Implement Mini App daily menu page
-- [x] Implement Mini App cart
-- [x] Implement Mini App order submission
-- [x] Initialize the Telegram Web App SDK and native Back button navigation
-- [x] Apply the online Yekan CDN font to the React Mini App (superseded by bundled Vazir)
-- [x] Persist and reconcile the Mini App cart against the latest daily menu
-- [x] Configure local Mini App API URL and API CORS allowlist
-- [x] Repair the Mini App npm lockfile for reproducible installs
-- [x] Refactor identity model to ASP.NET Core Identity
-- [x] Add CustomerProfile and reusable CustomerAddress
-- [x] Add default WPF admin seed
-- [x] Add admin login endpoint
-- [x] Add public customer menu endpoint `/api/menus/today`
-- [x] Protect WPF admin API routes with JWT authorization
-- [x] Add WPF login screen with password hide/show toggle
-- [x] Enable Enter-key submit on the WPF login form
-- [x] Add WPF sidebar logout with session and screen-state cleanup
-- [x] Add Telegram initData validation
-- [x] Add returning customer profile preload endpoint
-- [x] Add Mini App saved-address selection UI
-- [x] Add Worker notification queue
-- [x] Add Telegram order/status notifications
-- [x] Add Swagger UI to API
-- [x] Make Swagger UI the default API Development route
-- [x] Add WPF startup API reachability check
-- [x] Configure WPF Persian calendar display
-- [x] Change WPF admin layout to right sidebar navigation
-- [x] Apply Vazir font to WPF admin
-- [x] Normalize WPF font inheritance and numeric digit output
-- [x] Apply a shared polished Kafgir theme to WPF and the responsive Mini App
-- [x] Remove the shared WPF top panel and give pages the full content workspace
-- [x] Apply consistent top spacing across all authenticated WPF pages
-- [x] Replace the earthy theme with a modern crisp-blue WPF and Mini App design system (superseded by the approved Kafgir identity)
-- [x] Normalize WPF page headers, cards, toolbars, forms, grids, and semantic actions
-- [x] Fix WPF sidebar navigation contrast under global TextBlock styling
-- [x] Restore contextual foreground inheritance across all WPF text
-- [x] Increase WPF input typing font sizes
-- [x] Normalize WPF DataGrid row typography across all grids
-- [x] Lighten the WPF sidebar and simplify Orders, Foods, and Daily Menu grid toolbars
-- [x] Add reusable client-side pagination to every WPF DataGrid
-- [x] Simplify Mini App header, menu cards, cart, checkout, and responsive styling
-- [x] Reduce Mini App mobile font sizes
-- [x] Fix daily menu save/delete behavior for unsold items
-- [x] Add WPF manual order page
-- [x] Fix WPF manual order food selection and city/price input polish
-- [x] Add WPF login food background
-- [x] Fix runtime resolution of the embedded WPF login background
-- [x] Fix WPF daily-menu grid refresh after save
-- [x] Harden manual order storage defaults and phone normalization
-- [x] Move WPF price entry from Foods to Daily Menu add flow
-- [x] Guard daily-menu save against accidental empty-menu deletion
-- [x] Guard repeated Daily Menu save clicks from crashing WPF
-- [x] Preserve unsaved Daily Menu rows during sidebar navigation
-- [x] Make Daily Menu price separator formatting deterministic
-- [x] Match Daily Menu price input behavior to capacity input
-- [x] Restore Daily Menu price input thousands separators
-- [x] Add live Persian words preview under Daily Menu price input
-- [x] Change WPF Daily Menu add flow to immediate API persistence
-- [x] Default Daily Menu ordering to closed
-- [x] Fix WPF order/report ComboBox dropdown rendering
-- [x] Fix WPF SelectOption ComboBoxes showing record text
-- [x] Fix WPF order status filter ComboBox selected value showing record text
-- [x] Fix WPF report filter dropdowns leaking object text
-- [x] Replace circular-looking WPF grid status badges with rectangular badges
-- [x] Fix Mini App menu loading from phone over LAN
-- [x] Rework the Mini App header logo, menu hero, and missing-food-image treatment to match the `ka-2` brand direction
-- [x] Add Categories to the Mini App mobile bottom navigation
-- [x] Correct Kafgir logo assets, real-text wordmark composition, neutral food placeholders, and icon size tokens
-- [x] Reimplement the Kafgir symbol proportions, desktop/mobile header hierarchy, hero treatment, and WPF generated-symbol integration
-- [x] Complete the Mini App final visual-polish pass for logo balance, hero spacing, placeholder height, food-card proportions, and responsive grid behavior
-- [x] Correct the Mini App logo presence and rebuild the menu card hierarchy against the approved `final-de.png` food-card example
-- [x] Complete the focused React header-lockup and compact food-card correction pass
-- [x] Fix Mini App desktop food-card footer price/button wrapping
-- [x] Show plus/minus quantity controls on Mini App food cards after adding to basket
-- [x] Complete the final isolated React header-logo balance and sizing pass
-- [x] Replace the canonical Kafgir spatula with the final broad handcrafted symbol and validate 16–48px rendering
-- [x] Apply the corrected Kafgir brand icon to WPF generated ICO and symbol PNG assets
-- [x] Fix clipped WPF login logo container height
-- [x] Fix WPF runtime resolution of shared icon dimension resources
-- [x] Rename brand to Kafgir
-- [x] Configure development connection strings for Docker SQL Server
-- [x] Add per-machine local connection string override support for API and Worker
-- [x] Configure this non-Docker machine for LocalDB and apply all current migrations
-- [x] Move legacy markdown docs into `.ai/docs`
-- [ ] Add AI food image generation workflow
+## Complete
+
+- [x] Create npm workspace and shared Zod contracts
+- [x] Move the Mini App to Next.js App Router
+- [x] Preserve customer and admin `/api/...` contracts
+- [x] Model PostgreSQL persistence with Drizzle
+- [x] Implement capacity row locks and advisory order-number locking
+- [x] Implement ASP.NET Identity V3 compatibility and scrypt upgrade
+- [x] Implement Telegram `initData` validation
+- [x] Implement durable notification processing
+- [x] Implement Electron admin feature coverage and Persian dates
+- [x] Secure Electron preload, renderer, in-memory admin session, and remote URL handling
+- [x] Implement SQL Server-to-PostgreSQL import and validation
+- [x] Add unit/parity and guarded PostgreSQL integration tests
+- [x] Build Next.js and Electron
+- [x] Package and smoke-launch the Windows x64 NSIS installer
+- [x] Create rollback tag `legacy-dotnet-final-2026-07-28`
+- [x] Delete the .NET/WPF/Worker and old Vite source structures
+- [x] Remove obsolete legacy documentation
+- [x] Initialize local PostgreSQL `kafgir` database and run Drizzle migrations
+- [x] Seed starter roles, foods, and local admin user
+- [x] Replace legacy logo variants with `branding/logo.png` derivatives across Next.js and Electron
+- [x] Add secure food-photo upload, WebP normalization, previews, Object Storage integration, and managed cleanup
+- [x] Add food categories, tags, validated primary badges, ordered galleries, likes, and favorites
+- [x] Add customer food details, database-driven category filters, related foods, and card detail navigation
+- [x] Add an admin-photo carousel to the customer food detail page.
+- [x] Add Electron category/tag management and expanded food editor
+- [x] Move the Electron food editor out of the catalog grid into a dedicated page
+- [x] Prevent duplicate food names, clean current local duplicates, add food-photo status to the catalog list, and split photo upload into a separate editor form/card
+- [x] Rename admin slug wording to `عنوان انگلیسی` and add Daily Menu price separators plus live Persian price words
+- [x] Move food photo upload out of the add/update food page into a dedicated photo-management page
+- [x] Restore evolved WPF order/report UX in Electron with dedicated details, pagination, complete columns and filters, status actions, and auto-refresh
+- [x] Replace the simple Electron manual-order page with the evolved WPF-style order-entry layout
+- [x] Replace the separate Electron order-detail page with the WPF-style split Orders layout
+- [x] Fix Electron manual-order shortcut punctuation and Next.js order-create timestamp binding error
+- [x] Apply and seed PostgreSQL migration `0002_food_discovery.sql`
+
+## Remaining operational work
+
+- [x] Run guarded PostgreSQL integration tests against disposable `kafgir_food_discovery_test`
+- [ ] Review the default `rice` assignment for four pre-existing foods (`food-1` through `food-4`)
+- [ ] Rehearse the SQL Server import against staging PostgreSQL
+- [ ] Rotate and configure production database, JWT, Telegram, and processor secrets
+- [ ] Deploy Next.js and PostgreSQL on Liara
+- [ ] Create the public Liara Object Storage bucket, configure bucket-scoped credentials, and include it in the production backup plan
+- [ ] Save the production PostgreSQL TLS URL and Object Storage settings through the packaged Electron first-run setup
+- [ ] Run production order, admin, report, and notification smoke tests
+- [ ] Upgrade Next.js when a stable release resolves the inherited PostCSS/Sharp advisories
+- [x] Add Kafgir 1.5 PostgreSQL schema and idempotent reference-data seed.
+- [x] Add v1.5 shared Zod contracts for ingredients, purchasing, inventory, recipes and finance.
+- [x] Add transactional purchase confirmation/reversal and immutable inventory movements.
+- [x] Connect order confirmation/cancellation to recipe consumption/reversal.
+- [x] Add ingredient, supplier, purchase, inventory, recipe and finance Electron admin screens.
+- [x] Separate cash, POS, card-to-card and online methods in customer/admin payment UI.
+- [x] Add shopping requirements/list, payment verification/refund and managerial report APIs.
+- [x] Add centralized Pino logging, sensitive-field redaction, and the Admin log viewer.
+- [x] Replace the flat Electron sidebar with a tested single-open grouped navigation accordion.
+- [x] Add full sidebar collapse/expand behavior and reduce excessive navigation corner radii.
+- [x] Split food tag assignment into a dedicated Admin `تگ‌ها` form opened from the Foods page.
+- [x] Add shared Electron Admin toast notifications for mutating form operations.
+- [x] Remove seed-created duplicate foods and add a database-level normalized food-name uniqueness guard.
+- [x] Replace the Mini App home hero's single static photo with a responsive carousel containing the static hero plus daily-menu food photos.
+- [x] Clarify Electron food editor/photo labels and keep sparse Orders grids pinned to the top of their panels.
+- [x] Add unified Telegram/mobile OTP customer authentication with HttpOnly sessions.
+- [x] Add customer profile editing, saved-address management, personal order history, and protected order details.
+- [x] Add the Mini App `تماس با ما` page and navigation entry with two customer phone links.
+- [x] Add SMS.ir verification delivery, OTP rate limits/digests, phone normalization, and customer identity merging.
+- [x] Extract the framework-independent PostgreSQL schema and transactional admin services into `packages/server-core`.
+- [x] Replace Electron admin HTTP traffic with allowlisted typed IPC and direct PostgreSQL access confined to Electron main.
+- [x] Add DPAPI-encrypted first-run database/Object Storage configuration and direct Liara S3 food-photo uploads.
+- [x] Add the restricted Electron PostgreSQL role script and legacy disk-to-Object-Storage migration utility.
+- [x] Fix `npm run dev` Electron startup by bundling shared contracts into Electron main and serializing database runtime configuration.
+- [x] Standardize visible numeric output on Latin `0-9` digits in Web and Electron Admin, with formatter regression tests.
+- [x] Switch both application UIs to Vazir's Farsi-digits build without changing underlying ASCII number characters.
+- [x] Force Vazir FD rendering inside Web/Admin typed inputs, placeholders, autofill, LTR fields, and number controls.
+- [x] Restore Persian labels beneath the Mini App bottom-navigation icons.
+- [x] Restore Electron's local development food-photo adapter when Liara Object Storage is not configured.
+- [x] Align the Mini App food-detail desktop cart badge with the existing mobile badge treatment.
+- [x] Center one-column Mini App food cards on mobile widths.
+- [x] Remove the confusing share/forward icon from the Mini App food-detail header and keep the top back action clear.
+- [x] Swap the Mini App food-detail header basket and back control positions while preserving each icon.
+- [x] Hide the Mini App food-detail favorite header icon until the customer is logged in.
+- [x] Change Mini App basket badges to count distinct foods instead of summed portions.
+- [x] Swap the `ادامه خرید` basket-page button text/icon order for the RTL layout.
+- [x] Remove separate address-description fields from Web/Admin/contracts/database and keep one address textarea.
+- [x] Show labeled short/full description, portion contents, and allergy sections on the Mini App food-detail page.
+- [x] Keep the food-detail purchase controls under the photo on desktop without moving the mobile sticky bar structure.
+- [x] Animate the Mini App serving-dish mark only during menu and food-detail loading states.
+- [x] Enforce Vazir Farsi-digit rendering for typed values in all Electron Admin form controls.
+- [ ] Configure the production SMS.ir API key, approved template ID, OTP secret, and allowed public origin.
+- [ ] Create the production `kafgir_electron_admin` role, save its TLS URL through first-run setup, and rotate it after the acceptance test.
+- [ ] Create the public Liara food-image bucket, migrate legacy disk URLs with the dry-run utility, and verify public URLs before removing the legacy media route.
+- [ ] Remove compatibility `/api/admin/*` and admin-login Next.js routes after packaged Electron acceptance.
+- [ ] Expand the first operational Electron screens with multi-line purchase/recipe editors,
+  receipt/attachment upload and dedicated POS/payment/report pages.
+- [ ] Add isolated PostgreSQL integration coverage when Docker Desktop is available.

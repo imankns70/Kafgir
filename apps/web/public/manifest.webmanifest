@@ -1,0 +1,23 @@
+{
+  "name": "کفگیر | غذای خانگی",
+  "short_name": "کفگیر",
+  "description": "منوی روزانه غذای خانگی کفگیر در اندیمشک",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF3E2",
+  "theme_color": "#E46A4A",
+  "icons": [
+    {
+      "src": "/kafgir-app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/kafgir-app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

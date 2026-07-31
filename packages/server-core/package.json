@@ -1,0 +1,32 @@
+{
+  "name": "@kafgir/server-core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./db": "./src/db/client.ts",
+    "./schema": "./src/db/schema.ts",
+    "./services/*": "./src/services/*.ts",
+    "./auth/*": "./src/auth/*.ts",
+    "./logging/*": "./src/logging/*.ts",
+    "./storage/*": "./src/storage/*.ts",
+    "./telegram/*": "./src/telegram/*.ts"
+  },
+  "scripts": {
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@kafgir/contracts": "1.0.0",
+    "drizzle-orm": "0.45.2",
+    "pino": "^10.3.1",
+    "postgres": "3.4.9"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.2",
+    "typescript": "6.0.2",
+    "vitest": "4.1.10"
+  }
+}

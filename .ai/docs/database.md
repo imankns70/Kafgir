@@ -1,30 +1,49 @@
 # Database
 
-The initial SQL Server schema is represented by `InitialKafgirSchema`, followed by `AddIdentityCustomerProfilesAndAddresses`. The current model includes:
+Kafgir uses PostgreSQL with Drizzle ORM.
 
-- ASP.NET Core Identity tables (`AspNetUsers`, `AspNetRoles`, claims, logins, tokens, and user roles)
-- TelegramAccounts
-- CustomerProfiles
-- CustomerAddresses
-- Foods
-- DailyMenus
-- DailyMenuItems
-- Orders
-- OrderItems
-- OrderStatusHistories
-- NotificationMessages
-- AppSettings
+- Canonical schema: `packages/server-core/src/db/schema.ts`
+- Generated migrations: `apps/web/drizzle`
+- Shared client factory: `packages/server-core/src/db/client.ts`
+- Seed utility: `apps/web/scripts/seed.ts`
+- One-time SQL Server importer: `apps/web/scripts/migrate-sqlserver.ts`
 
-Daily menu dates are unique, and each food can appear only once per daily menu. Order items preserve food name and price snapshots. The four MVP foods are included as seed data. The migration has been generated but has not been applied to a database.
+## Model
 
-`DailyMenuItem.CapacityPortions` stores capacity as a number of portions. Daily-menu management APIs may change capacity only when it remains at least the existing `SoldPortions`; they never reduce or otherwise modify `SoldPortions`. Order submission does not reserve capacity. Confirming an order increases `SoldPortions`, and cancelling a confirmed, preparing, or ready order restores its portions.
+The schema includes users, roles and Identity compatibility tables, Telegram accounts, customer profiles and addresses, foods, daily menus and menu items, orders and immutable order lines, status history, notification outbox messages, and application settings.
 
-`OrderItem` stores snapshot values for food name, unit price, quantity, and total price so later food or menu changes do not alter historical orders.
+Customer addresses and order delivery snapshots keep a single address text field. Migration `0007_mighty_kree.sql` preserves legacy note text by appending it into the address line before dropping the old `customer_addresses.description` and `orders.delivery_address_description` columns.
 
-`CustomerProfiles` stores customer-specific business data and has a unique `UserId` link to Identity. `CustomerAddresses` stores multiple reusable, soft-disabled delivery addresses. Orders reference a profile and optionally a saved address, but also persist delivery name, phone, city, address line, and description snapshots.
+Food discovery is normalized through:
 
-`TelegramAccounts` stores Telegram-specific user and chat metadata, including `TelegramUserId`, username/name fields, `ChatId`, and last-seen timestamps. It has a unique one-to-one `UserId` link to `AspNetUsers` and a unique `TelegramUserId`. The migration backfills the table from existing Identity Telegram columns so older users keep their Telegram linkage.
+- `food_categories`: one required category per food;
+- `food_tags` and `food_to_tags`: reusable many-to-many labels;
+- `foods.primary_badge_tag_id`: an optional highlighted tag, validated as one of the food's assigned tags;
+- `food_images`: ordered image gallery with a partial unique index allowing at most one primary image;
+- `food_likes` and `food_favorites`: idempotent customer interactions with composite user/food primary keys.
 
-The Identity migration preserves legacy customer IDs and copies existing customer/order/address data before removing the old custom Customers table. The old passwordless Admins table is replaced by an Identity admin created through the development seeder.
+Migration `0002_food_discovery.sql` introduces these structures without resetting existing data. Existing foods are first assigned to the seeded `rice` category while the new columns are nullable, and only then are the required constraints applied. Legacy image URLs are copied into `food_images`.
 
-`NotificationMessages` is a durable outbox for Telegram notifications. Order submission and order status changes enqueue messages in the same database save as the business change. The Worker reads pending messages, sends them through Telegram, stores attempt timestamps/errors, and marks messages as `Sent` or `Failed` after the configured retry limit.
+Food image binaries are not database data. In local development, new images are normalized by Electron main and stored in `.data/uploads/foods`; PostgreSQL stores application-relative `/api/media/foods/{uuid}.webp` URLs served by Next.js. In production, new images are stored in a public Liara S3-compatible Object Storage bucket and PostgreSQL stores the public HTTPS URL. Existing external URLs remain valid. Local `/api/media/foods/{uuid}.webp` values can be migrated with `npm run migrate:food-images --workspace @kafgir/web -- --apply`; the migration retains local files for rollback.
+
+Electron uses the restricted `kafgir_electron_admin` login created by `infra/postgres/create-electron-admin-role.sql`. It has application DML and sequence privileges but cannot own schemas, create databases/roles, or run migrations.
+
+PostgreSQL preserves:
+
+- integer primary keys and numeric enum values;
+- `numeric(18,2)` money columns;
+- date-only menu dates;
+- UTC timestamp values;
+- unique menu dates, unique menu food entries, and unique order numbers;
+- foreign keys and snapshot records;
+- nonnegative capacity, sold-portion, money, quantity, and retry constraints.
+
+## Transactions
+
+Order submission starts in `PendingConfirmation` and does not reserve capacity. Confirmation locks the order and referenced menu rows before incrementing sold portions. Cancellation restores portions when required. Persian-year order-number generation is serialized with a PostgreSQL transaction advisory lock.
+
+## Testing
+
+The guarded integration suite requires `TEST_DATABASE_URL` whose database name contains `test`. Local disposable PostgreSQL configuration is in `infra/postgres.compose.yml`.
+
+`drizzle.config.ts` loads the Next.js environment files, so `npm run db:migrate` uses `apps/web/.env.local` during local development.

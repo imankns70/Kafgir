@@ -6,11 +6,11 @@ The brand is **Kafgir / کفگیر**. It represents authentic Persian homemade f
 
 The primary atmosphere reference is `ka-2.png` at the repository root. The practical logo and component guide is `final-de.png`. Both are reference boards only and must not be embedded as application pages, backgrounds, food images, or sources of text.
 
-## Symbol
+## Identity source
 
-The Kafgir symbol is a flat slotted cooking turner with a softly rounded rectangular head, four long vertical slots, and a warm wooden handle. The friendly handcrafted silhouette must remain clear at small sizes.
+`branding/logo.png` is the single source of truth for the Kafgir visual identity. It contains the approved flat four-slot cooking spatula, wooden handle, plate, olive branch, saffron accent, and terracotta rounded-square composition.
 
-It is never a ladle, soup ladle, deep serving spoon, rounded slotted spoon, or soup-related utensil. This applies to logos, favicons, application icons, navigation, empty states, packaging badges, and future generated assets.
+Do not redraw, recolor, stretch, or replace parts of the identity in application code. It is never substituted with a ladle, soup ladle, deep serving spoon, rounded slotted spoon, or soup-related utensil.
 
 ## Personality
 
@@ -45,9 +45,9 @@ Do not introduce repeated literal colors inside views or components. Add or adju
 
 ## Typography
 
-The repository contains licensed Vazir Regular, Medium, and Bold assets. WPF embeds TTF; React embeds WOFF2. No operating-system font or font CDN is required.
+The repository contains licensed Vazir Regular, Medium, and Bold WOFF2 assets used by both React applications. No operating-system font or font CDN is required.
 
-IranSans and IranYekan files are not present and were not downloaded. Vazir remains replaceable through centralized `AppFontFamily` and CSS `@font-face` definitions.
+IranSans and IranYekan files are not present and were not downloaded. Vazir remains replaceable through centralized CSS `@font-face` definitions.
 
 Use real bundled weights only: Regular 400, Medium 500, and Bold 700. Do not synthesize weight 600.
 
@@ -62,40 +62,27 @@ Roles are BrandTitle 32, HeroTitle 30, DisplayTitle 28, PageTitle 24, SectionTit
 
 ## Logo and generated assets
 
-Canonical assets live in `branding/`:
+- Canonical source: `branding/logo.png`.
+- Transparent-corner runtime logo: generated into each application's `/branding/logo.png`.
+- Web assets: favicon PNGs, multi-resolution `favicon.ico`, Apple touch icon, and PWA PNGs from 16 through 512 pixels.
+- Electron asset: multi-resolution `apps/admin/build/kafgir.ico`.
+- Neutral food fallback: `branding/illustrations/food-placeholder.svg`. This is an illustration, not a logo or identity variant.
 
-- Symbol-only assets: `kafgir-symbol.svg`, `kafgir-symbol-light.svg`, `kafgir-symbol-dark.svg`, and `kafgir-symbol-small.svg`.
-- App assets: `kafgir-app-icon.svg`.
-- Secondary assets: `kafgir-brand-badge.svg`, `kafgir-food-placeholder.svg`, and `kafgir-decoration.svg`.
-- `generated/` PNG sizes from 16 through 512 and the WPF multi-resolution ICO.
-
-Run `scripts/generate-kafgir-icons.ps1` to regenerate raster icons. Small icons contain no text and prioritize the slotted rectangular head.
-
-React renders the wordmark as real HTML Vazir text through `BrandLogo`. WPF renders it as a real Vazir `TextBlock`. SVG assets must not contain the Persian wordmark as `<text>` or paths, and the symbol/app-icon assets remain symbol-only.
-
-The WPF project has no native SVG dependency. Its logo templates therefore use the transparent `Assets/Brand/kafgir-symbol.png` generated from the same canonical script and compose it with a real Persian `TextBlock`. This generated file must not be edited by hand.
+Run `scripts/generate-kafgir-icons.ps1` after replacing the canonical source. The script deterministically preserves aspect ratio, removes only the opaque outer canvas corners, creates all runtime sizes, and copies them into Next.js and Electron. Do not maintain parallel SVG logo variants.
 
 ## Icon style
 
 Application icons use a 24×24 outline grid, 1.8px strokes, rounded caps, rounded joins, and `currentColor` or semantic brushes. Terracotta represents active actions, olive represents secondary or inactive navigation, and saffron is a restrained accent. Do not mix emoji, unrelated filled icon sets, or random icon colors.
 
-The brand symbol is the intentional filled exception: flat charcoal head, cream slots, and wooden handle.
+The supplied brand image is the intentional filled exception to the outline UI icon system.
 
-## WPF theme
+## Application themes
 
-The WPF theme is under `backend/src/Kafgir.WPF/Themes/Kafgir`: `Colors`, `Dimensions`, `Typography`, `Icons`, `Controls`, `Surfaces`, `DataGrid`, `Navigation`, and the merging `KafgirTheme` dictionary.
+The Mini App design system is under `apps/web/src/client`; tokens, fonts, RTL rules, reusable logo/icon/state components, food imagery, and responsive navigation remain centralized there.
 
-`App.xaml` merges the theme. Common controls, navigation, cards, feedback panels, DataGrids, typography, status badges, and focus/disabled states reuse these resources. Application icon configuration is in `Kafgir.WPF.csproj`.
+The Electron admin theme is under `apps/admin/src/renderer/src`. It reuses the same palette, typography, RTL direction, status meanings, rounded surfaces, and focus behavior while prioritizing dense operational layouts.
 
-WPF remains RTL at Window/UserControl level. Phone and order-number inputs use local LTR flow only where required. Existing Persian culture, numeric, and date behavior is unchanged.
-
-## React theme
-
-React tokens are in `src/styles/tokens.css`; fonts and root RTL rules are in `src/index.css`; application components and responsive behavior are in `src/App.css`.
-
-Reusable components in `src/design-system` are `BrandLogo`, `Icon`, `StatusBadge`, `FoodImage`, and `BrandedState`.
-
-`index.html` is `lang="fa"` and `dir="rtl"`, uses local fonts, and references the Kafgir favicon. Mobile navigation uses existing Menu, Categories, and Cart actions, supports safe areas, and has no decorative center action. Logical CSS properties are preferred. Food images use a consistent aspect ratio and `object-fit: cover`; failed or missing images use the neutral food placeholder, never the complete logo or brand symbol.
+Both applications keep phone numbers and identifiers locally LTR where necessary. Food images use a consistent aspect ratio and `object-fit: cover`; failed or missing images use the neutral food placeholder, never the complete logo or brand symbol.
 
 ## Order statuses
 
@@ -114,10 +101,10 @@ Badges include Persian text and may include an outline icon, so status is not co
 
 ## Correct usage
 
-- Use the flat slotted turner and real Persian word `کفگیر`.
+- Use only `branding/logo.png` and its generated derivatives for application identity.
 - Use cream surfaces, terracotta actions, olive natural accents, and limited saffron details.
 - Keep food photography warm, realistic, naturally lit, correctly cropped, and free of stretching.
-- Keep WPF operational grids calm and decorations sparse.
+- Keep Electron operational grids calm and decorations sparse.
 - Preserve visible focus, readable contrast, touch targets, and keyboard navigation.
 
 ## Incorrect usage
@@ -126,6 +113,6 @@ Badges include Persian text and may include an outline icon, so status is not co
 - Never use `ka-2.png` as a page, background, or food image.
 - Never extract malformed reference-image text.
 - Never restore the old blue/purple Vite identity or remote font CDN.
-- Never put a full wordmark in tiny icons.
+- Never introduce a second hand-built logo or substitute interface icon as the brand mark.
 - Never duplicate semantic colors per page.
 - Never add decorative leaves or floral marks to every operational control.

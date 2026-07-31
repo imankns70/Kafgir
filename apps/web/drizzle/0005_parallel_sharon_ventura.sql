@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "foods_name_normalized_uidx" ON "foods" USING btree (lower(btrim("name")));

@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1785239316690,
+      "tag": "0000_ambitious_carmella_unuscione",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1785240586783,
+      "tag": "0001_huge_viper",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785262292237,
+      "tag": "0002_food_discovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785341369409,
+      "tag": "0003_futuristic_praxagora",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785341793355,
+      "tag": "0004_slim_mystique",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785408622557,
+      "tag": "0005_parallel_sharon_ventura",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785434702636,
+      "tag": "0006_old_punisher",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785531330452,
+      "tag": "0007_mighty_kree",
+      "breakpoints": true
+    }
+  ]
+}

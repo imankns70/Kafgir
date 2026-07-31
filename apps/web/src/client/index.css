@@ -1,0 +1,121 @@
+@import './styles/tokens.css';
+
+@font-face {
+  font-family: 'Vazir';
+  src: url('./assets/fonts/Vazir-Regular-FD.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazir';
+  src: url('./assets/fonts/Vazir-Medium-FD.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazir';
+  src: url('./assets/fonts/Vazir-Bold-FD.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  font-family: 'Vazir', Tahoma, Arial, sans-serif;
+  color: var(--kafgir-color-text-primary);
+  background: var(--kafgir-color-background);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  min-height: 100%;
+  color-scheme: light;
+  direction: rtl;
+  background: var(--kafgir-color-background);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--kafgir-color-text-primary);
+  background:
+    radial-gradient(circle at 8% 12%, rgba(242, 178, 51, .13), transparent 24rem),
+    radial-gradient(circle at 92% 30%, rgba(111, 127, 78, .10), transparent 25rem),
+    var(--kafgir-color-background);
+  font-size: var(--kafgir-type-body);
+  line-height: 1.7;
+}
+
+nextjs-portal {
+  display: none !important;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  font-family: 'Vazir', Tahoma, Arial, sans-serif;
+  font-variant-numeric: normal;
+  font-feature-settings: normal;
+}
+
+input,
+textarea,
+select,
+input::placeholder,
+textarea::placeholder,
+input[dir="ltr"],
+textarea[dir="ltr"],
+.ltr-value {
+  font-family: 'Vazir', Tahoma, Arial, sans-serif !important;
+  font-variant-numeric: normal;
+  font-feature-settings: normal;
+}
+
+input::-webkit-input-placeholder,
+textarea::-webkit-input-placeholder,
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  font-family: 'Vazir', Tahoma, Arial, sans-serif !important;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+img,
+svg {
+  display: block;
+}
+
+::selection {
+  color: var(--kafgir-color-text-primary);
+  background: var(--kafgir-color-accent-soft);
+}
