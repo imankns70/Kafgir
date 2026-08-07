@@ -18,6 +18,7 @@ coverage/
 # Secrets and local environment
 secrets.json
 appsettings.*.local.json
+sms-config.txt
 .env
 .env.*
 !.env.example

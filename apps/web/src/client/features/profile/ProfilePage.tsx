@@ -25,6 +25,7 @@ import {
   type OrderDto,
 } from '../../types'
 import { formatMoney, formatNumber, formatPersianDateTime } from '../../utils/format'
+import { OrderInvoice } from '../orders/OrderInvoice'
 
 type LoginStep = 'phone' | 'code'
 const emptyAddress: CustomerAddressWriteRequest = {
@@ -38,7 +39,10 @@ const asciiDigits = (value: string) => value
   .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
   .replace(/\D/g, '')
 
-export function ProfilePage({ onBack }: { onBack: () => void }) {
+export function ProfilePage({ onBack, onAuthenticationChange }: {
+  onBack: () => void
+  onAuthenticationChange: (authenticated: boolean) => void
+}) {
   const [profile, setProfile] = useState<CustomerProfileDto | null>(null)
   const [orders, setOrders] = useState<CustomerOrdersPageDto | null>(null)
   const [selectedOrder, setSelectedOrder] = useState<OrderDto | null>(null)
@@ -61,11 +65,13 @@ export function ProfilePage({ onBack }: { onBack: () => void }) {
       const initData = getTelegramInitData()
       if (!session.authenticated && initData) session = await loginCustomerWithTelegram(initData)
       if (session.authenticated && session.profile) {
+        onAuthenticationChange(true)
         setProfile(session.profile)
         setEditingName(session.profile.preferredName)
         setOrders(await getCustomerOrders())
-      }
+      } else onAuthenticationChange(false)
     } catch (loadError) {
+      onAuthenticationChange(false)
       setError(loadError instanceof Error ? loadError.message : 'دریافت حساب کاربری ممکن نشد.')
     } finally {
       setIsLoading(false)
@@ -102,6 +108,7 @@ export function ProfilePage({ onBack }: { onBack: () => void }) {
       const session = await verifyCustomerOtp(phone, code)
       if (!session.profile) throw new Error('پروفایل مشتری ایجاد نشد.')
       setProfile(session.profile)
+      onAuthenticationChange(true)
       setEditingName(session.profile.preferredName)
       setOrders(await getCustomerOrders())
       setCode('')
@@ -170,6 +177,7 @@ export function ProfilePage({ onBack }: { onBack: () => void }) {
     setOrders(null)
     setSelectedOrder(null)
     setPhone('')
+    onAuthenticationChange(false)
   }
 
   if (isLoading && !profile) return <BrandedState title="در حال دریافت حساب شما" message="کمی صبر کنید…" icon="profile" />
@@ -178,7 +186,7 @@ export function ProfilePage({ onBack }: { onBack: () => void }) {
     <main className="profile-login-page">
       <div className="page-actions">
         <div><p className="eyebrow"><Icon name="profile" size="sm" /> حساب مشتری</p><h1 className="section-title">پروفایل کفگیر</h1></div>
-        <button className="outline-button menu-back-button" onClick={onBack}><Icon name="back" size="sm" /> بازگشت</button>
+        <button className="checkout-back-link" onClick={onBack}>بازگشت <Icon name="back" size="sm" /></button>
       </div>
       <form className="panel form-grid profile-login-card" onSubmit={loginStep === 'phone' ? sendOtp : verifyOtp}>
         <h2 className="section-title">{loginStep === 'phone' ? 'ورود با شماره موبایل' : 'کد تایید'}</h2>
@@ -206,7 +214,7 @@ export function ProfilePage({ onBack }: { onBack: () => void }) {
     <main className="customer-order-detail">
       <div className="page-actions">
         <div><p className="eyebrow">شماره سفارش {formatNumber(selectedOrder.orderNumber)}</p><h1 className="section-title">جزئیات سفارش</h1></div>
-        <button className="outline-button menu-back-button" onClick={() => setSelectedOrder(null)}><Icon name="back" size="sm" /> سفارش‌ها</button>
+        <button className="checkout-back-link" onClick={() => setSelectedOrder(null)}>سفارش‌ها <Icon name="back" size="sm" /></button>
       </div>
       <section className="panel order-detail-summary">
         <div><span>وضعیت</span><StatusBadge status={selectedOrder.status} /></div>
@@ -225,6 +233,7 @@ export function ProfilePage({ onBack }: { onBack: () => void }) {
         <p>{selectedOrder.customerFullName}، <bdi>{selectedOrder.customerPhoneNumber}</bdi></p>
         {selectedOrder.addressLine && <p>{selectedOrder.addressLine}</p>}
       </section>
+      <OrderInvoice order={selectedOrder} />
       <section className="panel">
         <h2 className="section-title">تاریخچه وضعیت</h2>
         <ol className="order-timeline">
@@ -240,7 +249,7 @@ export function ProfilePage({ onBack }: { onBack: () => void }) {
     <main className="customer-profile-page">
       <div className="page-actions">
         <div><p className="eyebrow"><Icon name="profile" size="sm" /> حساب مشتری</p><h1 className="section-title">پروفایل من</h1></div>
-        <button className="outline-button menu-back-button" onClick={onBack}><Icon name="back" size="sm" /> منوی امروز</button>
+        <button className="checkout-back-link" onClick={onBack}>منوی امروز <Icon name="back" size="sm" /></button>
       </div>
       {error && <div className="form-error" role="alert">{error}</div>}
       <div className="profile-layout">
@@ -249,13 +258,18 @@ export function ProfilePage({ onBack }: { onBack: () => void }) {
             <h2 className="section-title">اطلاعات حساب</h2>
             <label className="field">نام و نام خانوادگی<input value={editingName} onChange={(event) => setEditingName(event.target.value)} /></label>
             <div className="profile-identity"><span>شماره موبایل</span><bdi>{profile.defaultPhoneNumber || 'ثبت نشده'}</bdi>{profile.phoneNumberConfirmed && <span className="verified-label"><Icon name="confirm" size="xs" /> تاییدشده</span>}</div>
-            {profile.telegramUsername && <div className="profile-identity"><span>تلگرام</span><bdi>@{profile.telegramUsername}</bdi></div>}
+            {profile.telegramUserId != null && <div className="profile-identity profile-telegram-identity">
+              <span>حساب تلگرام</span>
+              <bdi>{profile.telegramUsername ? `@${profile.telegramUsername}` : 'بدون نام کاربری'}</bdi>
+              <small>شناسه: <bdi>{profile.telegramUserId}</bdi></small>
+              <span className="verified-label"><Icon name="confirm" size="xs" /> متصل</span>
+            </div>}
             <button className="primary-button" disabled={isSubmitting}>ذخیره نام</button>
           </form>
 
           {!profile.phoneNumberConfirmed && <form className="panel form-grid" onSubmit={loginStep === 'phone' ? sendOtp : verifyOtp}>
             <h2 className="section-title">تایید شماره موبایل</h2>
-            <p className="muted">با تایید شماره، سفارش‌های ثبت‌شده با این موبایل به حساب تلگرام شما متصل می‌شوند.</p>
+            <p className="muted">با تایید شماره، سفارش‌ها و آدرس‌های ثبت‌شده با این موبایل به همین حساب متصل می‌شوند. فقط داشتن یا وارد کردن شماره برای دسترسی کافی نیست.</p>
             {loginStep === 'phone'
               ? <label className="field">شماره موبایل<input className="ltr-value" dir="ltr" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
               : <label className="field">کد تایید<input className="otp-input ltr-value" dir="ltr" inputMode="numeric" maxLength={6} value={code} onChange={(event) => setCode(asciiDigits(event.target.value))} /></label>}

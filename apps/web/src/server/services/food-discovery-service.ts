@@ -2,6 +2,7 @@ import type {
   FavoriteFoodDto,
   FoodDetailDto,
   FoodInteractionResponse,
+  PersianRiceDto,
 } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
 import { NotFoundError } from '../errors'
@@ -28,9 +29,12 @@ type DetailBase = {
   isMenuOpen: boolean | null
   orderDeadline: Date | null
   price: number | null
+  originalPrice: number | null
+  discountPercentage: number | null
   capacityPortions: number | null
   soldPortions: number | null
   isAvailable: boolean | null
+  allowsPersianRice: boolean
 }
 
 export function evaluateFoodAvailability(base: Pick<
@@ -68,8 +72,14 @@ export async function getFoodDetail(
            f.preparation_time_minutes AS "preparationTimeMinutes",
            c.id AS "categoryId", c.title AS "categoryTitle", c.slug AS "categorySlug",
            c.icon AS "categoryIcon", f.primary_badge_tag_id AS "primaryBadgeTagId",
+           f.allows_persian_rice AS "allowsPersianRice",
            mi.id AS "menuItemId", m.menu_date AS "menuDate", m.is_open AS "isMenuOpen",
-           m.order_deadline AS "orderDeadline", mi.price::float8 AS price,
+           m.order_deadline AS "orderDeadline",
+           COALESCE(mi.discount_price, mi.price)::float8 AS price,
+           CASE WHEN mi.discount_price IS NOT NULL THEN mi.price::float8 ELSE NULL END AS "originalPrice",
+           CASE WHEN mi.discount_price IS NOT NULL
+             THEN ROUND(((mi.price - mi.discount_price) / mi.price) * 100)::int
+             ELSE NULL END AS "discountPercentage",
            mi.capacity_portions AS "capacityPortions", mi.sold_portions AS "soldPortions",
            mi.is_available AS "isAvailable"
     FROM foods f
@@ -91,7 +101,7 @@ export async function getFoodDetail(
   const base = rows[0]
   if (!base) throw new NotFoundError('غذا پیدا نشد.')
 
-  const [tags, images, interaction, related] = await Promise.all([
+  const [tags, images, interaction, related, persianRice] = await Promise.all([
     sqlClient<Array<{ id: number; title: string; slug: string; icon: string | null; group: FoodDetailDto['tags'][number]['group'] }>>`
       SELECT t.id, t.title, t.slug, t.icon, t.group_name AS "group"
       FROM food_to_tags ft
@@ -119,9 +129,14 @@ export async function getFoodDetail(
     sqlClient<FoodDetailDto['relatedFoods']>`
       SELECT i.id AS "menuItemId", rf.slug, rf.name AS title,
              COALESCE(ri.image_url, rf.image_url) AS "imageUrl",
-             i.price::float8 AS price,
+             COALESCE(i.discount_price, i.price)::float8 AS price,
+             CASE WHEN i.discount_price IS NOT NULL THEN i.price::float8 ELSE NULL END AS "originalPrice",
+             CASE WHEN i.discount_price IS NOT NULL
+               THEN ROUND(((i.price - i.discount_price) / i.price) * 100)::int
+               ELSE NULL END AS "discountPercentage",
              CASE WHEN bt.id IS NULL THEN NULL
-               ELSE json_build_object('title', bt.title, 'icon', bt.icon) END AS "primaryBadge"
+               ELSE json_build_object('title', bt.title, 'icon', bt.icon) END AS "primaryBadge",
+             rf.allows_persian_rice AS "allowsPersianRice"
       FROM daily_menu_items i
       JOIN daily_menus m ON m.id = i.daily_menu_id
       JOIN foods rf ON rf.id = i.food_id
@@ -131,7 +146,7 @@ export async function getFoodDetail(
         SELECT image_url FROM food_images
         WHERE food_id = rf.id ORDER BY is_primary DESC, display_order, id LIMIT 1
       ) ri ON true
-      WHERE rf.id <> ${base.foodId} AND rf.is_active = true
+      WHERE rf.id <> ${base.foodId} AND rf.is_active = true AND NOT rf.is_persian_rice
         AND m.menu_date >= ${today}::date AND m.is_open = true
         AND i.is_available = true AND i.capacity_portions > i.sold_portions
       ORDER BY
@@ -142,6 +157,21 @@ export async function getFoodDetail(
         m.menu_date, i.id
       LIMIT 4
     `,
+    // The Persian upgrade belongs to the whole menu, not to one dish, so it is fetched by menu.
+    base.menuItemId ? sqlClient<PersianRiceDto[]>`
+      SELECT ri.id AS "menuItemId", rf.id AS "foodId",
+             rf.name AS title, rf.image_url AS "imageUrl",
+             COALESCE(ri.discount_price, ri.price)::float8 AS price,
+             ri.capacity_portions AS "capacityPortions", ri.sold_portions AS "soldPortions",
+             ri.capacity_portions - ri.sold_portions AS "remainingPortions",
+             (ri.is_available AND rf.is_active) AS "isAvailable"
+      FROM daily_menu_items ri
+      JOIN foods rf ON rf.id = ri.food_id
+      WHERE rf.is_persian_rice
+        AND ri.daily_menu_id = (SELECT daily_menu_id FROM daily_menu_items WHERE id = ${base.menuItemId})
+      ORDER BY ri.id
+      LIMIT 1
+    ` : Promise.resolve([]),
   ])
 
   const state = evaluateFoodAvailability(base)
@@ -163,6 +193,8 @@ export async function getFoodDetail(
       icon: base.categoryIcon,
     },
     tags,
+    allowsPersianRice: base.allowsPersianRice,
+    persianRice: persianRice[0] ?? null,
     primaryBadge,
     images,
     ingredients: base.ingredients,
@@ -170,6 +202,8 @@ export async function getFoodDetail(
     allergyInformation: base.allergyInformation,
     preparationTimeMinutes: base.preparationTimeMinutes,
     price: base.price,
+    originalPrice: base.originalPrice,
+    discountPercentage: base.discountPercentage,
     menuDate: base.menuDate,
     remainingCapacity: state.remaining,
     orderDeadline: base.orderDeadline?.toISOString() ?? null,

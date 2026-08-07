@@ -20,6 +20,7 @@ export interface AdminBridge {
   deleteFoodImage(imageUrl: string): Promise<void>
   resolveMediaUrl(imageUrl: string): Promise<string>
   desktopLogs(limit?: number): Promise<Array<Record<string, unknown>>>
+  printInvoice(): Promise<void>
 }
 
 const bridge: AdminBridge = {
@@ -33,6 +34,7 @@ const bridge: AdminBridge = {
   deleteFoodImage: (imageUrl) => ipcRenderer.invoke('foods:delete-image', imageUrl),
   resolveMediaUrl: (imageUrl) => ipcRenderer.invoke('media:resolve-url', imageUrl),
   desktopLogs: (limit) => ipcRenderer.invoke('logs:desktop', limit),
+  printInvoice: () => ipcRenderer.invoke('print:invoice'),
 }
 
 contextBridge.exposeInMainWorld('kafgir', bridge)

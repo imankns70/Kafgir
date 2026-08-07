@@ -1,0 +1,1 @@
+ALTER TABLE "notification_messages" ALTER COLUMN "text" SET DATA TYPE text;

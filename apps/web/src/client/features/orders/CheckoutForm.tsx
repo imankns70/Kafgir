@@ -1,14 +1,44 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { getCustomerSession, loginCustomerWithTelegram } from '../../services/customerApi'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import {
+  getCustomerSession,
+  loginCustomerWithTelegram,
+  requestCustomerOtp,
+  verifyCustomerOtp,
+} from '../../services/customerApi'
 import { createOrder } from '../../services/ordersApi'
 import { getTelegramInitData, getTelegramUser } from '../../services/telegram'
-import { DeliveryMethod, PaymentMethod, type CartItem, type CreateOrderRequest, type CustomerAddressDto, type OrderDto } from '../../types'
+import { cartItemIssue } from '../../services/cartReconciliation'
+import { Icon } from '../../design-system/Icon'
+import { formatNumber } from '../../utils/format'
+import {
+  DeliveryMethod,
+  PaymentMethod,
+  type CartItem,
+  type CreateOrderRequest,
+  type CustomerAddressDto,
+  type CustomerProfileDto,
+  type OrderDto,
+} from '../../types'
 
 type FormState = { fullName: string; phoneNumber: string; addressLine: string; customerNote: string; deliveryMethod: DeliveryMethod; paymentMethod: PaymentMethod }
 const initialForm: FormState = { fullName: '', phoneNumber: '', addressLine: '', customerNote: '', deliveryMethod: DeliveryMethod.Delivery, paymentMethod: PaymentMethod.CardToCard }
 const newAddressValue = 'new'
+type AuthenticationState = 'checking' | 'guest' | 'authenticated'
+type LoginStep = 'phone' | 'code'
+type LoginPurpose = 'checkout' | 'link'
+const asciiDigits = (value: string) => value
+  .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+  .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+  .replace(/\D/g, '')
 
-export function CheckoutForm({ items, onSuccess }: { items: CartItem[]; onSuccess: (order: OrderDto) => void }) {
+export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshCart, onSuccess, onAuthenticationChange }: {
+  items: CartItem[]
+  isCartVerified: boolean
+  isCheckingCart: boolean
+  onRefreshCart: () => void
+  onSuccess: (order: OrderDto) => void
+  onAuthenticationChange: (authenticated: boolean) => void
+}) {
   const [form, setForm] = useState(initialForm)
   const [savedAddresses, setSavedAddresses] = useState<CustomerAddressDto[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<string>(newAddressValue)
@@ -16,8 +46,36 @@ export function CheckoutForm({ items, onSuccess }: { items: CartItem[]; onSucces
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const [authentication, setAuthentication] = useState<AuthenticationState>('checking')
+  const [authenticationMethod, setAuthenticationMethod] = useState<'telegram' | 'phone' | null>(null)
+  const [customerProfile, setCustomerProfile] = useState<CustomerProfileDto | null>(null)
+  const [showLogin, setShowLogin] = useState(false)
+  const [loginPurpose, setLoginPurpose] = useState<LoginPurpose>('checkout')
+  const [loginStep, setLoginStep] = useState<LoginStep>('phone')
+  const [loginPhone, setLoginPhone] = useState('')
+  const [otpCode, setOtpCode] = useState('')
+  const [otpError, setOtpError] = useState<string | null>(null)
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
+  const [resendSeconds, setResendSeconds] = useState(0)
+  const [authenticationMessage, setAuthenticationMessage] = useState<string | null>(null)
+  const loginGateRef = useRef<HTMLElement>(null)
+  const cartIssue = items.map(cartItemIssue).find((issue): issue is string => Boolean(issue)) ?? null
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }))
   const selectedSavedAddress = savedAddresses.find((address) => address.id.toString() === selectedAddressId)
+
+  const applyProfile = useCallback((profile: CustomerProfileDto, requireConfirmedPhone: boolean) => {
+    setCustomerProfile(profile)
+    setForm((current) => ({
+      ...current,
+      fullName: current.fullName || profile.preferredName,
+      phoneNumber: requireConfirmedPhone && profile.defaultPhoneNumber
+        ? profile.defaultPhoneNumber
+        : current.phoneNumber || profile.defaultPhoneNumber,
+    }))
+    setSavedAddresses(profile.addresses)
+    const defaultAddress = profile.addresses.find((address) => address.isDefault) ?? profile.addresses[0]
+    if (defaultAddress) setSelectedAddressId(defaultAddress.id.toString())
+  }, [])
 
   useEffect(() => {
     let isActive = true
@@ -29,24 +87,84 @@ export function CheckoutForm({ items, onSuccess }: { items: CartItem[]; onSucces
         const initData = getTelegramInitData()
         if (!session.authenticated && initData) session = await loginCustomerWithTelegram(initData)
         const profile = session.profile
-        if (!isActive || profile === null) return
-        setForm((current) => ({
-          ...current,
-          fullName: current.fullName || profile.preferredName,
-          phoneNumber: current.phoneNumber || profile.defaultPhoneNumber,
-        }))
-        setSavedAddresses(profile.addresses)
-        const defaultAddress = profile.addresses.find((address) => address.isDefault) ?? profile.addresses[0]
-        if (defaultAddress) setSelectedAddressId(defaultAddress.id.toString())
+        if (!isActive) return
+        if (session.authenticated && profile) {
+          onAuthenticationChange(true)
+          setAuthentication('authenticated')
+          setAuthenticationMethod(session.method)
+          applyProfile(profile, session.method === 'phone')
+        } else {
+          onAuthenticationChange(false)
+          setAuthentication('guest')
+          setAuthenticationMethod(null)
+          setCustomerProfile(null)
+        }
       } catch {
-        if (isActive) setProfileMessage('دریافت اطلاعات قبلی شما ممکن نشد. می‌توانید سفارش را دستی ثبت کنید.')
+        if (isActive) {
+          onAuthenticationChange(false)
+          setAuthentication('guest')
+          setAuthenticationMethod(null)
+          setCustomerProfile(null)
+          setProfileMessage('بررسی وضعیت ورود ممکن نشد. برای ثبت نهایی سفارش، ورود با موبایل دوباره بررسی می‌شود.')
+        }
       } finally {
         if (isActive) setIsLoadingProfile(false)
       }
     }
     void loadProfile()
     return () => { isActive = false }
-  }, [])
+  }, [applyProfile])
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return
+    const timer = window.setInterval(() => setResendSeconds((current) => Math.max(0, current - 1)), 1_000)
+    return () => window.clearInterval(timer)
+  }, [resendSeconds])
+
+  useEffect(() => {
+    if (!showLogin) return
+    const frame = window.requestAnimationFrame(() => loginGateRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [showLogin])
+
+  const sendOtp = async () => {
+    setOtpError(null)
+    if (!loginPhone.trim()) return setOtpError('شماره موبایل را وارد کنید.')
+    setIsAuthenticating(true)
+    try {
+      await requestCustomerOtp(loginPhone)
+      setField('phoneNumber', loginPhone.trim())
+      setLoginStep('code')
+      setResendSeconds(60)
+    } catch (submitError) {
+      setOtpError(submitError instanceof Error ? submitError.message : 'ارسال کد تایید ممکن نشد.')
+    } finally {
+      setIsAuthenticating(false)
+    }
+  }
+
+  const verifyOtp = async () => {
+    setOtpError(null)
+    setIsAuthenticating(true)
+    try {
+      const session = await verifyCustomerOtp(loginPhone, otpCode)
+      if (!session.authenticated || !session.profile) throw new Error('ورود به حساب کامل نشد.')
+      setAuthentication('authenticated')
+      onAuthenticationChange(true)
+      setAuthenticationMethod(session.method)
+      applyProfile(session.profile, true)
+      setShowLogin(false)
+      setLoginStep('phone')
+      setOtpCode('')
+      setAuthenticationMessage(loginPurpose === 'link'
+        ? 'موبایل و تلگرام به یک حساب متصل شدند. آدرس‌ها و سفارش‌های مرتبط بازیابی شد.'
+        : 'ورود با موفقیت انجام شد. اطلاعات تحویل را بررسی و سفارش را ثبت کنید.')
+    } catch (submitError) {
+      setOtpError(submitError instanceof Error ? submitError.message : 'کد تایید پذیرفته نشد.')
+    } finally {
+      setIsAuthenticating(false)
+    }
+  }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -55,7 +173,26 @@ export function CheckoutForm({ items, onSuccess }: { items: CartItem[]; onSucces
     if (!form.phoneNumber.trim()) return setError('شماره موبایل الزامی است.')
     if (form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && !form.addressLine.trim()) return setError('آدرس برای ارسال سفارش الزامی است.')
     if (items.length === 0) return setError('حداقل یک غذا به سبد خرید اضافه کنید.')
-    if (items.some((item) => item.quantity <= 0 || item.quantity > item.remainingPortions)) return setError('تعداد یکی از غذاها معتبر نیست.')
+    if (isCheckingCart) return setError('لطفاً تا پایان بررسی موجودی صبر کنید.')
+    if (!isCartVerified) return setError('پیش از ثبت سفارش، موجودی سبد را دوباره بررسی کنید.')
+    if (cartIssue) return setError(cartIssue)
+    if (items.some((item) => item.quantity <= 0)) return setError('تعداد یکی از غذاها معتبر نیست.')
+    if (authentication === 'checking') return setError('لطفاً تا پایان بررسی وضعیت ورود صبر کنید.')
+    if (authentication !== 'authenticated') {
+      if (!showLogin) {
+        setLoginPurpose('checkout')
+        setLoginPhone(form.phoneNumber.trim())
+        setLoginStep('phone')
+        setOtpCode('')
+        setOtpError(null)
+        setShowLogin(true)
+      } else if (loginStep === 'phone') {
+        void sendOtp()
+      } else {
+        void verifyOtp()
+      }
+      return
+    }
 
     const telegramUser = getTelegramUser()
     const selectedAddressForOrder = form.deliveryMethod === DeliveryMethod.Delivery ? selectedSavedAddress : undefined
@@ -72,11 +209,14 @@ export function CheckoutForm({ items, onSuccess }: { items: CartItem[]; onSucces
         : 'تحویل حضوری',
       customerNote: form.customerNote.trim() || null,
       deliveryMethod: form.deliveryMethod, paymentMethod: form.paymentMethod,
-      items: items.map((item) => ({ dailyMenuItemId: item.dailyMenuItemId, quantity: item.quantity })),
+      items: items.map((item) => ({ dailyMenuItemId: item.dailyMenuItemId, withPersianRice: Boolean(item.withPersianRice), quantity: item.quantity })),
     }
     setIsSubmitting(true)
     try { onSuccess(await createOrder(request)) }
-    catch (submitError) { setError(submitError instanceof Error ? submitError.message : 'ثبت سفارش ناموفق بود.') }
+    catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'ثبت سفارش ناموفق بود.')
+      onRefreshCart()
+    }
     finally { setIsSubmitting(false) }
   }
 
@@ -84,8 +224,69 @@ export function CheckoutForm({ items, onSuccess }: { items: CartItem[]; onSucces
     <h2 className="section-title">اطلاعات تحویل</h2>
     {isLoadingProfile && <p className="muted">در حال بررسی اطلاعات قبلی شما…</p>}
     {profileMessage && <div className="form-hint">{profileMessage}</div>}
+    {authenticationMessage && <div className="checkout-auth-success" role="status"><Icon name="confirm" size="sm" />{authenticationMessage}</div>}
+    {authentication === 'authenticated' && customerProfile && <section className="checkout-customer-identity" aria-label="هویت متصل به سفارش">
+      <div className="checkout-customer-identity-icon"><Icon name="profile" size="md" /></div>
+      <div className="checkout-customer-identity-copy">
+        <strong>{authenticationMethod === 'telegram' ? 'ورود امن با تلگرام' : 'ورود با موبایل تاییدشده'}</strong>
+        {customerProfile.telegramUserId != null && <span>
+          {customerProfile.telegramUsername ? <bdi>@{customerProfile.telegramUsername}</bdi> : 'حساب تلگرام'}
+          <small>شناسه تلگرام: <bdi>{customerProfile.telegramUserId}</bdi></small>
+        </span>}
+        {customerProfile.phoneNumberConfirmed
+          ? <span className="checkout-linked-phone"><Icon name="confirm" size="xs" /> موبایل متصل: <bdi>{customerProfile.defaultPhoneNumber}</bdi></span>
+          : <span className="checkout-unlinked-phone">موبایل هنوز به این حساب متصل نشده است.</span>}
+      </div>
+      {authenticationMethod === 'telegram' && !customerProfile.phoneNumberConfirmed && <button type="button" className="outline-button checkout-link-phone" onClick={() => {
+        setLoginPurpose('link')
+        setLoginPhone(form.phoneNumber.trim())
+        setLoginStep('phone')
+        setOtpCode('')
+        setOtpError(null)
+        setShowLogin(true)
+      }}>اتصال موبایل و بازیابی آدرس‌ها</button>}
+    </section>}
+    {showLogin && <section ref={loginGateRef} className="checkout-login-gate" aria-labelledby="checkout-login-title">
+      <header>
+        <span><Icon name="profile" size="md" /></span>
+        <div>
+          <h3 id="checkout-login-title">{loginPurpose === 'link' ? 'اتصال موبایل به حساب تلگرام' : 'ورود برای ثبت سفارش'}</h3>
+          <p>{loginPurpose === 'link'
+            ? 'پس از تایید، آدرس‌ها و سفارش‌های این موبایل به همین حساب امن تلگرام متصل می‌شوند.'
+            : 'سبد و اطلاعاتی که وارد کرده‌اید حفظ می‌شود.'}</p>
+        </div>
+      </header>
+      {loginStep === 'phone' ? <>
+        <label className="field">شماره موبایل
+          <input className="ltr-value" dir="ltr" inputMode="tel" autoComplete="tel" value={loginPhone}
+            onChange={(event) => { setLoginPhone(event.target.value); setField('phoneNumber', event.target.value) }} placeholder="09121234567" />
+        </label>
+        <button type="button" className="primary-button full-width" disabled={isAuthenticating} onClick={() => void sendOtp()}>
+          {isAuthenticating ? 'در حال ارسال…' : 'ارسال کد ورود'}
+        </button>
+      </> : <>
+        <p className="muted">کد شش‌رقمی ارسال‌شده به <bdi>{loginPhone}</bdi> را وارد کنید.</p>
+        <label className="field">کد تایید
+          <input className="otp-input ltr-value" dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
+            value={otpCode} onChange={(event) => setOtpCode(asciiDigits(event.target.value))} autoFocus />
+        </label>
+        <button type="button" className="primary-button full-width" disabled={isAuthenticating || otpCode.length !== 6} onClick={() => void verifyOtp()}>
+          {isAuthenticating ? 'در حال بررسی…' : 'تایید و ادامه'}
+        </button>
+        <div className="otp-actions">
+          <button type="button" className="outline-button" onClick={() => { setLoginStep('phone'); setOtpCode(''); setOtpError(null) }}>تغییر شماره</button>
+          <button type="button" className="outline-button" disabled={resendSeconds > 0 || isAuthenticating} onClick={() => void sendOtp()}>
+            {resendSeconds > 0 ? `ارسال دوباره تا ${formatNumber(resendSeconds)} ثانیه` : 'ارسال دوباره'}
+          </button>
+        </div>
+      </>}
+      {otpError && <div className="form-error" role="alert">{otpError}</div>}
+      <button type="button" className="checkout-login-cancel" onClick={() => { setShowLogin(false); setOtpError(null) }}>
+        {loginPurpose === 'link' ? 'فعلاً بدون اتصال ادامه می‌دهم' : 'فعلاً نه؛ بازگشت به سبد'}
+      </button>
+    </section>}
     <label className="field">نام و نام خانوادگی<input value={form.fullName} onChange={(e) => setField('fullName', e.target.value)} autoComplete="name" /></label>
-    <label className="field">شماره موبایل<input className="ltr-value" dir="ltr" value={form.phoneNumber} onChange={(e) => setField('phoneNumber', e.target.value)} inputMode="tel" autoComplete="tel" /></label>
+    <label className="field">شماره موبایل{authentication === 'guest' ? ' (برای ورود و پیگیری سفارش)' : ''}<input className="ltr-value" dir="ltr" value={form.phoneNumber} onChange={(e) => setField('phoneNumber', e.target.value)} inputMode="tel" autoComplete="tel" readOnly={authenticationMethod === 'phone'} /></label>
     <div className="form-grid two-columns">
       <label className="field">روش دریافت<select value={form.deliveryMethod} onChange={(e) => setField('deliveryMethod', Number(e.target.value) as DeliveryMethod)}>
         <option value={DeliveryMethod.Delivery}>ارسال</option><option value={DeliveryMethod.Pickup}>تحویل حضوری</option>
@@ -112,6 +313,6 @@ export function CheckoutForm({ items, onSuccess }: { items: CartItem[]; onSucces
     {form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && <label className="field">آدرس<textarea value={form.addressLine} onChange={(e) => setField('addressLine', e.target.value)} /></label>}
     <label className="field">توضیح سفارش<textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
     {error && <div className="form-error" role="alert">{error}</div>}
-    <button className="primary-button full-width" disabled={isSubmitting || items.length === 0}>{isSubmitting ? 'در حال ثبت سفارش…' : 'ثبت سفارش'}</button>
+    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || showLogin || !isCartVerified || Boolean(cartIssue) || items.length === 0}>{isSubmitting ? 'در حال ثبت سفارش…' : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
   </form>
 }

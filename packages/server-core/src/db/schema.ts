@@ -216,6 +216,11 @@ export const foods = pgTable('foods', {
   primaryBadgeTagId: integer('primary_badge_tag_id').references(() => foodTags.id, { onDelete: 'set null' }),
   defaultPrice: money('default_price').notNull().default(0),
   imageUrl: varchar('image_url', { length: 2000 }),
+  // Every dish includes foreign rice in its price. This offers the paid Persian rice upgrade.
+  allowsPersianRice: boolean('allows_persian_rice').notNull().default(false),
+  // Marks the one purchasable Persian rice food: hidden from the customer grid and offered only as
+  // the upgrade on dishes that allow it.
+  isPersianRice: boolean('is_persian_rice').notNull().default(false),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: utcTimestamp('created_at').notNull(),
   updatedAt: utcTimestamp('updated_at').notNull(),
@@ -223,6 +228,9 @@ export const foods = pgTable('foods', {
   uniqueIndex('foods_slug_uidx').on(table.slug),
   uniqueIndex('foods_name_normalized_uidx').on(sql`lower(btrim(${table.name}))`),
   index('foods_category_id_idx').on(table.categoryId),
+  uniqueIndex('foods_persian_rice_uidx').on(table.isPersianRice)
+    .where(sql`${table.isPersianRice} AND ${table.isActive}`),
+  check('foods_persian_rice_role_check', sql`NOT (${table.isPersianRice} AND ${table.allowsPersianRice})`),
   check('foods_preparation_time_check', sql`${table.preparationTimeMinutes} IS NULL OR ${table.preparationTimeMinutes} > 0`),
 ])
 
@@ -282,6 +290,7 @@ export const dailyMenuItems = pgTable('daily_menu_items', {
   dailyMenuId: integer('daily_menu_id').notNull().references(() => dailyMenus.id, { onDelete: 'cascade' }),
   foodId: integer('food_id').notNull().references(() => foods.id, { onDelete: 'restrict' }),
   price: money('price').notNull(),
+  discountPrice: money('discount_price'),
   capacityPortions: integer('capacity_portions').notNull(),
   soldPortions: integer('sold_portions').notNull().default(0),
   isAvailable: boolean('is_available').notNull().default(true),
@@ -291,6 +300,7 @@ export const dailyMenuItems = pgTable('daily_menu_items', {
   check('daily_menu_items_capacity_check', sql`${table.capacityPortions} >= 0`),
   check('daily_menu_items_sold_check', sql`${table.soldPortions} >= 0 AND ${table.soldPortions} <= ${table.capacityPortions}`),
   check('daily_menu_items_price_check', sql`${table.price} >= 0`),
+  check('daily_menu_items_discount_price_check', sql`${table.discountPrice} IS NULL OR (${table.discountPrice} > 0 AND ${table.discountPrice} < ${table.price})`),
 ])
 
 export const orders = pgTable('orders', {
@@ -328,6 +338,7 @@ export const orderItems = pgTable('order_items', {
   id: serial('id').primaryKey(),
   orderId: integer('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
   dailyMenuItemId: integer('daily_menu_item_id').notNull().references(() => dailyMenuItems.id, { onDelete: 'restrict' }),
+  originalUnitPrice: money('original_unit_price'),
   foodName: varchar('food_name', { length: 150 }).notNull(),
   unitPrice: money('unit_price').notNull(),
   quantity: integer('quantity').notNull(),
@@ -335,7 +346,7 @@ export const orderItems = pgTable('order_items', {
 }, (table) => [
   index('order_items_order_idx').on(table.orderId),
   check('order_items_quantity_check', sql`${table.quantity} > 0`),
-  check('order_items_money_check', sql`${table.unitPrice} >= 0 AND ${table.totalPrice} = ${table.unitPrice} * ${table.quantity}`),
+  check('order_items_money_check', sql`${table.unitPrice} >= 0 AND (${table.originalUnitPrice} IS NULL OR ${table.originalUnitPrice} >= ${table.unitPrice}) AND ${table.totalPrice} = ${table.unitPrice} * ${table.quantity}`),
 ])
 
 export const orderStatusHistories = pgTable('order_status_histories', {
@@ -355,7 +366,7 @@ export const notificationMessages = pgTable('notification_messages', {
   type: integer('type').notNull(),
   status: integer('status').notNull().default(1),
   target: varchar('target', { length: 120 }).notNull(),
-  text: varchar('text', { length: 2000 }).notNull(),
+  text: text('text').notNull(),
   orderId: integer('order_id').references(() => orders.id, { onDelete: 'set null' }),
   orderNumber: varchar('order_number', { length: 32 }),
   retryCount: integer('retry_count').notNull().default(0),
@@ -415,6 +426,7 @@ export const ingredients = pgTable('ingredients', {
   uniqueIndex('ingredients_name_uidx').on(sql`lower(trim(${table.name}))`),
   uniqueIndex('ingredients_code_uidx').on(table.code).where(sql`${table.code} IS NOT NULL`),
   index('ingredients_category_idx').on(table.categoryId),
+  check('ingredients_stock_levels_check', sql`${table.minimumStockLevel} >= 0 AND (${table.preferredStockLevel} IS NULL OR ${table.preferredStockLevel} >= 0)`),
 ])
 
 export const suppliers = pgTable('suppliers', {
@@ -455,6 +467,7 @@ export const purchases = pgTable('purchases', {
   index('purchases_date_status_idx').on(table.purchaseDate, table.status),
   index('purchases_supplier_idx').on(table.supplierId),
   check('purchases_status_check', sql`${table.status} BETWEEN 1 AND 3`),
+  check('purchases_payment_status_check', sql`${table.paymentStatus} BETWEEN 1 AND 3`),
   check('purchases_amounts_check', sql`${table.subtotalAmount} >= 0 AND ${table.discountAmount} >= 0 AND ${table.additionalCostAmount} >= 0 AND ${table.totalAmount} = ${table.subtotalAmount} - ${table.discountAmount} + ${table.additionalCostAmount} AND ${table.paidAmount} >= 0 AND ${table.paidAmount} <= ${table.totalAmount}`),
 ])
 
@@ -476,6 +489,7 @@ export const purchaseItems = pgTable('purchase_items', {
   index('purchase_items_purchase_idx').on(table.purchaseId),
   index('purchase_items_ingredient_idx').on(table.ingredientId),
   check('purchase_items_quantity_check', sql`${table.quantity} > 0 AND ${table.conversionFactorToBaseUnit} > 0 AND ${table.baseUnitQuantity} > 0`),
+  check('purchase_items_amount_check', sql`${table.unitPrice} >= 0 AND ${table.lineDiscountAmount} >= 0 AND ${table.lineTotalAmount} = ROUND(${table.quantity} * ${table.unitPrice} - ${table.lineDiscountAmount}, 2) AND ${table.lineTotalAmount} >= 0`),
 ])
 
 export const inventoryTransactions = pgTable('inventory_transactions', {
@@ -498,6 +512,12 @@ export const inventoryTransactions = pgTable('inventory_transactions', {
   uniqueIndex('inventory_transactions_reversal_uidx').on(table.reversedTransactionId).where(sql`${table.reversedTransactionId} IS NOT NULL`),
   index('inventory_transactions_reference_idx').on(table.referenceType, table.referenceId),
   check('inventory_transactions_quantity_check', sql`${table.quantityInBaseUnit} <> 0`),
+  check('inventory_transactions_type_check', sql`${table.transactionType} BETWEEN 1 AND 8`),
+  check('inventory_transactions_sign_check', sql`(
+    (${table.transactionType} IN (1, 4, 8) AND ${table.quantityInBaseUnit} > 0) OR
+    (${table.transactionType} IN (2, 3, 5, 7) AND ${table.quantityInBaseUnit} < 0) OR
+    (${table.transactionType} = 6 AND ${table.quantityInBaseUnit} <> 0)
+  ) AND ${table.unitCost} >= 0 AND ${table.quantityInBaseUnit} * ${table.totalCost} >= 0`),
 ])
 
 export const recipes = pgTable('recipes', {
@@ -513,6 +533,7 @@ export const recipes = pgTable('recipes', {
 }, (table) => [
   uniqueIndex('recipes_active_food_uidx').on(table.foodId).where(sql`${table.isActive} = true`),
   check('recipes_yield_check', sql`${table.yieldQuantity} > 0`),
+  check('recipes_values_check', sql`${table.overheadPerPortion} >= 0 AND (${table.preparationLossPercent} IS NULL OR (${table.preparationLossPercent} >= 0 AND ${table.preparationLossPercent} < 100))`),
 ])
 
 export const recipeItems = pgTable('recipe_items', {
@@ -525,6 +546,7 @@ export const recipeItems = pgTable('recipe_items', {
 }, (table) => [
   uniqueIndex('recipe_items_recipe_ingredient_uidx').on(table.recipeId, table.ingredientId),
   check('recipe_items_quantity_check', sql`${table.quantityInBaseUnit} > 0`),
+  check('recipe_items_waste_check', sql`${table.wastePercent} IS NULL OR (${table.wastePercent} >= 0 AND ${table.wastePercent} < 100)`),
 ])
 
 export const orderInventoryConsumptions = pgTable('order_inventory_consumptions', {
@@ -552,7 +574,7 @@ export const shoppingLists = pgTable('shopping_lists', {
   createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
   createdAt: utcTimestamp('created_at').notNull(),
   updatedAt: utcTimestamp('updated_at').notNull(),
-})
+}, (table) => [check('shopping_lists_status_check', sql`${table.status} BETWEEN 1 AND 4`)])
 
 export const shoppingListItems = pgTable('shopping_list_items', {
   id: serial('id').primaryKey(),
@@ -564,7 +586,10 @@ export const shoppingListItems = pgTable('shopping_list_items', {
   estimatedUnitCost: money('estimated_unit_cost').notNull().default(0),
   notes: text('notes'),
   isPurchased: boolean('is_purchased').notNull().default(false),
-}, (table) => [uniqueIndex('shopping_list_items_list_ingredient_uidx').on(table.shoppingListId, table.ingredientId)])
+}, (table) => [
+  uniqueIndex('shopping_list_items_list_ingredient_uidx').on(table.shoppingListId, table.ingredientId),
+  check('shopping_list_items_quantities_check', sql`${table.requiredQuantity} > 0 AND ${table.currentStockSnapshot} >= 0 AND ${table.suggestedPurchaseQuantity} >= 0 AND ${table.estimatedUnitCost} >= 0`),
+])
 
 export const financialAccounts = pgTable('financial_accounts', {
   id: serial('id').primaryKey(),
@@ -579,7 +604,11 @@ export const financialAccounts = pgTable('financial_accounts', {
   notes: text('notes'),
   createdAt: utcTimestamp('created_at').notNull(),
   updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [uniqueIndex('financial_accounts_name_uidx').on(table.name)])
+}, (table) => [
+  uniqueIndex('financial_accounts_name_uidx').on(table.name),
+  check('financial_accounts_type_check', sql`${table.type} BETWEEN 1 AND 5`),
+  check('financial_accounts_opening_balance_check', sql`${table.openingBalance} >= 0`),
+])
 
 export const posTerminals = pgTable('pos_terminals', {
   id: serial('id').primaryKey(),
@@ -621,6 +650,7 @@ export const payments = pgTable('payments', {
   index('payments_order_status_idx').on(table.orderId, table.status),
   check('payments_amount_check', sql`${table.amount} > 0`),
   check('payments_method_check', sql`${table.paymentMethod} BETWEEN 1 AND 4`),
+  check('payments_status_check', sql`${table.status} BETWEEN 1 AND 7`),
 ])
 
 export const financialTransactions = pgTable('financial_transactions', {
@@ -641,6 +671,12 @@ export const financialTransactions = pgTable('financial_transactions', {
   index('financial_transactions_account_date_idx').on(table.financialAccountId, table.transactionDate),
   uniqueIndex('financial_transactions_reference_uidx').on(table.transactionType, table.referenceType, table.referenceId)
     .where(sql`${table.referenceId} IS NOT NULL AND ${table.transactionType} IN (1, 2, 7, 8)`),
+  check('financial_transactions_type_check', sql`${table.transactionType} BETWEEN 1 AND 8`),
+  check('financial_transactions_amount_check', sql`${table.amount} <> 0`),
+  check('financial_transactions_sign_check', sql`
+    (${table.transactionType} IN (1, 3, 5) AND ${table.amount} > 0) OR
+    (${table.transactionType} IN (2, 4, 6, 7) AND ${table.amount} < 0) OR
+    ${table.transactionType} = 8`),
 ])
 
 export const purchasePayments = pgTable('purchase_payments', {
@@ -654,7 +690,11 @@ export const purchasePayments = pgTable('purchase_payments', {
   notes: text('notes'),
   createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
   createdAt: utcTimestamp('created_at').notNull(),
-}, (table) => [index('purchase_payments_purchase_idx').on(table.purchaseId)])
+}, (table) => [
+  index('purchase_payments_purchase_idx').on(table.purchaseId),
+  check('purchase_payments_amount_check', sql`${table.amount} > 0`),
+  check('purchase_payments_method_check', sql`${table.paymentMethod} BETWEEN 1 AND 4`),
+])
 
 export const auditLogs = pgTable('audit_logs', {
   id: serial('id').primaryKey(),

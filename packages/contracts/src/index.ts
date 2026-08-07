@@ -24,6 +24,53 @@ export enum OrderStatus {
 
 export const nullableText = z.string().trim().nullable().optional()
 
+const persianSearchDiacritics = /[\u0610-\u061a\u064b-\u065f\u0670\u06d6-\u06ed]/gu
+const persianSearchSeparators = /[^\p{L}\p{N}]+/gu
+
+export function normalizePersianSearch(value: string | null | undefined) {
+  return (value ?? '')
+    .normalize('NFKC')
+    .replace(/[يى]/gu, 'ی')
+    .replace(/ك/gu, 'ک')
+    .replace(/ـ/gu, '')
+    .replace(persianSearchDiacritics, '')
+    .replace(/[\u200c\u200d\u2060\ufeff]/gu, ' ')
+    .replace(persianSearchSeparators, ' ')
+    .trim()
+    .replace(/\s+/gu, ' ')
+    .toLocaleLowerCase('fa')
+}
+
+export const foodTagGroupSchema = z.enum([
+  'status', 'protein', 'diet', 'taste', 'serving', 'service', 'style', 'marketing',
+])
+
+const publicFoodTagSchema = z.object({
+  id: z.number().int(),
+  title: z.string(),
+  slug: z.string(),
+  icon: z.string().nullable().optional(),
+  group: foodTagGroupSchema,
+})
+
+/**
+ * Every dish already includes foreign rice in its price. Persian rice is the one purchasable upgrade:
+ * an ordinary food carrying `isPersianRice`, on the daily menu with its own price and capacity, hidden
+ * from the customer grid and offered only on dishes whose `allowsPersianRice` is set. Its price is the
+ * upgrade difference, not a full portion, because the dish price already covers rice.
+ */
+export const persianRiceSchema = z.object({
+  menuItemId: z.number().int().positive(),
+  foodId: z.number().int().positive(),
+  title: z.string(),
+  imageUrl: z.string().nullable().optional(),
+  price: z.number().nonnegative(),
+  capacityPortions: z.number().int().nonnegative(),
+  soldPortions: z.number().int().nonnegative(),
+  remainingPortions: z.number().int(),
+  isAvailable: z.boolean(),
+})
+
 export const dailyMenuItemSchema = z.object({
   id: z.number().int(),
   foodId: z.number().int(),
@@ -43,7 +90,11 @@ export const dailyMenuItemSchema = z.object({
     slug: z.string(),
     icon: z.string().nullable().optional(),
   }).nullable().optional(),
+  tags: z.array(publicFoodTagSchema),
+  allowsPersianRice: z.boolean().default(false),
   price: z.number().nonnegative(),
+  originalPrice: z.number().positive().nullable().optional(),
+  discountPercentage: z.number().int().min(1).max(99).nullable().optional(),
   capacityPortions: z.number().int().nonnegative(),
   soldPortions: z.number().int().nonnegative(),
   remainingPortions: z.number().int(),
@@ -64,6 +115,44 @@ export const dailyMenuSchema = z.object({
     displayOrder: z.number().int(),
   })),
   items: z.array(dailyMenuItemSchema),
+  persianRice: persianRiceSchema.nullable().default(null),
+})
+
+export const publicDailyMenuPageSchema = dailyMenuSchema.extend({
+  discountItems: z.array(dailyMenuItemSchema).default([]),
+  totalItems: z.number().int().nonnegative(),
+  nextCursor: z.number().int().positive().nullable(),
+})
+
+export const publicDailyMenuQuerySchema = z.object({
+  q: z.string().trim().max(100).optional().default(''),
+  category: z.string().trim().max(100).optional().default(''),
+  cursor: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(60).optional().default(12),
+})
+
+export const menuCartSnapshotRequestSchema = z.object({
+  items: z.array(z.object({
+    dailyMenuItemId: z.number().int().positive(),
+    withPersianRice: z.boolean().default(false),
+  })).max(100).refine((values) => new Set(values.map((item) =>
+    `${item.dailyMenuItemId}:${item.withPersianRice}`)).size === values.length,
+  'گزینه‌های سبد نباید تکراری باشند.'),
+})
+
+export const menuCartSnapshotSchema = z.object({
+  isOpen: z.boolean(),
+  items: z.array(dailyMenuItemSchema.pick({
+    id: true,
+    foodName: true,
+    price: true,
+    originalPrice: true,
+    discountPercentage: true,
+    allowsPersianRice: true,
+    remainingPortions: true,
+    isAvailable: true,
+  })),
+  persianRice: persianRiceSchema.nullable().default(null),
 })
 
 export const customerAddressSchema = z.object({
@@ -80,6 +169,7 @@ export const customerProfileSchema = z.object({
   preferredName: z.string(),
   defaultPhoneNumber: z.string(),
   phoneNumberConfirmed: z.boolean().default(false),
+  telegramUserId: z.number().int().nullable().optional(),
   telegramUsername: z.string().nullable().optional(),
   addresses: z.array(customerAddressSchema),
 })
@@ -123,8 +213,13 @@ export const customerProfileLookupSchema = z.object({
   telegramUsername: z.string().nullable().optional(),
 })
 
+/**
+ * One entry per dish. Persian rice is the only upgrade, so the client just says yes or no; the server
+ * resolves today's Persian rice menu item, prices it and expands it into its own order line.
+ */
 export const createOrderItemSchema = z.object({
   dailyMenuItemId: z.number().int().positive(),
+  withPersianRice: z.boolean().default(false),
   quantity: z.number().int().positive(),
 })
 
@@ -149,6 +244,7 @@ export const orderItemSchema = z.object({
   id: z.number().int(),
   dailyMenuItemId: z.number().int(),
   foodName: z.string(),
+  originalUnitPrice: z.number().nonnegative().nullable().optional(),
   unitPrice: z.number(),
   quantity: z.number().int(),
   totalPrice: z.number(),
@@ -228,10 +324,6 @@ export const foodCategoryWriteSchema = z.object({
   isActive: z.boolean(),
 })
 
-export const foodTagGroupSchema = z.enum([
-  'status', 'protein', 'diet', 'taste', 'serving', 'service', 'style', 'marketing',
-])
-
 export const foodTagSchema = z.object({
   id: z.number().int(),
   title: z.string(),
@@ -287,6 +379,8 @@ export const foodSchema = z.object({
   images: z.array(foodImageSchema),
   defaultPrice: z.number(),
   imageUrl: z.string().nullable().optional(),
+  allowsPersianRice: z.boolean().default(false),
+  isPersianRice: z.boolean().default(false),
   isActive: z.boolean(),
 })
 
@@ -307,6 +401,8 @@ export const foodWriteSchema = z.object({
     .refine((values) => values.filter((image) => image.isPrimary).length <= 1, 'فقط یک تصویر می‌تواند اصلی باشد.'),
   defaultPrice: z.number().nonnegative(),
   imageUrl: z.string().trim().max(2000).nullable().optional(),
+  allowsPersianRice: z.boolean().default(false),
+  isPersianRice: z.boolean().default(false),
   isActive: z.boolean().default(true),
 }).superRefine((value, context) => {
   if (value.primaryBadgeTagId && !value.tagIds.includes(value.primaryBadgeTagId)) {
@@ -314,6 +410,14 @@ export const foodWriteSchema = z.object({
       code: 'custom',
       path: ['primaryBadgeTagId'],
       message: 'نشان اصلی باید یکی از برچسب‌های انتخاب‌شده باشد.',
+    })
+  }
+  // Persian rice is what other dishes upgrade to; it cannot offer the upgrade to itself.
+  if (value.isPersianRice && value.allowsPersianRice) {
+    context.addIssue({
+      code: 'custom',
+      path: ['allowsPersianRice'],
+      message: 'غذای «برنج ایرانی» خودش نمی‌تواند گزینه افزودن برنج ایرانی داشته باشد.',
     })
   }
 })
@@ -334,6 +438,8 @@ export const foodDetailSchema = z.object({
   fullDescription: z.string().nullable(),
   category: foodCategorySchema.pick({ id: true, title: true, slug: true, icon: true }),
   tags: z.array(foodTagSchema.pick({ id: true, title: true, slug: true, icon: true, group: true })),
+  allowsPersianRice: z.boolean().default(false),
+  persianRice: persianRiceSchema.nullable().default(null),
   primaryBadge: foodTagSchema.pick({ id: true, title: true, slug: true, icon: true }).nullable(),
   images: z.array(foodImageSchema),
   ingredients: z.string().nullable(),
@@ -341,6 +447,8 @@ export const foodDetailSchema = z.object({
   allergyInformation: z.string().nullable(),
   preparationTimeMinutes: z.number().int().positive().nullable(),
   price: z.number().nullable(),
+  originalPrice: z.number().positive().nullable().optional(),
+  discountPercentage: z.number().int().min(1).max(99).nullable().optional(),
   menuDate: z.string().nullable(),
   remainingCapacity: z.number().int().nonnegative(),
   orderDeadline: z.string().nullable(),
@@ -355,7 +463,11 @@ export const foodDetailSchema = z.object({
     title: z.string(),
     imageUrl: z.string().nullable(),
     price: z.number(),
+    originalPrice: z.number().positive().nullable().optional(),
+    discountPercentage: z.number().int().min(1).max(99).nullable().optional(),
     primaryBadge: z.object({ title: z.string(), icon: z.string().nullable() }).nullable(),
+    // Lets the suggestion chip warn that this dish still needs a rice choice added on top.
+    allowsPersianRice: z.boolean().default(false),
   })),
 })
 
@@ -378,8 +490,17 @@ export const dailyMenuItemWriteSchema = z.object({
   id: z.number().int().positive().nullable().optional(),
   foodId: z.number().int().positive(),
   price: z.number().nonnegative(),
+  discountPrice: z.number().positive().nullable().optional(),
   capacityPortions: z.number().int().nonnegative(),
   isAvailable: z.boolean().default(true),
+}).superRefine((value, context) => {
+  if (value.discountPrice != null && value.discountPrice >= value.price) {
+    context.addIssue({
+      code: 'custom',
+      path: ['discountPrice'],
+      message: 'قیمت تخفیف باید از قیمت اصلی کمتر باشد.',
+    })
+  }
 })
 
 export const dailyMenuWriteSchema = z.object({
@@ -391,8 +512,17 @@ export const dailyMenuWriteSchema = z.object({
 
 export const updateDailyMenuItemSchema = z.object({
   price: z.number().nonnegative(),
+  discountPrice: z.number().positive().nullable().optional(),
   capacityPortions: z.number().int().nonnegative(),
   isAvailable: z.boolean(),
+}).superRefine((value, context) => {
+  if (value.discountPrice != null && value.discountPrice >= value.price) {
+    context.addIssue({
+      code: 'custom',
+      path: ['discountPrice'],
+      message: 'قیمت تخفیف باید از قیمت اصلی کمتر باشد.',
+    })
+  }
 })
 
 export const updateDailyMenuSettingsSchema = z.object({
@@ -439,6 +569,11 @@ export const dashboardSummarySchema = z.object({
 
 export type DailyMenuDto = z.infer<typeof dailyMenuSchema>
 export type DailyMenuItemDto = z.infer<typeof dailyMenuItemSchema>
+export type PublicDailyMenuPageDto = z.infer<typeof publicDailyMenuPageSchema>
+export type PublicDailyMenuQuery = z.infer<typeof publicDailyMenuQuerySchema>
+export type MenuCartSnapshotDto = z.infer<typeof menuCartSnapshotSchema>
+export type MenuCartSnapshotRequest = z.infer<typeof menuCartSnapshotRequestSchema>
+export type PersianRiceDto = z.infer<typeof persianRiceSchema>
 export type CustomerAddressDto = z.infer<typeof customerAddressSchema>
 export type CustomerProfileDto = z.infer<typeof customerProfileSchema>
 export type CustomerSessionDto = z.infer<typeof customerSessionSchema>
@@ -484,10 +619,20 @@ export interface OrderReportQuery {
   foodName?: string
 }
 
+/**
+ * One line per dish. The same dish with and without the Persian rice upgrade are two separate lines;
+ * when the upgrade is on, it is shown as its own row and becomes its own order line, but its quantity
+ * always follows the dish. `persianRicePrice` is a cached display value, refreshed on reconciliation.
+ */
 export interface CartItem {
   dailyMenuItemId: number
+  withPersianRice?: boolean
+  persianRiceTitle?: string | null
+  persianRicePrice?: number
   foodName: string
   unitPrice: number
+  originalUnitPrice?: number | null
+  discountPercentage?: number | null
   quantity: number
   remainingPortions: number
 }

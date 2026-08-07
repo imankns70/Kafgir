@@ -6,11 +6,16 @@ import {
   paymentWriteSchema,
   purchaseWriteSchema,
   recipeWriteSchema,
+  shoppingListSummarySchema,
+  stockCountSchema,
 } from './v15.js'
 
 describe('Kafgir v1.5 contracts', () => {
-  it('keeps POS and card-to-card as distinct payment methods', () => {
-    expect(CustomerPaymentMethod.Pos).not.toBe(CustomerPaymentMethod.CardToCard)
+  it('keeps finance payment values aligned with order payment values', () => {
+    expect(CustomerPaymentMethod.Cash).toBe(1)
+    expect(CustomerPaymentMethod.CardToCard).toBe(2)
+    expect(CustomerPaymentMethod.OnlineGateway).toBe(3)
+    expect(CustomerPaymentMethod.Pos).toBe(4)
   })
 
   it('requires explicit purchase conversion and positive decimal quantities', () => {
@@ -24,6 +29,9 @@ describe('Kafgir v1.5 contracts', () => {
     expect(purchaseWriteSchema.safeParse(base).success).toBe(true)
     expect(purchaseWriteSchema.safeParse({
       ...base, items: [{ ...base.items[0], conversionFactorToBaseUnit: '0' }],
+    }).success).toBe(false)
+    expect(purchaseWriteSchema.safeParse({
+      ...base, items: [{ ...base.items[0], lineDiscountAmount: 5_000_001 }],
     }).success).toBe(false)
   })
 
@@ -51,5 +59,34 @@ describe('Kafgir v1.5 contracts', () => {
     expect(recipeWriteSchema.safeParse({
       yieldQuantity: 10, overheadPerPortion: 0, isActive: true, items: [],
     }).success).toBe(false)
+  })
+
+  it('rejects duplicate ingredients in recipes and stock counts', () => {
+    expect(recipeWriteSchema.safeParse({
+      yieldQuantity: 10, overheadPerPortion: 0, items: [
+        { ingredientId: 1, quantityInBaseUnit: '2' },
+        { ingredientId: 1, quantityInBaseUnit: '3' },
+      ],
+    }).success).toBe(false)
+    expect(stockCountSchema.safeParse({
+      items: [
+        { ingredientId: 1, countedQuantity: '2' },
+        { ingredientId: 1, countedQuantity: '3' },
+      ],
+    }).success).toBe(false)
+  })
+
+  it('validates saved shopping-list summaries returned to Admin', () => {
+    expect(shoppingListSummarySchema.safeParse({
+      id: 1,
+      title: 'لیست خرید آموزشی',
+      targetDate: '2026-08-02',
+      status: 1,
+      notes: null,
+      itemCount: 4,
+      estimatedTotal: 8_388_000,
+      itemSummary: 'برنج هاشمی ایرانی، مرغ کامل تازه',
+      createdAt: '2026-08-01T08:30:00.000Z',
+    }).success).toBe(true)
   })
 })

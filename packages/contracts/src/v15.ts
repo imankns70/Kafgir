@@ -16,7 +16,9 @@ export enum InventoryTransactionType {
 }
 export enum ShoppingListStatus { Draft = 1, InProgress = 2, Completed = 3, Cancelled = 4 }
 export enum FinancialAccountType { Cash = 1, Bank = 2, GatewaySettlement = 3, PettyCash = 4, Other = 5 }
-export enum CustomerPaymentMethod { Cash = 1, Pos = 2, CardToCard = 3, OnlineGateway = 4 }
+// Keep these values identical to the order PaymentMethod enum in index.ts.
+export enum CustomerPaymentMethod { Cash = 1, CardToCard = 2, OnlineGateway = 3, Pos = 4 }
+export enum PurchasePaymentMethod { Cash = 1, Bank = 2, Card = 3, Other = 4 }
 export enum PaymentStatus {
   Pending = 1, AwaitingVerification = 2, Paid = 3, Failed = 4,
   Rejected = 5, Cancelled = 6, Refunded = 7,
@@ -70,6 +72,10 @@ export const purchaseItemWriteSchema = z.object({
   ingredientId: id, purchaseUnitId: id, quantity, conversionFactorToBaseUnit: quantity,
   unitPrice: money, lineDiscountAmount: money.default(0), expirationDate: isoDate.nullable().optional(),
   batchNumber: z.string().trim().max(100).nullable().optional(), notes: optionalText,
+}).superRefine((value, context) => {
+  if (value.lineDiscountAmount > Number(value.quantity) * value.unitPrice) {
+    context.addIssue({ code: 'custom', path: ['lineDiscountAmount'], message: 'تخفیف ردیف نمی‌تواند از مبلغ ردیف بیشتر باشد.' })
+  }
 })
 export const purchaseWriteSchema = z.object({
   supplierId: id.nullable().optional(), invoiceNumber: z.string().trim().max(100).nullable().optional(),
@@ -90,6 +96,12 @@ export const purchaseSchema = z.object({
     expirationDate: z.string().nullable(), batchNumber: z.string().nullable(), notes: z.string().nullable(),
   })),
 })
+export const purchaseSummarySchema = purchaseSchema.pick({
+  id: true, purchaseNumber: true, supplierId: true, supplierName: true, invoiceNumber: true,
+  purchaseDate: true, status: true, subtotalAmount: true, discountAmount: true,
+  additionalCostAmount: true, totalAmount: true, paidAmount: true, paymentStatus: true,
+  notes: true, attachmentUrl: true, createdAt: true, confirmedAt: true,
+})
 export const inventoryMovementSchema = z.object({
   id, ingredientId: id, ingredientName: z.string(), transactionType: z.nativeEnum(InventoryTransactionType),
   quantityInBaseUnit: z.string(), unitCost: z.number(), totalCost: z.number(),
@@ -109,14 +121,30 @@ export const wasteWriteSchema = z.object({
 export const stockCountSchema = z.object({
   items: z.array(z.object({ ingredientId: id, countedQuantity: decimalQuantity })).min(1),
   notes: optionalText,
+}).superRefine((value, context) => {
+  const ids = new Set<number>()
+  value.items.forEach((item, index) => {
+    if (ids.has(item.ingredientId)) {
+      context.addIssue({ code: 'custom', path: ['items', index, 'ingredientId'], message: 'هر ماده در انبارگردانی فقط یک‌بار مجاز است.' })
+    }
+    ids.add(item.ingredientId)
+  })
 })
 export const recipeWriteSchema = z.object({
-  yieldQuantity: z.number().int().positive(), preparationLossPercent: z.number().min(0).max(100).nullable().optional(),
+  yieldQuantity: z.number().int().positive(), preparationLossPercent: z.number().min(0).max(99.99).nullable().optional(),
   overheadPerPortion: money.default(0), notes: optionalText, isActive: z.boolean().default(true),
   items: z.array(z.object({
     ingredientId: id, quantityInBaseUnit: quantity,
-    wastePercent: z.number().min(0).max(100).nullable().optional(), notes: optionalText,
+    wastePercent: z.number().min(0).max(99.99).nullable().optional(), notes: optionalText,
   })).min(1),
+}).superRefine((value, context) => {
+  const ids = new Set<number>()
+  value.items.forEach((item, index) => {
+    if (ids.has(item.ingredientId)) {
+      context.addIssue({ code: 'custom', path: ['items', index, 'ingredientId'], message: 'هر ماده در دستور پخت فقط یک‌بار مجاز است.' })
+    }
+    ids.add(item.ingredientId)
+  })
 })
 export const recipeSchema = z.object({
   id, foodId: id, foodName: z.string(), yieldQuantity: z.number().int(),
@@ -141,6 +169,9 @@ export const financialAccountWriteSchema = z.object({
   accountNumberMasked: z.string().trim().max(40).nullable().optional(), ibanMasked: z.string().trim().max(40).nullable().optional(),
   openingBalance: money.default(0), isActive: z.boolean().default(true), notes: optionalText,
 })
+export const expenseCategorySchema = z.object({
+  id, name: z.string(), isActive: z.boolean(), createdAt: z.string(),
+})
 export const posTerminalSchema = z.object({
   id, title: z.string(), terminalNumber: z.string(), merchantNumber: z.string().nullable(),
   financialAccountId: id, financialAccountName: z.string(), isActive: z.boolean(), notes: z.string().nullable(),
@@ -160,6 +191,16 @@ export const paymentWriteSchema = z.object({
 export const paymentStatusWriteSchema = z.object({
   status: z.nativeEnum(PaymentStatus), description: optionalText,
 })
+export const customerPaymentSchema = z.object({
+  id, orderId: id, orderNumber: z.string(), customerFullName: z.string(),
+  customerPhoneNumber: z.string(), orderTotalAmount: money,
+  paymentMethod: z.nativeEnum(CustomerPaymentMethod), amount: money,
+  status: z.nativeEnum(PaymentStatus), financialAccountId: id,
+  financialAccountName: z.string(), posTerminalId: id.nullable(),
+  trackingNumber: z.string().nullable(), referenceNumber: z.string().nullable(),
+  receiptImageUrl: z.string().nullable(), description: z.string().nullable(),
+  paidAt: z.string().nullable(), createdAt: z.string(),
+})
 export const financialEntrySchema = z.object({
   financialAccountId: id, amount: money.positive(), transactionDate: z.string().datetime().optional(),
   categoryId: id.nullable().optional(), description: z.string().trim().min(1).max(1000),
@@ -170,7 +211,7 @@ export const accountTransferSchema = z.object({
 }).refine((value) => value.fromAccountId !== value.toAccountId, 'حساب مبدأ و مقصد باید متفاوت باشند.')
 export const purchasePaymentWriteSchema = z.object({
   purchaseId: id, financialAccountId: id, amount: money.positive(),
-  paymentMethod: z.enum(['cash', 'bank', 'card', 'other']),
+  paymentMethod: z.nativeEnum(PurchasePaymentMethod),
   paidAt: z.string().datetime().optional(), trackingNumber: z.string().trim().max(100).nullable().optional(),
   notes: optionalText,
 })
@@ -184,6 +225,11 @@ export const shoppingListCreateSchema = z.object({
     suggestedPurchaseQuantity: decimalQuantity, estimatedUnitCost: money,
   })).min(1),
 })
+export const shoppingListSummarySchema = z.object({
+  id, title: z.string(), targetDate: isoDate, status: z.nativeEnum(ShoppingListStatus),
+  notes: z.string().nullable(), itemCount: z.number().int().nonnegative(),
+  estimatedTotal: z.number().nonnegative(), itemSummary: z.string(), createdAt: z.string(),
+})
 
 export type UnitDto = z.infer<typeof unitSchema>
 export type UnitWriteRequest = z.infer<typeof unitWriteSchema>
@@ -194,6 +240,7 @@ export type IngredientWriteRequest = z.infer<typeof ingredientWriteSchema>
 export type SupplierDto = z.infer<typeof supplierSchema>
 export type SupplierWriteRequest = z.infer<typeof supplierWriteSchema>
 export type PurchaseDto = z.infer<typeof purchaseSchema>
+export type PurchaseSummaryDto = z.infer<typeof purchaseSummarySchema>
 export type PurchaseWriteRequest = z.infer<typeof purchaseWriteSchema>
 export type InventoryMovementDto = z.infer<typeof inventoryMovementSchema>
 export type InventoryAdjustmentRequest = z.infer<typeof inventoryAdjustmentSchema>
@@ -203,12 +250,15 @@ export type RecipeDto = z.infer<typeof recipeSchema>
 export type RecipeWriteRequest = z.infer<typeof recipeWriteSchema>
 export type FinancialAccountDto = z.infer<typeof financialAccountSchema>
 export type FinancialAccountWriteRequest = z.infer<typeof financialAccountWriteSchema>
+export type ExpenseCategoryDto = z.infer<typeof expenseCategorySchema>
 export type PosTerminalDto = z.infer<typeof posTerminalSchema>
 export type PosTerminalWriteRequest = z.infer<typeof posTerminalWriteSchema>
 export type PaymentWriteRequest = z.infer<typeof paymentWriteSchema>
 export type PaymentStatusWriteRequest = z.infer<typeof paymentStatusWriteSchema>
+export type CustomerPaymentDto = z.infer<typeof customerPaymentSchema>
 export type FinancialEntryRequest = z.infer<typeof financialEntrySchema>
 export type AccountTransferRequest = z.infer<typeof accountTransferSchema>
 export type PurchasePaymentWriteRequest = z.infer<typeof purchasePaymentWriteSchema>
 export type ShoppingRequirementsRequest = z.infer<typeof shoppingRequirementsSchema>
 export type ShoppingListCreateRequest = z.infer<typeof shoppingListCreateSchema>
+export type ShoppingListSummaryDto = z.infer<typeof shoppingListSummarySchema>

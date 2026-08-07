@@ -35,6 +35,7 @@ Copy `apps/web/.env.example` to `apps/web/.env.local` and set local secrets. Nev
 ```powershell
 npm run db:migrate
 npm run db:seed
+npm run db:seed-demo # optional: realistic fictional operations data for local learning
 npm run dev:web
 ```
 
@@ -43,6 +44,16 @@ In a second terminal:
 ```powershell
 npm run dev:admin
 ```
+
+For private Telegram testing over a changing Pinggy URL, expose only `localhost:3000`, keep
+`TELEGRAM_REQUIRE_INIT_DATA=true`, and update the bot menu after each tunnel restart:
+
+```powershell
+npm run telegram:configure -- -MiniAppUrl https://your-current-host.pinggy.link
+```
+
+See [.ai/docs/telegram-mini-app.md](.ai/docs/telegram-mini-app.md) for the BotFather, channel, and
+security checklist. Never expose Electron, PostgreSQL, or pgAdmin through the tunnel.
 
 For development, Electron reads `DATABASE_URL` directly, uses a three-connection pool by default, and stores uploaded food photos in `.data/uploads/foods` through the same `/api/media/foods/...` URLs served by Next.js. Packaged builds test and encrypt PostgreSQL and Liara Object Storage configuration through Windows DPAPI.
 

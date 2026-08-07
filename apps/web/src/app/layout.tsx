@@ -19,7 +19,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="fa" dir="rtl">
+    // The Telegram Web App script runs before hydration and writes --tg-viewport-* onto <html>,
+    // which the server never rendered. Without this, React fails hydration on every page load.
+    <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body>
         {children}
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />

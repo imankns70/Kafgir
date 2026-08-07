@@ -16,9 +16,11 @@
     "db:test:down": "docker compose -f infra/postgres.compose.yml down",
     "dev:web": "npm run dev --workspace @kafgir/web",
     "dev:admin": "npm run dev --workspace @kafgir/admin",
+    "telegram:configure": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/configure-telegram-miniapp.ps1",
     "db:generate": "npm run db:generate --workspace @kafgir/web",
     "db:migrate": "npm run db:migrate --workspace @kafgir/web",
     "db:seed": "npm run db:seed --workspace @kafgir/web",
+    "db:seed-demo": "npm run db:seed-demo --workspace @kafgir/web",
     "migrate:sqlserver": "npm run migrate:sqlserver --workspace @kafgir/web"
   },
   "engines": {

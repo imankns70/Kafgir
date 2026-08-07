@@ -15,6 +15,7 @@ import type { TelegramIdentity } from '../telegram/validation'
 import { isAllowedOrderTransition, normalizePhone, optionalText } from '../domain/order-rules'
 import { consumeOrderInventory, reverseOrderInventory } from './v15-service'
 import { logger } from '../logging/logger'
+import { formatTelegramOrderInvoice } from '../domain/order-invoice'
 
 const defaultCity = 'اندیمشک'
 const customerRole = 'Customer'
@@ -51,6 +52,7 @@ type OrderItemRecord = {
   id: number
   dailyMenuItemId: number
   foodName: string
+  originalUnitPrice: number | null
   unitPrice: number
   quantity: number
   totalPrice: number
@@ -127,7 +129,12 @@ async function resolveCustomer(
   } else {
     await tx`
       UPDATE users
-      SET full_name = ${fullName}, phone_number = ${phoneNumber},
+      SET full_name = ${fullName},
+          phone_number = CASE
+            WHEN EXISTS(SELECT 1 FROM customer_login_phones WHERE user_id = ${userId})
+              THEN phone_number
+            ELSE ${phoneNumber}
+          END,
           last_seen_at = ${nowSql}, last_order_at = ${nowSql}
       WHERE id = ${userId}
     `
@@ -159,7 +166,13 @@ async function resolveCustomer(
   } else {
     await tx`
       UPDATE customer_profiles
-      SET preferred_name = ${fullName}, default_phone_number = ${phoneNumber}, last_order_at = ${nowSql}
+      SET preferred_name = ${fullName},
+          default_phone_number = CASE
+            WHEN EXISTS(SELECT 1 FROM customer_login_phones WHERE user_id = ${userId})
+              THEN default_phone_number
+            ELSE ${phoneNumber}
+          END,
+          last_order_at = ${nowSql}
       WHERE id = ${profileId}
     `
   }
@@ -171,6 +184,7 @@ export async function createOrder(
   identity: TelegramIdentity,
   allowMissingTelegramIdentity = false,
   authenticatedUserId?: number,
+  sendTelegramInvoice = false,
 ): Promise<OrderDto> {
   if (!allowMissingTelegramIdentity && !identity.userId && !authenticatedUserId) {
     throw new UnauthorizedError('برای ثبت سفارش وارد حساب خود شوید.')
@@ -178,10 +192,10 @@ export async function createOrder(
   const fullName = request.fullName.trim()
   const phoneNumber = normalizePhone(request.phoneNumber)
   if (request.deliveryMethod === DeliveryMethod.Delivery && !request.customerAddressId && !optionalText(request.addressLine)) {
-    throw new AppError('A saved address or address line is required for delivery orders.')
+    throw new AppError('برای سفارش ارسالی، انتخاب آدرس ذخیره‌شده یا وارد کردن آدرس الزامی است.')
   }
-  if (new Set(request.items.map((item) => item.dailyMenuItemId)).size !== request.items.length) {
-    throw new AppError('A daily menu item appears more than once.')
+  if (new Set(request.items.map((item) => `${item.dailyMenuItemId}:${item.withPersianRice}`)).size !== request.items.length) {
+    throw new AppError('هر غذا با و بدون برنج ایرانی فقط یک‌بار می‌تواند در اقلام سفارش ارسال شود.')
   }
 
   const createdId = await sqlClient.begin(async (tx) => {
@@ -199,7 +213,7 @@ export async function createOrder(
         LIMIT 1
       `
       const address = addresses[0]
-      if (!address) throw new AppError('The selected saved address was not found.')
+      if (!address) throw new AppError('آدرس ذخیره‌شده انتخابی یافت نشد.')
       city = address.city
       addressLine = address.addressLine
       await tx`UPDATE customer_addresses SET last_used_at = ${nowSql} WHERE id = ${customerAddressId}`
@@ -221,54 +235,102 @@ export async function createOrder(
       customerAddressId = inserted[0]!.id
     }
 
-    const menuItems: Array<{
+    type MenuItemRecord = {
       id: number
+      dailyMenuId: number
       name: string
       price: number
+      originalPrice: number | null
       isAvailable: boolean
       isOpen: boolean
       remaining: number
       orderDeadline: Date | null
       foodIsActive: boolean
-    }> = []
-    for (const item of request.items) {
-      const records = await tx<typeof menuItems>`
-        SELECT i.id, f.name, i.price::float8 AS price,
-               i.is_available AS "isAvailable", m.is_open AS "isOpen",
-               i.capacity_portions - i.sold_portions AS remaining,
-               m.order_deadline AS "orderDeadline", f.is_active AS "foodIsActive"
-        FROM daily_menu_items i
-        JOIN daily_menus m ON m.id = i.daily_menu_id
-        JOIN foods f ON f.id = i.food_id
-        WHERE i.id = ${item.dailyMenuItemId}
-        LIMIT 1
-      `
-      const menuItem = records[0]
-      if (!menuItem) throw new AppError(`Daily menu item with id ${item.dailyMenuItemId} was not found.`)
-      if (!menuItem.foodIsActive) throw new AppError(`${menuItem.name} is not active.`)
-      if (!menuItem.isAvailable) throw new AppError(`${menuItem.name} is not available.`)
-      if (!menuItem.isOpen) throw new AppError('The daily menu is closed.')
+      allowsPersianRice: boolean
+      isPersianRice: boolean
+    }
+    const selectMenuItem = (id: number) => tx<MenuItemRecord[]>`
+      SELECT i.id, i.daily_menu_id AS "dailyMenuId", f.name,
+             COALESCE(i.discount_price, i.price)::float8 AS price,
+             CASE WHEN i.discount_price IS NOT NULL THEN i.price::float8 ELSE NULL END AS "originalPrice",
+             i.is_available AS "isAvailable", m.is_open AS "isOpen",
+             i.capacity_portions - i.sold_portions AS remaining,
+             m.order_deadline AS "orderDeadline", f.is_active AS "foodIsActive",
+             f.allows_persian_rice AS "allowsPersianRice",
+             f.is_persian_rice AS "isPersianRice"
+      FROM daily_menu_items i
+      JOIN daily_menus m ON m.id = i.daily_menu_id
+      JOIN foods f ON f.id = i.food_id
+      WHERE i.id = ${id}
+      LIMIT 1
+    `
+    const assertOrderable = (menuItem: MenuItemRecord | undefined): MenuItemRecord => {
+      if (!menuItem) throw new AppError('یکی از غذاهای سبد دیگر در منوی امروز وجود ندارد.')
+      if (!menuItem.foodIsActive) throw new AppError(`«${menuItem.name}» غیرفعال شده است.`)
+      if (!menuItem.isAvailable) throw new AppError(`«${menuItem.name}» امروز قابل سفارش نیست.`)
+      if (!menuItem.isOpen) throw new AppError('سفارش‌گیری منوی امروز بسته است.')
       if (menuItem.orderDeadline && menuItem.orderDeadline <= now) {
-        throw new AppError('The order deadline has passed.')
+        throw new AppError('مهلت سفارش منوی امروز به پایان رسیده است.')
       }
-      if (item.quantity > menuItem.remaining) {
-        throw new AppError(`Only ${menuItem.remaining} portions of ${menuItem.name} remain.`)
+      return menuItem
+    }
+
+    // Foreign rice is already inside every dish price. The Persian upgrade is an ordinary food, so the
+    // client only says yes or no per dish and the server resolves, prices and aggregates it into one
+    // extra order line.
+    // One dish can arrive twice — once plain and once upgraded — and both carry the same dish price.
+    // Capacity must therefore be checked on the combined total and the dish emitted as a single order
+    // line; checking each variant alone let two 8-portion lines pass against a 10-portion dish.
+    const dishes = new Map<number, { menuItem: MenuItemRecord; quantity: number }>()
+    let persianRicePortions = 0
+    for (const item of request.items) {
+      const menuItem = assertOrderable((await selectMenuItem(item.dailyMenuItemId))[0])
+      if (menuItem.isPersianRice) {
+        throw new AppError(`«${menuItem.name}» فقط به‌عنوان افزودن به یک غذا قابل سفارش است.`)
       }
-      menuItems.push(menuItem)
+      if (item.withPersianRice && !menuItem.allowsPersianRice) {
+        throw new AppError(`«${menuItem.name}» امکان افزودن برنج ایرانی ندارد.`)
+      }
+      const quantity = (dishes.get(menuItem.id)?.quantity ?? 0) + item.quantity
+      if (quantity > menuItem.remaining) {
+        throw new AppError(`از «${menuItem.name}» فقط ${menuItem.remaining} پرس باقی مانده است. سبد را به‌روزرسانی کنید.`)
+      }
+      if (item.withPersianRice) persianRicePortions += item.quantity
+      dishes.set(menuItem.id, { menuItem, quantity })
+    }
+
+    const orderLines = [...dishes.values()]
+    if (persianRicePortions > 0) {
+      const menuId = orderLines[0]!.menuItem.dailyMenuId
+      const riceRows = await tx<{ id: number }[]>`
+        SELECT i.id FROM daily_menu_items i
+        JOIN foods f ON f.id = i.food_id
+        WHERE i.daily_menu_id = ${menuId} AND f.is_persian_rice
+        ORDER BY i.id LIMIT 1
+      `
+      if (!riceRows[0]) throw new AppError('برنج ایرانی امروز در منو موجود نیست.')
+      const rice = assertOrderable((await selectMenuItem(riceRows[0].id))[0])
+      if (persianRicePortions > rice.remaining) {
+        throw new AppError(`از «${rice.name}» فقط ${rice.remaining} پرس باقی مانده است. سبد را به‌روزرسانی کنید.`)
+      }
+      orderLines.push({ menuItem: rice, quantity: persianRicePortions })
     }
 
     const year = String(persianBusinessYear(now))
     await tx`SELECT pg_advisory_xact_lock(hashtext(${`kafgir-order-${year}`}))`
+    // The offset MUST be cast to int. Bound untyped, PostgreSQL resolves the POSIX-regex overload
+    // `substring(text FROM text)` instead of the positional one, so '14051' matched '5' and every
+    // order in the year collapsed to the same counter value.
     const counters = await tx<{ value: number }[]>`
       SELECT COALESCE(MAX(
-        CASE WHEN substring(order_number from ${year.length + 1}) ~ '^[0-9]+$'
-          THEN substring(order_number from ${year.length + 1})::int ELSE 0 END
+        CASE WHEN substring(order_number from ${year.length + 1}::int) ~ '^[0-9]+$'
+          THEN substring(order_number from ${year.length + 1}::int)::int ELSE 0 END
       ), 0)::int AS value
       FROM orders
       WHERE order_number LIKE ${`${year}%`}
     `
     const orderNumber = `${year}${(counters[0]?.value ?? 0) + 1}`
-    const subtotal = request.items.reduce((sum, item, index) => sum + menuItems[index]!.price * item.quantity, 0)
+    const subtotal = orderLines.reduce((sum, line) => sum + line.menuItem.price * line.quantity, 0)
     const orderRows = await tx<{ id: number }[]>`
       INSERT INTO orders
         (order_number, customer_profile_id, customer_address_id, delivery_full_name,
@@ -283,14 +345,13 @@ export async function createOrder(
       RETURNING id
     `
     const orderId = orderRows[0]!.id
-    for (const [index, item] of request.items.entries()) {
-      const menuItem = menuItems[index]!
+    for (const { menuItem, quantity } of orderLines) {
       await tx`
         INSERT INTO order_items
-          (order_id, daily_menu_item_id, food_name, unit_price, quantity, total_price)
+          (order_id, daily_menu_item_id, original_unit_price, food_name, unit_price, quantity, total_price)
         VALUES
-          (${orderId}, ${menuItem.id}, ${menuItem.name}, ${menuItem.price},
-           ${item.quantity}, ${menuItem.price * item.quantity})
+          (${orderId}, ${menuItem.id}, ${menuItem.originalPrice}, ${menuItem.name}, ${menuItem.price},
+           ${quantity}, ${menuItem.price * quantity})
       `
     }
     const adminChat = optionalText(process.env.TELEGRAM_ADMIN_CHAT_ID)
@@ -303,6 +364,39 @@ export async function createOrder(
            ${`سفارش جدید کفگیر\nشماره سفارش: ${orderNumber}\nمشتری: ${fullName}\nموبایل: ${phoneNumber}\nمبلغ: ${subtotal.toLocaleString('en-US')} تومان\nآدرس: ${city}، ${addressLine}`},
            ${orderId}, ${orderNumber}, 0, ${nowSql})
       `
+    }
+    if (sendTelegramInvoice) {
+      const chats = await tx<{ chatId: string }[]>`
+        SELECT chat_id AS "chatId"
+        FROM telegram_accounts
+        WHERE user_id = ${customer.userId} AND chat_id IS NOT NULL
+        LIMIT 1
+      `
+      if (chats[0]?.chatId) {
+        const invoiceText = formatTelegramOrderInvoice({
+          orderNumber,
+          createdAt: now,
+          customerFullName: fullName,
+          customerPhoneNumber: phoneNumber,
+          addressLine: request.deliveryMethod === DeliveryMethod.Delivery ? `${city}، ${addressLine}` : null,
+          deliveryMethod: request.deliveryMethod,
+          paymentMethod: request.paymentMethod,
+          subtotalAmount: subtotal,
+          deliveryFee: 0,
+          totalAmount: subtotal,
+          items: orderLines.map(({ menuItem, quantity }) => ({
+            foodName: menuItem.name,
+            unitPrice: menuItem.price,
+            quantity,
+          })),
+        })
+        await tx`
+          INSERT INTO notification_messages
+            (channel, type, status, target, text, order_id, order_number, retry_count, created_at)
+          VALUES
+            (1, 3, 1, ${chats[0].chatId}, ${invoiceText}, ${orderId}, ${orderNumber}, 0, ${nowSql})
+        `
+      }
     }
     return orderId
   })
@@ -332,6 +426,7 @@ export async function getOrder(id: number): Promise<OrderDto> {
   if (!order) throw new NotFoundError()
   const items = await sqlClient<OrderItemRecord[]>`
     SELECT id, daily_menu_item_id AS "dailyMenuItemId", food_name AS "foodName",
+           original_unit_price::float8 AS "originalUnitPrice",
            unit_price::float8 AS "unitPrice", quantity, total_price::float8 AS "totalPrice"
     FROM order_items WHERE order_id = ${id} ORDER BY id
   `
@@ -414,6 +509,7 @@ export async function updateOrderStatus(id: number, request: UpdateOrderStatusRe
     const now = new Date()
     const nowSql = sqlTimestamp(now)
     if (request.newStatus === OrderStatus.Confirmed) {
+      // Rice lines are ordinary order items, so one capacity loop now covers dishes and rice alike.
       const items = await tx<{ id: number; foodName: string; quantity: number; remaining: number }[]>`
         SELECT d.id, oi.food_name AS "foodName", oi.quantity,
                d.capacity_portions - d.sold_portions AS remaining
@@ -424,7 +520,7 @@ export async function updateOrderStatus(id: number, request: UpdateOrderStatusRe
       `
       const insufficient = items.find((item) => item.remaining < item.quantity)
       if (insufficient) {
-        throw new AppError(`Not enough remaining portions for ${insufficient.foodName}.`)
+        throw new AppError(`موجودی «${insufficient.foodName}» برای تأیید سفارش کافی نیست.`)
       }
       for (const item of items) {
         await tx`UPDATE daily_menu_items SET sold_portions = sold_portions + ${item.quantity} WHERE id = ${item.id}`

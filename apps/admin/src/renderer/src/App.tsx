@@ -12,6 +12,7 @@ import {
   type FoodTagDto,
   type FoodTagWriteRequest,
   type FoodWriteRequest,
+  type IngredientDto,
   type OrderDto,
   type OrderReportQuery,
   type OrderSummaryDto,
@@ -47,6 +48,7 @@ const groupedNumber = (value: number) => formatNumber(value)
 const normalizedFoodName = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('fa-IR')
 const asciiDigits = (value: string) => value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
   .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+const integerDigits = (value: string) => asciiDigits(value).replace(/\D/g, '')
 const parseMoneyInput = (value: string) => Number(asciiDigits(value).replace(/[,\s٬،]/g, '')) || 0
 const formatMoneyInput = (value: number) => value > 0 ? groupedNumber(value) : ''
 const persianOnes = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه']
@@ -161,6 +163,77 @@ function Message({ error, children }: { error?: string | null; children?: ReactN
   return <div className={error ? 'message error' : 'message'} role={error ? 'alert' : 'status'}>
     {error && <span>{error}</span>}
     {children}
+  </div>
+}
+
+function AdminOrderInvoice({ order }: { order: OrderDto }) {
+  return <article className="admin-invoice" aria-labelledby={`admin-invoice-title-${order.id}`}>
+    <header className="admin-invoice-header">
+      <Logo />
+      <div>
+        <span>فاکتور فروش</span>
+        <h2 id={`admin-invoice-title-${order.id}`}>سفارش <bdi dir="ltr">{order.orderNumber}</bdi></h2>
+      </div>
+      <Status value={order.status} />
+    </header>
+
+    <section className="admin-invoice-meta">
+      <div><span>تاریخ و زمان</span><strong>{dateTime(order.createdAt)}</strong></div>
+      <div><span>نام مشتری</span><strong>{order.customerFullName}</strong></div>
+      <div><span>شماره تماس</span><strong dir="ltr">{order.customerPhoneNumber}</strong></div>
+      <div><span>روش دریافت</span><strong>{deliveryMethodLabel[order.deliveryMethod]}</strong></div>
+      <div><span>روش پرداخت</span><strong>{paymentMethodLabel[order.paymentMethod]}</strong></div>
+      {order.addressLine && <div className="admin-invoice-address"><span>آدرس</span><strong>{order.addressLine}</strong></div>}
+    </section>
+
+    <div className="admin-invoice-table-wrap">
+      <table className="admin-invoice-table">
+        <thead><tr><th>ردیف</th><th>شرح</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr></thead>
+        <tbody>{order.items.map((item, index) => <tr key={item.id}>
+          <td>{plainNumber(index + 1)}</td>
+          <td>{item.foodName}</td>
+          <td>{plainNumber(item.quantity)}</td>
+          <td>{money(item.unitPrice)}</td>
+          <td>{money(item.totalPrice)}</td>
+        </tr>)}</tbody>
+      </table>
+    </div>
+
+    <section className="admin-invoice-summary">
+      <div><span>جمع اقلام</span><strong>{money(order.subtotalAmount)}</strong></div>
+      <div><span>هزینه ارسال</span><strong>{money(order.deliveryFee)}</strong></div>
+      <div className="admin-invoice-total"><span>مبلغ قابل پرداخت</span><strong>{money(order.totalAmount)}</strong></div>
+    </section>
+    {order.customerNote && <section className="admin-invoice-note"><strong>یادداشت مشتری</strong><p>{order.customerNote}</p></section>}
+    <footer className="admin-invoice-footer">
+      <span>کفگیر؛ غذای خانگی با مهر</span>
+      <span dir="ltr">09166450262 · 09163442440</span>
+    </footer>
+  </article>
+}
+
+function InvoiceDialog({ order, onClose }: { order: OrderDto; onClose: () => void }) {
+  const [isPrinting, setIsPrinting] = useState(false)
+  const [printError, setPrintError] = useState<string | null>(null)
+  const printInvoice = async () => {
+    setIsPrinting(true)
+    setPrintError(null)
+    try { await window.kafgir.printInvoice() }
+    catch (reason) { setPrintError(reason instanceof Error ? reason.message : 'چاپ فاکتور ممکن نشد.') }
+    finally { setIsPrinting(false) }
+  }
+  return <div className="invoice-dialog" role="dialog" aria-modal="true" aria-label={`فاکتور سفارش ${order.orderNumber}`}>
+    <button type="button" className="invoice-dialog-backdrop" aria-label="بستن فاکتور" onClick={onClose} />
+    <div className="invoice-dialog-card">
+      <div className="invoice-dialog-actions">
+        {printError && <span className="invoice-print-error" role="alert">{printError}</span>}
+        <button type="button" className="secondary-outline" onClick={onClose}>بستن</button>
+        <button type="button" className="primary" disabled={isPrinting} onClick={() => void printInvoice()}>
+          {isPrinting ? 'در حال باز کردن چاپ…' : 'چاپ یا ذخیره فاکتور'}
+        </button>
+      </div>
+      <AdminOrderInvoice order={order} />
+    </div>
   </div>
 }
 
@@ -323,12 +396,17 @@ function DashboardPage() {
     ['فروش تایید شده', money(data.confirmedSales)],
     ['فروش تحویل داده شده', money(data.deliveredSales)],
   ] : []
-  return <PageFrame title="داشبورد امروز" actions={<button onClick={() => void load()}>تازه‌سازی</button>}>
+  return <PageFrame
+    title="داشبورد امروز"
+    actions={<>
+      {data && <div className="panel menu-state menu-state-inline"><strong>سفارش‌گیری امروز</strong><StatusPill active={data.isTodayMenuOpen} /></div>}
+      <button onClick={() => void load()}>تازه‌سازی</button>
+    </>}
+  >
     <Message error={error} />
     <div className="metric-grid">{cards.map(([label, value]) =>
       <article className="metric" key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
-    {data && <div className="panel menu-state"><strong>سفارش‌گیری امروز</strong><StatusPill active={data.isTodayMenuOpen} /></div>}
-    {operations && <><h2 className="dashboard-section-title">عملیات نسخه 1.5</h2><div className="metric-grid">
+    {operations && <><div className="metric-grid">
       {[
         ['هزینه امروز', money(operations.todayExpense)],
         ['پرداخت‌های تأییدنشده', plainNumber(operations.unverifiedPayments)],
@@ -404,13 +482,17 @@ function OrderStatusActions({ status, busy, onChange }: {
 }
 
 function OrderDetails({ order }: { order: OrderDto }) {
+  const [showInvoice, setShowInvoice] = useState(false)
   return <div className="order-detail">
     <div className="order-detail-heading">
       <div>
         <span className="eyebrow">شماره سفارش</span>
         <strong dir="ltr">{order.orderNumber}</strong>
       </div>
-      <Status value={order.status} />
+      <div className="order-detail-heading-actions">
+        <Status value={order.status} />
+        <button type="button" className="secondary-outline" onClick={() => setShowInvoice(true)}>مشاهده و چاپ فاکتور</button>
+      </div>
     </div>
 
     <div className="order-info-grid">
@@ -456,6 +538,7 @@ function OrderDetails({ order }: { order: OrderDto }) {
           <td>{dateTime(item.changedAt)}</td><td>{item.note || '—'}</td>
         </tr>)}</tbody></table></div>
     </section>
+    {showInvoice && <InvoiceDialog order={order} onClose={() => setShowInvoice(false)} />}
   </div>
 }
 
@@ -680,7 +763,7 @@ const emptyFood = (categoryId = 0): FoodWriteRequest => ({
   name: '', slug: '', description: null, fullDescription: null, ingredients: null,
   portionDescription: null, allergyInformation: null, preparationTimeMinutes: null,
   categoryId, tagIds: [], primaryBadgeTagId: null, images: [],
-  defaultPrice: 0, imageUrl: null, isActive: true,
+  defaultPrice: 0, imageUrl: null, allowsPersianRice: false, isPersianRice: false, isActive: true,
 })
 
 type PendingPhoto = { file: File; preview: string }
@@ -702,6 +785,8 @@ const foodWriteFromDto = (food: FoodDto, overrides: Partial<FoodWriteRequest> = 
     images,
     defaultPrice: food.defaultPrice,
     imageUrl: images.find((image) => image.isPrimary)?.imageUrl ?? images[0]?.imageUrl ?? food.imageUrl ?? null,
+    allowsPersianRice: food.allowsPersianRice,
+    isPersianRice: food.isPersianRice,
     isActive: food.isActive,
     ...overrides,
   }
@@ -730,10 +815,13 @@ function FoodsPage({ onCreate, onEdit, onPhotos, onTags }: {
   return <PageFrame title="غذاها" actions={<button className="primary" onClick={onCreate}>غذای جدید</button>}>
     <Message error={error} />
     <div className="toolbar"><label>جستجوی نام غذا<input value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
-    <div className="panel table-wrap"><table><thead><tr><th>نام</th><th>دسته</th><th>توضیحات</th><th>عکس</th><th>وضعیت</th><th /></tr></thead>
+    <div className="panel table-wrap"><table><thead><tr><th>نام</th><th>دسته</th><th>توضیحات</th><th>عکس</th><th>نقش برنج</th><th>وضعیت</th><th /></tr></thead>
       <tbody>{visible.map((food) => {
         const hasPhoto = food.images.length > 0 || Boolean(food.imageUrl)
-        return <tr key={food.id}><td>{food.name}</td><td>{categories.find((category) => category.id === food.categoryId)?.title}</td><td>{food.description}</td><td><span className={`badge ${hasPhoto ? 'open' : 'closed'}`}>{hasPhoto ? 'دارد' : 'ندارد'}</span></td><td><StatusPill active={food.isActive} /></td><td className="actions"><button onClick={() => onEdit(food.id)}>ویرایش</button><button onClick={() => onTags(food.id)}>تگ‌ها</button><button onClick={() => onPhotos(food.id)}>عکس‌ها</button></td></tr>
+        const riceRole = food.isPersianRice
+          ? 'خودِ برنج ایرانی'
+          : food.allowsPersianRice ? 'قابل ارتقا به برنج ایرانی' : '—'
+        return <tr key={food.id}><td>{food.name}</td><td>{categories.find((category) => category.id === food.categoryId)?.title}</td><td>{food.description}</td><td><span className={`badge ${hasPhoto ? 'open' : 'closed'}`}>{hasPhoto ? 'دارد' : 'ندارد'}</span></td><td><span className={`badge ${food.isPersianRice || food.allowsPersianRice ? 'open' : 'closed'}`}>{riceRole}</span></td><td><StatusPill active={food.isActive} /></td><td className="actions"><button onClick={() => onEdit(food.id)}>ویرایش</button><button onClick={() => onTags(food.id)}>تگ‌ها</button><button onClick={() => onPhotos(food.id)}>عکس‌ها</button></td></tr>
       })}</tbody></table></div>
   </PageFrame>
 }
@@ -781,7 +869,8 @@ function FoodEditorPage({
             preparationTimeMinutes: food.preparationTimeMinutes, categoryId: food.categoryId,
             tagIds: food.tagIds, primaryBadgeTagId: food.primaryBadgeTagId,
             images: [], defaultPrice: food.defaultPrice,
-            imageUrl: null, isActive: food.isActive,
+            imageUrl: null, allowsPersianRice: food.allowsPersianRice,
+            isPersianRice: food.isPersianRice, isActive: food.isActive,
           })
         } else {
           setSavedFood(null)
@@ -838,6 +927,23 @@ function FoodEditorPage({
           <option value="">انتخاب دسته</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.icon} {category.title}{!category.isActive ? ' (غیرفعال)' : ''}</option>)}</select></label>
         <label className="switch"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />فعال</label>
       </div>
+      <fieldset className="food-rice-role"><legend>برنج</legend>
+        <label className="switch">
+          <input type="checkbox" checked={form.allowsPersianRice} disabled={form.isPersianRice}
+            onChange={(event) => setForm({ ...form, allowsPersianRice: event.target.checked })} />
+          امکان افزودن برنج ایرانی به این غذا
+        </label>
+        <label className="switch">
+          <input type="checkbox" checked={form.isPersianRice} disabled={form.allowsPersianRice}
+            onChange={(event) => setForm({ ...form, isPersianRice: event.target.checked })} />
+          این غذا خودِ «برنج ایرانی» است
+        </label>
+        <small className="food-rice-help">
+          همه غذاها با برنج خارجی سرو می‌شوند و قیمتشان شامل آن است. با فعال‌کردن گزینه اول، مشتری
+          می‌تواند برنج ایرانی را با پرداخت مابه‌التفاوت جایگزین کند. غذای «برنج ایرانی» در فهرست
+          غذاهای مشتری دیده نمی‌شود و قیمت و ظرفیتش مثل هر غذای دیگر در منوی امروز تنظیم می‌شود.
+        </small>
+      </fieldset>
       <label>توضیح کوتاه<textarea maxLength={300} value={form.description ?? ''} onChange={(event) => setForm({ ...form, description: event.target.value || null })} /></label>
       <label>توضیح کامل<textarea value={form.fullDescription ?? ''} onChange={(event) => setForm({ ...form, fullDescription: event.target.value || null })} /></label>
       <div className="food-editor-grid">
@@ -1062,6 +1168,8 @@ function DailyMenuPage() {
   const [foods, setFoods] = useState<FoodDto[]>([])
   const [foodId, setFoodId] = useState('')
   const [price, setPrice] = useState(0)
+  const [discountEnabled, setDiscountEnabled] = useState(false)
+  const [discountPrice, setDiscountPrice] = useState(0)
   const [capacity, setCapacity] = useState(1)
   const [editing, setEditing] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -1074,18 +1182,36 @@ function DailyMenuPage() {
     setMenu(menuRow)
   }
   useEffect(() => { void load() }, [])
+  const persianRice = menu?.persianRice ?? null
+  const selectedFood = foods.find((food) => food.id === Number(foodId))
   const saveItem = async (event: FormEvent) => {
     event.preventDefault()
+    if (discountEnabled && (discountPrice <= 0 || discountPrice >= price)) {
+      setError('قیمت تخفیف باید بیشتر از صفر و کمتر از قیمت اصلی باشد.')
+      return
+    }
     try {
+      const item = { price, discountPrice: discountEnabled ? discountPrice : null, capacityPortions: capacity, isAvailable: true }
       const updated = editing
-        ? await adminApi.updateMenuItem(editing, { price, capacityPortions: capacity, isAvailable: true })
-        : await adminApi.addMenuItem(date, { foodId: Number(foodId), price, capacityPortions: capacity, isAvailable: true })
-      setMenu(updated); setEditing(null); setFoodId(''); setPrice(0); setCapacity(1); setError(null)
+        ? await adminApi.updateMenuItem(editing, item)
+        : await adminApi.addMenuItem(date, { foodId: Number(foodId), ...item })
+      setMenu(updated); setEditing(null); setFoodId(''); setPrice(0); setDiscountEnabled(false); setDiscountPrice(0); setCapacity(1); setError(null)
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
   }
-  const edit = (item: DailyMenuDto['items'][number]) => {
-    setEditing(item.id); setFoodId(String(item.foodId)); setPrice(item.price); setCapacity(item.capacityPortions)
+  const edit = (item: DailyMenuDto['items'][number], startDiscount = false) => {
+    const regularPrice = item.originalPrice ?? item.price
+    const hasDiscount = item.originalPrice != null
+    setEditing(item.id)
+    setFoodId(String(item.foodId))
+    setPrice(regularPrice)
+    setDiscountEnabled(hasDiscount || startDiscount)
+    setDiscountPrice(hasDiscount ? item.price : Math.max(1, Math.round((regularPrice * 0.9) / 1_000) * 1_000))
+    setCapacity(item.capacityPortions)
+    setError(null)
   }
+  const discountPercentage = discountEnabled && price > 0 && discountPrice > 0 && discountPrice < price
+    ? Math.round((1 - discountPrice / price) * 100)
+    : 0
   const toggle = async () => setMenu(await adminApi.menuSettings(date, !(menu?.isOpen ?? false), menu?.note))
   return <PageFrame title="منوی امروز" actions={<button className={menu?.isOpen ? 'secondary' : 'primary'} onClick={() => void toggle()}>
     سفارش‌گیری {menu?.isOpen ? 'باز است' : 'بسته است'}
@@ -1093,19 +1219,29 @@ function DailyMenuPage() {
     <Message error={error} />
     <form className="panel form-grid menu-form" onSubmit={saveItem}>
       <label>غذا<select value={foodId} disabled={editing !== null} onChange={(event) => setFoodId(event.target.value)} required>
-        <option value="">انتخاب غذا</option>{foods.filter((food) => food.isActive).map((food) => <option value={food.id} key={food.id}>{food.name}</option>)}</select><small /></label>
+        <option value="">انتخاب غذا</option>{foods.filter((food) => food.isActive).map((food) => <option value={food.id} key={food.id}>{food.name}{food.isPersianRice ? ' (برنج ایرانی)' : ''}</option>)}</select>
+        <small>{selectedFood?.isPersianRice ? 'قیمت این ردیف باید مابه‌التفاوت ارتقا به برنج ایرانی باشد، نه قیمت یک پرس کامل برنج.' : selectedFood?.allowsPersianRice ? 'مشتری می‌تواند به این غذا برنج ایرانی اضافه کند؛ «برنج ایرانی» را هم به منوی امروز اضافه کنید.' : ''}</small></label>
       <label>قیمت امروز<input dir="ltr" inputMode="numeric" value={formatMoneyInput(price)} onChange={(event) => setPrice(parseMoneyInput(event.target.value))} /><small className="price-help">{numberToPersianWords(price)}</small></label>
       <label>ظرفیت پرس<input type="number" min="0" value={capacity} onChange={(event) => setCapacity(Number(event.target.value))} /><small /></label>
+      <div className={`menu-discount-control ${discountEnabled ? 'active' : ''}`}>
+        <label className="switch"><input type="checkbox" checked={discountEnabled} onChange={(event) => setDiscountEnabled(event.target.checked)} /> تخفیف فوری</label>
+        {discountEnabled
+          ? <label>قیمت نهایی<input dir="ltr" inputMode="numeric" value={discountPrice ? formatMoneyInput(discountPrice) : ''} onChange={(event) => setDiscountPrice(parseMoneyInput(event.target.value))} /><small>{discountPercentage > 0 ? `${plainNumber(discountPercentage)}٪ تخفیف؛ ${money(price - discountPrice)} صرفه‌جویی` : 'قیمت نهایی باید کمتر از قیمت اصلی باشد'}</small></label>
+          : <small>با فعال‌سازی، قیمت تخفیف همان لحظه در وب نمایش داده می‌شود.</small>}
+      </div>
+      {selectedFood?.allowsPersianRice && !persianRice && <p className="menu-rice-warning">
+        «برنج ایرانی» هنوز به منوی امروز اضافه نشده است؛ تا وقتی اضافه نشود گزینه ارتقا به مشتری نمایش داده نمی‌شود.
+      </p>}
       <button className="primary">{editing ? 'ذخیره' : 'افزودن به منو'}</button>
     </form>
-    <div className="panel table-wrap"><table><thead><tr><th>غذا</th><th>قیمت</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
-      <tbody>{menu?.items.map((item) => <tr key={item.id}><td>{item.foodName}</td><td>{money(item.price)}</td><td>{plainNumber(item.capacityPortions)}</td><td>{plainNumber(item.soldPortions)}</td><td>{plainNumber(item.remainingPortions)}</td><td className="actions"><button onClick={() => edit(item)}>ویرایش</button><button className="danger" onClick={() => void adminApi.removeMenuItem(item.id).then(setMenu)}>حذف</button></td></tr>)}</tbody></table></div>
+    <div className="panel table-wrap"><table><thead><tr><th>غذا</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
+      <tbody>{menu?.items.map((item) => <tr key={item.id}><td>{item.foodName}</td><td>{item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)}</td><td>{persianRice?.menuItemId === item.id ? 'برنج ایرانی' : item.allowsPersianRice ? 'قابل ارتقا' : '—'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{plainNumber(item.capacityPortions)}</td><td>{plainNumber(item.soldPortions)}</td><td>{plainNumber(item.remainingPortions)}</td><td className="actions"><button onClick={() => edit(item)}>ویرایش</button><button className="discount-action" onClick={() => edit(item, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button><button className="danger" onClick={() => void adminApi.removeMenuItem(item.id).then(setMenu)}>حذف</button></td></tr>)}</tbody></table></div>
   </PageFrame>
 }
 
 function ManualOrderPage() {
   const [menu, setMenu] = useState<DailyMenuDto | null>(null)
-  const [cart, setCart] = useState<Array<{ id: number; name: string; price: number; quantity: number; remaining: number }>>([])
+  const [cart, setCart] = useState<Array<{ id: number; withPersianRice: boolean; persianRicePrice: number; name: string; price: number; quantity: number; remaining: number }>>([])
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [delivery, setDelivery] = useState(DeliveryMethod.Pickup)
@@ -1113,6 +1249,7 @@ function ManualOrderPage() {
   const [address, setAddress] = useState('')
   const [customerNote, setCustomerNote] = useState('')
   const [selectedItemId, setSelectedItemId] = useState('')
+  const [withPersianRice, setWithPersianRice] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -1127,28 +1264,39 @@ function ManualOrderPage() {
         setError(reason instanceof Error ? reason.message : String(reason))
       })
   }, [])
-  const menuItems = menu?.items.filter((item) => item.isAvailable && item.remainingPortions > 0) ?? []
+  // Persian rice is hidden from the dish list; it is added as an upgrade on a dish that allows it.
+  const persianRice = menu?.persianRice ?? null
+  const riceAvailable = Boolean(persianRice?.isAvailable && persianRice.remainingPortions > 0)
+  const menuItems = menu?.items.filter((item) => item.isAvailable && item.remainingPortions > 0
+    && item.id !== persianRice?.menuItemId) ?? []
   const selectedItem = menuItems.find((item) => item.id === Number(selectedItemId))
-  const cartTotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  const cartTotal = cart.reduce((sum, item) => sum + (item.price + item.persianRicePrice) * item.quantity, 0)
   const addSelected = () => {
     if (!selectedItem) return
+    const withRice = withPersianRice && selectedItem.allowsPersianRice && riceAvailable
+    setError(null)
     setCart((current) => {
-      const existing = current.find((line) => line.id === selectedItem.id)
-      const nextQuantity = existing ? Math.min(existing.quantity + quantity, existing.remaining) : Math.min(quantity, selectedItem.remainingPortions)
+      const remaining = withRice
+        ? Math.min(selectedItem.remainingPortions, persianRice!.remainingPortions)
+        : selectedItem.remainingPortions
+      const existing = current.find((line) => line.id === selectedItem.id && line.withPersianRice === withRice)
+      const nextQuantity = existing ? Math.min(existing.quantity + quantity, existing.remaining) : Math.min(quantity, remaining)
       return existing
-        ? current.map((line) => line.id === selectedItem.id ? { ...line, quantity: nextQuantity } : line)
+        ? current.map((line) => line.id === selectedItem.id && line.withPersianRice === withRice ? { ...line, quantity: nextQuantity } : line)
         : [...current, {
           id: selectedItem.id,
+          withPersianRice: withRice,
+          persianRicePrice: withRice ? persianRice!.price : 0,
           name: selectedItem.foodName,
           price: selectedItem.price,
           quantity: nextQuantity,
-          remaining: selectedItem.remainingPortions,
+          remaining,
         }]
     })
   }
-  const changeLineQuantity = (id: number, delta: number) => setCart((current) =>
+  const changeLineQuantity = (id: number, withRice: boolean, delta: number) => setCart((current) =>
     current.flatMap((line) => {
-      if (line.id !== id) return [line]
+      if (line.id !== id || line.withPersianRice !== withRice) return [line]
       const nextQuantity = line.quantity + delta
       if (nextQuantity <= 0) return []
       return [{ ...line, quantity: Math.min(nextQuantity, line.remaining) }]
@@ -1162,6 +1310,7 @@ function ManualOrderPage() {
     setAddress('')
     setCustomerNote('')
     setSelectedItemId('')
+    setWithPersianRice(false)
     setQuantity(1)
     setMessage(null)
     setError(null)
@@ -1173,7 +1322,7 @@ function ManualOrderPage() {
       addressLine: delivery === DeliveryMethod.Delivery ? address : 'تحویل حضوری',
       customerNote: customerNote || null,
       saveAddress: false, paymentMethod: payment, deliveryMethod: delivery,
-      items: cart.map((item) => ({ dailyMenuItemId: item.id, quantity: item.quantity })),
+      items: cart.map((item) => ({ dailyMenuItemId: item.id, withPersianRice: item.withPersianRice, quantity: item.quantity })),
     }
     try {
       const order = await adminApi.createOrder(request)
@@ -1209,10 +1358,17 @@ function ManualOrderPage() {
         <section className="panel manual-add-panel">
           <h2>افزودن غذا از منوی امروز</h2>
           <div className="manual-add-row">
-            <label>غذا<select value={selectedItemId} onChange={(event) => setSelectedItemId(event.target.value)}>
+            <label>غذا<select value={selectedItemId} onChange={(event) => { setSelectedItemId(event.target.value); setWithPersianRice(false) }}>
               <option value="">انتخاب غذا</option>
               {menuItems.map((item) => <option key={item.id} value={item.id}>{item.foodName} - {money(item.price)} - باقی‌مانده {plainNumber(item.remainingPortions)}</option>)}
             </select></label>
+            {selectedItem?.allowsPersianRice && <label className="switch manual-rice-toggle">
+              <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable}
+                onChange={(event) => setWithPersianRice(event.target.checked)} />
+              {riceAvailable
+                ? `با برنج ایرانی (+${money(persianRice!.price)} — ${plainNumber(persianRice!.remainingPortions)} پرس)`
+                : 'برنج ایرانی امروز موجود نیست'}
+            </label>}
             <label>تعداد<input type="number" min="1" max={selectedItem?.remainingPortions ?? 99} value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value) || 1))} /></label>
             <div className="manual-stepper" aria-label="تغییر تعداد">
               <button type="button" onClick={() => setQuantity((value) => Math.max(1, value - 1))}>-</button>
@@ -1225,9 +1381,9 @@ function ManualOrderPage() {
         <section className="panel manual-items-panel">
           <div className="manual-section-title"><h2>آیتم‌های سفارش</h2><span>{plainNumber(cart.length)} ردیف</span></div>
           <div className="table-wrap manual-cart-table"><table><thead><tr><th>غذا</th><th>قیمت</th><th>تعداد</th><th>جمع</th><th>عملیات</th></tr></thead>
-            <tbody>{cart.length > 0 ? cart.map((line) => <tr key={line.id}>
-              <td>{line.name}</td><td>{money(line.price)}</td><td>{plainNumber(line.quantity)}</td><td>{money(line.price * line.quantity)}</td>
-              <td className="actions"><button type="button" onClick={() => changeLineQuantity(line.id, -1)}>-</button><button type="button" onClick={() => changeLineQuantity(line.id, 1)}>+</button><button type="button" className="danger" onClick={() => setCart((rows) => rows.filter((item) => item.id !== line.id))}>حذف</button></td>
+            <tbody>{cart.length > 0 ? cart.map((line) => <tr key={`${line.id}:${line.withPersianRice}`}>
+              <td>{line.name}{line.withPersianRice && <small className="rice-line-label">با برنج ایرانی ({money(line.persianRicePrice)}) — ردیف جداگانه در فاکتور</small>}</td><td>{money(line.price + line.persianRicePrice)}</td><td>{plainNumber(line.quantity)}</td><td>{money((line.price + line.persianRicePrice) * line.quantity)}</td>
+              <td className="actions"><button type="button" onClick={() => changeLineQuantity(line.id, line.withPersianRice, -1)}>-</button><button type="button" onClick={() => changeLineQuantity(line.id, line.withPersianRice, 1)}>+</button><button type="button" className="danger" onClick={() => setCart((rows) => rows.filter((item) => item.id !== line.id || item.withPersianRice !== line.withPersianRice))}>حذف</button></td>
             </tr>) : <tr><td colSpan={5}>هنوز آیتمی به سفارش اضافه نشده است.</td></tr>}</tbody></table></div>
           <div className="table-summary"><span>{plainNumber(cart.length)} مورد</span><span>صفحه 1 از 1</span></div>
         </section>

@@ -19,8 +19,8 @@ export function ContactPage({ onBack }: Props) {
           <p className="eyebrow"><Icon name="support" size="sm" /> تماس با ما</p>
           <h1 className="section-title">ارتباط با کفگیر</h1>
         </div>
-        <button className="outline-button menu-back-button" onClick={onBack}>
-          <Icon name="back" size="sm" /> منوی امروز
+        <button className="checkout-back-link" onClick={onBack}>
+          منوی امروز <Icon name="back" size="sm" />
         </button>
       </div>
 

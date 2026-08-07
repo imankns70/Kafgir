@@ -4,6 +4,11 @@ import { sqlClient } from '../db/client'
 import { AppError, UnauthorizedError } from '../errors'
 import { logger } from '../logging/logger'
 import { normalizeIranianMobile } from '../auth/customer-phone'
+import {
+  isConflictingVerifiedPhoneLink,
+  selectVerifiedPhoneCanonicalUserId,
+  type CustomerLinkIdentity,
+} from '../domain/customer-linking'
 import { resolveCustomerUserId } from './customer-identity-service'
 import { sendCustomerOtp } from './sms-service'
 import type { TelegramIdentity } from '../telegram/validation'
@@ -88,10 +93,33 @@ async function ensureCustomerProfile(tx: TransactionSql, userId: number, phone: 
 }
 
 async function resolveVerifiedPhoneUser(tx: TransactionSql, phone: string, preferredUserId?: number | null) {
-  const mapped = await tx<{ userId: number }[]>`
-    SELECT user_id AS "userId" FROM customer_login_phones
-    WHERE normalized_phone_number = ${phone} LIMIT 1
+  await tx`SELECT pg_advisory_xact_lock(hashtext(${`customer-phone:${phone}`}))`
+  const mapped = await tx<CustomerLinkIdentity[]>`
+    SELECT lp.user_id AS "userId", t.telegram_user_id AS "telegramUserId"
+    FROM customer_login_phones lp
+    LEFT JOIN telegram_accounts t ON t.user_id = lp.user_id
+    WHERE lp.normalized_phone_number = ${phone}
+    LIMIT 1
+    FOR UPDATE OF lp
   `
+  const preferred = preferredUserId
+    ? await tx<CustomerLinkIdentity[]>`
+        SELECT u.id AS "userId", t.telegram_user_id AS "telegramUserId"
+        FROM users u
+        LEFT JOIN telegram_accounts t ON t.user_id = u.id
+        WHERE u.id = ${preferredUserId} AND u.is_active = true
+        LIMIT 1
+      `
+    : []
+  if (isConflictingVerifiedPhoneLink(preferred[0] ?? null, mapped[0] ?? null)) {
+    logger.warn({
+      event: 'customer.identity.link.rejected',
+      preferredUserId,
+      mappedUserId: mapped[0]?.userId,
+      reason: 'phone-linked-to-another-telegram',
+    }, 'اتصال موبایل به حساب تلگرام دیگری رد شد')
+    throw new AppError('این شماره موبایل قبلاً به حساب تلگرام دیگری متصل شده است. ابتدا از همان حساب وارد شوید.', 409)
+  }
   const rows = await tx<CustomerCandidate[]>`
     SELECT u.id AS "userId", p.id AS "profileId",
            COALESCE(NULLIF(p.default_phone_number, ''), u.phone_number, '') AS phone,
@@ -106,11 +134,7 @@ async function resolveVerifiedPhoneUser(tx: TransactionSql, phone: string, prefe
     try { return normalizeIranianMobile(row.phone) === phone } catch { return false }
   })
 
-  let canonicalUserId = preferredUserId && rows.some((row) => row.userId === preferredUserId)
-    ? preferredUserId
-    : mapped[0]?.userId
-      ?? candidates.find((row) => row.telegramUserId)?.userId
-      ?? candidates[0]?.userId
+  let canonicalUserId = selectVerifiedPhoneCanonicalUserId(preferred[0] ?? null, mapped[0] ?? null, candidates)
 
   if (!canonicalUserId) {
     const username = `phone_${phone}`

@@ -20,8 +20,8 @@ export async function POST(request: Request) {
       }
     }
     const telegram = validateTelegramInitData(body.telegramInitData)
-    if (!customer && !telegram.valid && !telegram.canUseDevelopmentFallback) {
-      throw new UnauthorizedError(telegram.error)
+    if (!customer && !telegram.valid) {
+      throw new UnauthorizedError('برای ثبت سفارش، ابتدا با شماره موبایل وارد شوید یا برنامه را از داخل تلگرام باز کنید.')
     }
     const identity = telegram.identity ?? {
       userId: body.telegramUserId ?? null,
@@ -32,8 +32,9 @@ export async function POST(request: Request) {
     const order = await createOrder(
       body,
       identity,
-      telegram.canUseDevelopmentFallback,
+      false,
       customer?.userId,
+      telegram.valid || customer?.method === 'telegram',
     )
     return NextResponse.json(order, { status: 201 })
   } catch (error) {

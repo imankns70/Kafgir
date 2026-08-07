@@ -15,6 +15,7 @@ type ProfileRecord = {
   preferredName: string
   defaultPhoneNumber: string
   phoneNumberConfirmed: boolean
+  telegramUserId: number | null
   telegramUsername: string | null
 }
 
@@ -35,13 +36,15 @@ export async function getCustomerProfileByUserId(userId: number): Promise<Custom
     preferredName: string
     defaultPhoneNumber: string
     phoneNumberConfirmed: boolean
+    telegramUserId: number | null
     telegramUsername: string | null
   }[]>`
     SELECT p.id, p.user_id AS "userId", p.preferred_name AS "preferredName",
-           p.default_phone_number AS "defaultPhoneNumber",
-           EXISTS(SELECT 1 FROM customer_login_phones lp WHERE lp.user_id = p.user_id) AS "phoneNumberConfirmed",
-           t.username AS "telegramUsername"
+           COALESCE(lp.normalized_phone_number, p.default_phone_number) AS "defaultPhoneNumber",
+           (lp.id IS NOT NULL) AS "phoneNumberConfirmed",
+           t.telegram_user_id AS "telegramUserId", t.username AS "telegramUsername"
     FROM customer_profiles p
+    LEFT JOIN customer_login_phones lp ON lp.user_id = p.user_id
     LEFT JOIN telegram_accounts t ON t.user_id = p.user_id
     WHERE p.user_id = ${userId}
     LIMIT 1

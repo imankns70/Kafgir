@@ -184,6 +184,19 @@ function registerIpc() {
     assertTrustedSender(event)
     return readDesktopLogs(limit)
   })
+  ipcMain.handle('print:invoice', async (event) => {
+    assertTrustedSender(event)
+    if (!mainWindow || !principal) throw new Error('ابتدا وارد حساب مدیریت شوید.')
+    await new Promise<void>((resolvePrint, rejectPrint) => {
+      mainWindow!.webContents.print({
+        silent: false,
+        printBackground: true,
+      }, (success, failureReason) => {
+        if (success) resolvePrint()
+        else rejectPrint(new Error(failureReason || 'باز کردن پنجره چاپ ممکن نشد.'))
+      })
+    })
+  })
 }
 
 function createWindow() {

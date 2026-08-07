@@ -1,0 +1,2 @@
+ALTER TABLE "daily_menu_items" ADD COLUMN "discount_price" numeric(18, 2);--> statement-breakpoint
+ALTER TABLE "daily_menu_items" ADD CONSTRAINT "daily_menu_items_discount_price_check" CHECK ("daily_menu_items"."discount_price" IS NULL OR ("daily_menu_items"."discount_price" > 0 AND "daily_menu_items"."discount_price" < "daily_menu_items"."price"));

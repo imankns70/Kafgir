@@ -15,9 +15,13 @@ import type {
   UpdateDailyMenuItemRequest,
   UpdateOrderStatusRequest,
   FinancialAccountWriteRequest,
+  AccountTransferRequest,
   IngredientWriteRequest,
   InventoryAdjustmentRequest,
   PurchaseWriteRequest,
+  PurchasePaymentWriteRequest,
+  PaymentWriteRequest,
+  PosTerminalWriteRequest,
   RecipeWriteRequest,
   StockCountRequest,
   SupplierWriteRequest,
@@ -26,9 +30,13 @@ import type {
   IngredientDto,
   SupplierDto,
   FinancialAccountDto,
+  ExpenseCategoryDto,
   InventoryMovementDto,
-  PurchaseDto,
+  PurchaseSummaryDto,
+  PosTerminalDto,
   RecipeDto,
+  ShoppingListSummaryDto,
+  CustomerPaymentDto,
 } from '@kafgir/contracts'
 import type { AdminOperation } from '../../shared/admin-operations'
 
@@ -72,12 +80,19 @@ const directOperation = (
     'POST /api/admin/suppliers': 'suppliers.create',
     'GET /api/admin/purchases': 'purchases.list',
     'POST /api/admin/purchases': 'purchases.create',
+    'POST /api/admin/purchase-payments': 'purchases.pay',
     'GET /api/admin/financial-accounts': 'finance.accounts',
+    'GET /api/admin/expense-categories': 'finance.expenseCategories',
     'POST /api/admin/financial-accounts': 'finance.createAccount',
     'GET /api/admin/financial-transactions': 'finance.transactions',
     'POST /api/admin/financial-transactions': 'finance.createEntry',
+    'POST /api/admin/financial-transactions/transfers': 'finance.transfer',
+    'GET /api/admin/pos-terminals': 'finance.posTerminals',
+    'POST /api/admin/pos-terminals': 'finance.createPosTerminal',
+    'GET /api/admin/shopping-lists': 'shopping.list',
     'POST /api/admin/shopping-lists': 'shopping.create',
     'GET /api/admin/payments': 'payments.list',
+    'POST /api/admin/payments': 'payments.create',
     'GET /api/admin/logs': 'logs.server',
   }
   const key = `${method.toUpperCase()} ${pathname}`
@@ -179,6 +194,10 @@ const directOperation = (
       payload: (match) => ({ id: Number(match[1]) }) },
     { regex: /^\/api\/admin\/purchases\/(\d+)\/cancel$/u, operation: 'purchases.cancel',
       payload: (match) => ({ id: Number(match[1]) }) },
+    { regex: /^\/api\/admin\/financial-accounts\/(\d+)$/u, operation: 'finance.updateAccount',
+      payload: (match) => ({ id: Number(match[1]), value: body }) },
+    { regex: /^\/api\/admin\/pos-terminals\/(\d+)$/u, operation: 'finance.updatePosTerminal',
+      payload: (match) => ({ id: Number(match[1]), value: body }) },
     { regex: /^\/api\/admin\/recipes\/(\d+)$/u,
       operation: method === 'GET' ? 'recipes.get' : 'recipes.save',
       payload: (match) => ({ foodId: Number(match[1]), value: body }) },
@@ -282,10 +301,12 @@ export const adminApi = {
   suppliers: () => request<SupplierDto[]>('/api/admin/suppliers'),
   createSupplier: (value: SupplierWriteRequest) => request<void>('/api/admin/suppliers', 'POST', value),
   updateSupplier: (id: number, value: SupplierWriteRequest) => request<void>(`/api/admin/suppliers/${id}`, 'PUT', value),
-  purchases: () => request<PurchaseDto[]>('/api/admin/purchases'),
+  purchases: () => request<PurchaseSummaryDto[]>('/api/admin/purchases'),
   createPurchase: (value: PurchaseWriteRequest) => request<{ id: number }>('/api/admin/purchases', 'POST', value),
   confirmPurchase: (id: number) => request<void>(`/api/admin/purchases/${id}/confirm`, 'POST'),
   cancelPurchase: (id: number) => request<void>(`/api/admin/purchases/${id}/cancel`, 'POST'),
+  registerPurchasePayment: (value: PurchasePaymentWriteRequest) =>
+    request<void>('/api/admin/purchase-payments', 'POST', value),
   inventoryMovements: (ingredientId?: number) => request<InventoryMovementDto[]>(
     `/api/admin/inventory${ingredientId ? `?ingredientId=${ingredientId}` : ''}`),
   adjustInventory: (value: InventoryAdjustmentRequest) =>
@@ -295,15 +316,25 @@ export const adminApi = {
   recipe: (foodId: number) => request<RecipeDto | null>(`/api/admin/recipes/${foodId}`),
   saveRecipe: (foodId: number, value: RecipeWriteRequest) => request<void>(`/api/admin/recipes/${foodId}`, 'PUT', value),
   financialAccounts: () => request<FinancialAccountDto[]>('/api/admin/financial-accounts'),
+  expenseCategories: () => request<ExpenseCategoryDto[]>('/api/admin/expense-categories'),
   createFinancialAccount: (value: FinancialAccountWriteRequest) =>
     request<void>('/api/admin/financial-accounts', 'POST', value),
+  updateFinancialAccount: (id: number, value: FinancialAccountWriteRequest) =>
+    request<void>(`/api/admin/financial-accounts/${id}`, 'PUT', value),
   financialTransactions: () => request<Array<{
     id: number; transactionType: number; financialAccountName: string; amount: number;
     transactionDate: string; categoryName: string | null; description: string;
   }>>('/api/admin/financial-transactions'),
   createFinancialEntry: (kind: 'income' | 'expense', entry: {
-    financialAccountId: number; amount: number; description: string
+    financialAccountId: number; amount: number; categoryId?: number | null; description: string
   }) => request<void>('/api/admin/financial-transactions', 'POST', { kind, entry }),
+  transferFinancialAmount: (value: AccountTransferRequest) =>
+    request<void>('/api/admin/financial-transactions/transfers', 'POST', value),
+  posTerminals: () => request<PosTerminalDto[]>('/api/admin/pos-terminals'),
+  createPosTerminal: (value: PosTerminalWriteRequest) =>
+    request<void>('/api/admin/pos-terminals', 'POST', value),
+  updatePosTerminal: (id: number, value: PosTerminalWriteRequest) =>
+    request<void>(`/api/admin/pos-terminals/${id}`, 'PUT', value),
   v15Dashboard: () => request<{
     todaySales: number; unverifiedPayments: number; todayExpense: number; lowStockCount: number;
     unpaidPurchases: number; missingRecipeOrders: number; todayWasteCost: number;
@@ -312,14 +343,13 @@ export const adminApi = {
     ingredientId: number; ingredientName: string; unitName: string; requiredQuantity: string;
     currentStock: string; shortageQuantity: string; estimatedUnitCost: number; estimatedPurchaseCost: number;
   }>>(`/api/admin/shopping-lists/requirements?from=${from}&to=${to}`),
+  shoppingLists: () => request<ShoppingListSummaryDto[]>('/api/admin/shopping-lists'),
   createShoppingList: (value: {
     title: string; targetDate: string; items: Array<{ ingredientId: number; requiredQuantity: string;
       currentStockSnapshot: string; suggestedPurchaseQuantity: string; estimatedUnitCost: number }>
   }) => request<{ id: number }>('/api/admin/shopping-lists', 'POST', value),
-  payments: () => request<Array<{
-    id: number; orderNumber: string; paymentMethod: number; amount: number; status: number;
-    financialAccountName: string; trackingNumber: string | null; createdAt: string;
-  }>>('/api/admin/payments'),
+  payments: () => request<CustomerPaymentDto[]>('/api/admin/payments'),
+  createPayment: (value: PaymentWriteRequest) => request<{ id: number }>('/api/admin/payments', 'POST', value),
   changePaymentStatus: (id: number, status: number) =>
     request<void>(`/api/admin/payments/${id}/status`, 'PATCH', { status }),
   refundPayment: (id: number) => request<void>(`/api/admin/payments/${id}/refund`, 'POST'),

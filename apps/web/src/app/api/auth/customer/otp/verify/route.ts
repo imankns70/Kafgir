@@ -20,10 +20,11 @@ export async function POST(request: Request) {
       body.code,
       current?.method === 'telegram' ? current.userId : null,
     )
-    const session = await createCustomerToken({ userId, method: 'phone' })
+    const method = current?.method === 'telegram' ? 'telegram' : 'phone'
+    const session = await createCustomerToken({ userId, method })
     const response = NextResponse.json({
       authenticated: true,
-      method: 'phone',
+      method,
       profile: await getCustomerProfileByUserId(userId),
     })
     setCustomerCookie(response, session.token, session.expiresAt)

@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import type { FoodDetailDto } from '@kafgir/contracts'
+import type { CartItem } from '../../types'
 import { BrandLogo } from '../../design-system/BrandLogo'
 import { FoodImage } from '../../design-system/FoodImage'
 import { Icon } from '../../design-system/Icon'
 import { BrandedState } from '../../design-system/BrandedState'
+import { PriceDisplay } from '../../design-system/PriceDisplay'
 import { addStoredCartItem, loadStoredCart, setStoredCartItemQuantity } from '../../services/cartStorage'
 import { getCustomerSession, loginCustomerWithTelegram } from '../../services/customerApi'
 import { favoriteFood, getFoodDetails, likeFood } from '../../services/foodDiscoveryApi'
@@ -28,6 +30,8 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [interactionBusy, setInteractionBusy] = useState(false)
   const [cartQuantity, setCartQuantity] = useState(0)
+  const [cartItems, setCartItems] = useState<CartItem[]>([])
+  const [withPersianRice, setWithPersianRice] = useState(false)
   const [cartCount, setCartCount] = useState(0)
   const [isCustomerAuthenticated, setIsCustomerAuthenticated] = useState(false)
 
@@ -45,6 +49,18 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
   }
 
   useEffect(() => { void load() }, [slug, menuItemId])
+  useEffect(() => {
+    const refreshPrice = async () => {
+      if (document.visibilityState !== 'visible') return
+      try { setFood(await getFoodDetails(slug, menuItemId)) } catch { /* Keep the last valid view. */ }
+    }
+    const interval = window.setInterval(() => void refreshPrice(), 15_000)
+    window.addEventListener('focus', refreshPrice)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refreshPrice)
+    }
+  }, [slug, menuItemId])
   useEffect(() => bindTelegramBackButton(() => history.back()), [])
   useEffect(() => {
     let isActive = true
@@ -64,8 +80,8 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
   useEffect(() => { setActiveImage(0) }, [food?.foodId])
   useEffect(() => {
     const storedCart = loadStoredCart()
-    const item = food?.menuItemId ? storedCart.find((cartItem) => cartItem.dailyMenuItemId === food.menuItemId) : null
-    setCartQuantity(item?.quantity ?? 0)
+    setCartItems(storedCart)
+    setCartQuantity(food?.menuItemId ? storedCart.filter((cartItem) => cartItem.dailyMenuItemId === food.menuItemId).reduce((sum, item) => sum + item.quantity, 0) : 0)
     setCartCount(storedCart.length)
   }, [food?.menuItemId])
 
@@ -105,21 +121,30 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
 
   const addToCart = () => {
     if (!food?.menuItemId || !food.price || !food.isOrderable) return
+    const rice = withPersianRice && food.allowsPersianRice ? food.persianRice : null
+    const remaining = Math.min(food.remainingCapacity, rice?.remainingPortions ?? food.remainingCapacity)
     const nextCart = addStoredCartItem({
       dailyMenuItemId: food.menuItemId,
+      withPersianRice: rice != null,
+      persianRiceTitle: rice?.title ?? null,
+      persianRicePrice: rice?.price ?? 0,
       foodName: food.title,
       unitPrice: food.price,
+      originalUnitPrice: food.originalPrice ?? null,
+      discountPercentage: food.discountPercentage ?? null,
       quantity: 1,
-      remainingPortions: food.remainingCapacity,
+      remainingPortions: remaining,
     })
-    setCartQuantity(nextCart.find((item) => item.dailyMenuItemId === food.menuItemId)?.quantity ?? 0)
+    setCartItems(nextCart)
+    setCartQuantity(nextCart.filter((item) => item.dailyMenuItemId === food.menuItemId).reduce((sum, item) => sum + item.quantity, 0))
     setCartCount(nextCart.length)
   }
 
-  const changeCartQuantity = (quantity: number) => {
+  const changeCartQuantity = (quantity: number, upgraded = false) => {
     if (!food?.menuItemId) return
-    const nextCart = setStoredCartItemQuantity(food.menuItemId, quantity)
-    setCartQuantity(nextCart.find((item) => item.dailyMenuItemId === food.menuItemId)?.quantity ?? 0)
+    const nextCart = setStoredCartItemQuantity(food.menuItemId, quantity, upgraded)
+    setCartItems(nextCart)
+    setCartQuantity(nextCart.filter((item) => item.dailyMenuItemId === food.menuItemId).reduce((sum, item) => sum + item.quantity, 0))
     setCartCount(nextCart.length)
   }
 
@@ -132,33 +157,56 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
   const showCarouselControls = imageCount > 1
   const showPreviousImage = () => setActiveImage((current) => (current - 1 + imageCount) % imageCount)
   const showNextImage = () => setActiveImage((current) => (current + 1) % imageCount)
+  const rice = food.persianRice
+  const riceAvailable = Boolean(rice?.isAvailable && rice.remainingPortions > 0)
+  const offersRice = food.allowsPersianRice && rice != null
+  // Same rule as the menu card: the checkbox chooses what the next add does, and the other basket
+  // variant is named rather than silently hidden.
+  const lines = cartItems.filter((item) => item.dailyMenuItemId === food.menuItemId)
+  const upgradedInCart = lines.some((item) => item.withPersianRice)
+  const upgradedQuantity = lines.find((item) => Boolean(item.withPersianRice) === withPersianRice)?.quantity ?? 0
+  const otherLine = lines.find((item) => Boolean(item.withPersianRice) !== withPersianRice)
   const renderPurchaseBar = (className: string) => <div className={className}>
-    <div className="menu-card-price"><span>قیمت هر پرس</span><strong className="price">{food.price !== null ? formatMoney(food.price) : '—'}</strong></div>
-    {cartQuantity > 0
+    <PriceDisplay
+      price={(food.price ?? 0) + (withPersianRice && rice ? rice.price : 0)}
+      originalPrice={food.originalPrice}
+      discountPercentage={food.discountPercentage}
+    />
+    {offersRice && <label className="rice-upgrade-option">
+      <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
+        onChange={(event) => setWithPersianRice(event.target.checked)} />
+      <span>{riceAvailable || upgradedInCart
+        ? `با برنج ایرانی (+${formatMoney(rice.price)})`
+        : 'برنج ایرانی امروز تمام شده است'}</span>
+    </label>}
+    {otherLine && <small className="cart-variant-hint">
+      {formatNumber(otherLine.quantity)} پرس {otherLine.withPersianRice ? 'با برنج ایرانی' : 'بدون برنج ایرانی'} هم در سبد شماست
+    </small>}
+    {upgradedQuantity > 0
       ? <div className="add-button quantity-add-control" aria-label={`${food.title} در سبد خرید`}>
           <button
             type="button"
             className="quantity-add-button"
-            onClick={() => changeCartQuantity(cartQuantity - 1)}
+            onClick={() => changeCartQuantity(upgradedQuantity - 1, withPersianRice)}
             aria-label={`کم کردن ${food.title}`}
           >
             <Icon name="minus" size="sm" />
           </button>
           <span className="quantity-add-status">
-            <span>{formatNumber(cartQuantity)}</span>
+            <span>{formatNumber(upgradedQuantity)}</span>
             <small>در سبد خرید</small>
           </span>
           <button
             type="button"
             className="quantity-add-button"
-            onClick={addToCart}
-            disabled={cartQuantity >= food.remainingCapacity}
+            onClick={() => addToCart()}
+            disabled={upgradedQuantity >= food.remainingCapacity}
             aria-label={`اضافه کردن ${food.title}`}
           >
             <Icon name="add" size="sm" />
           </button>
         </div>
-      : <button className="primary-button add-button" disabled={!food.isOrderable} onClick={addToCart}>
+      : <button className="primary-button add-button" disabled={!food.isOrderable} onClick={() => addToCart()}>
           <Icon name="cart" size="sm" /><span>افزودن به سبد خرید</span>
         </button>}
   </div>
@@ -174,7 +222,9 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
         </a>
         {isCustomerAuthenticated && <button className={food.isFavoriteByCurrentUser ? 'icon-action active' : 'icon-action'} disabled={interactionBusy}
           onClick={() => void changeInteraction('favorite')} aria-label="افزودن یا حذف از علاقه‌مندی‌ها"><Icon name="favorite" /></button>}
-        <button className="icon-action" onClick={() => history.back()} aria-label="بازگشت"><Icon name="back" /></button>
+        <button type="button" className="checkout-back-link" onClick={() => history.back()}>
+          بازگشت <Icon name="back" size="sm" />
+        </button>
       </div>
     </header>
 
@@ -183,6 +233,7 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
         <div className="food-detail-main-image" aria-roledescription="carousel" aria-label={`تصاویر ${food.title}`}>
           <FoodImage src={primaryImage} alt={food.images[activeImage]?.altText || food.title} />
           {food.primaryBadge && <span className="food-card-badge">{food.primaryBadge.icon} {food.primaryBadge.title}</span>}
+          {food.discountPercentage && <span className="discount-card-badge"><Icon name="discount" size="xs" /> {formatNumber(food.discountPercentage)}٪ تخفیف</span>}
           {showCarouselControls && <>
             <button className="food-gallery-arrow previous" onClick={showPreviousImage} aria-label="تصویر قبلی">
               <Icon name="forward" size="md" />
@@ -228,7 +279,7 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
         {food.ingredients && <section className="panel food-copy-section"><h2>مواد اولیه</h2><p>{food.ingredients}</p></section>}
 
         <section className="panel current-menu-box">
-          <div><strong>{food.price !== null ? formatMoney(food.price) : 'بدون قیمت روز'}</strong><span>{food.availabilityReason}</span></div>
+          <div><PriceDisplay price={food.price} originalPrice={food.originalPrice} discountPercentage={food.discountPercentage} label="قیمت امروز" /><span>{food.availabilityReason}</span></div>
           <div><span>{formatNumber(food.remainingCapacity)} پرس باقی‌مانده</span>
             {food.orderDeadline && <small>مهلت سفارش: {new Intl.DateTimeFormat('fa-IR-u-nu-latn', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(new Date(food.orderDeadline))}</small>}</div>
         </section>
@@ -238,7 +289,13 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
           <h2>غذاهای پیشنهادی</h2>
           <div>{food.relatedFoods.map((related) => <a key={related.menuItemId} href={`/foods/${related.slug}?menuItemId=${related.menuItemId}`}>
             <FoodImage src={related.imageUrl} alt={related.title} />
-            <strong>{related.title}</strong><span>{formatMoney(related.price)}</span>
+            <strong>{related.title}</strong>
+            {related.allowsPersianRice && <span className="rice-upgrade-hint">با امکان برنج ایرانی</span>}
+            <div>
+              <PriceDisplay compact label="" price={related.price}
+                originalPrice={related.originalPrice}
+                discountPercentage={related.discountPercentage} />
+            </div>
           </a>)}</div>
         </section>}
       </section>

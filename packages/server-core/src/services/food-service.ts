@@ -18,6 +18,8 @@ type FoodRecord = {
   primaryBadgeTagId: number | null
   defaultPrice: number
   imageUrl: string | null
+  allowsPersianRice: boolean
+  isPersianRice: boolean
   isActive: boolean
 }
 
@@ -55,6 +57,7 @@ export async function listFoods(): Promise<FoodDto[]> {
            preparation_time_minutes AS "preparationTimeMinutes",
            category_id AS "categoryId", primary_badge_tag_id AS "primaryBadgeTagId",
            default_price::float8 AS "defaultPrice", image_url AS "imageUrl",
+           allows_persian_rice AS "allowsPersianRice", is_persian_rice AS "isPersianRice",
            is_active AS "isActive"
     FROM foods
     ORDER BY name
@@ -70,6 +73,7 @@ export async function getFood(id: number): Promise<FoodDto> {
            preparation_time_minutes AS "preparationTimeMinutes",
            category_id AS "categoryId", primary_badge_tag_id AS "primaryBadgeTagId",
            default_price::float8 AS "defaultPrice", image_url AS "imageUrl",
+           allows_persian_rice AS "allowsPersianRice", is_persian_rice AS "isPersianRice",
            is_active AS "isActive"
     FROM foods WHERE id = ${id} LIMIT 1
   `
@@ -150,14 +154,16 @@ export async function createFood(request: FoodWriteRequest): Promise<FoodDto> {
         INSERT INTO foods
           (name, slug, description, full_description, ingredients, portion_description,
            allergy_information, preparation_time_minutes, category_id, primary_badge_tag_id,
-           default_price, image_url, is_active, created_at, updated_at)
+           default_price, image_url, allows_persian_rice, is_persian_rice,
+           is_active, created_at, updated_at)
         VALUES
           (${request.name}, ${request.slug}, ${request.description ?? null},
            ${request.fullDescription ?? null}, ${request.ingredients ?? null},
            ${request.portionDescription ?? null}, ${request.allergyInformation ?? null},
            ${request.preparationTimeMinutes ?? null}, ${request.categoryId},
            ${request.primaryBadgeTagId ?? null}, ${request.defaultPrice},
-           ${primaryImageUrl(request)}, ${request.isActive}, NOW(), NOW())
+           ${primaryImageUrl(request)}, ${request.allowsPersianRice},
+           ${request.isPersianRice}, ${request.isActive}, NOW(), NOW())
         RETURNING id
       `
       await writeRelations(tx, rows[0]!.id, request)
@@ -193,6 +199,8 @@ export async function updateFood(id: number, request: FoodWriteRequest): Promise
             category_id = ${request.categoryId},
             primary_badge_tag_id = ${request.primaryBadgeTagId ?? null},
             default_price = ${request.defaultPrice}, image_url = ${primaryImageUrl(request)},
+            allows_persian_rice = ${request.allowsPersianRice},
+            is_persian_rice = ${request.isPersianRice},
             is_active = ${request.isActive}, updated_at = NOW()
         WHERE id = ${id}
         RETURNING id

@@ -8,6 +8,11 @@ import {
 } from '../services/food-discovery-service'
 import { listFoodTags } from '../services/catalog-service'
 import { createFood, updateFood } from '../services/food-service'
+import {
+  getMenuByDate,
+  getMenuCartSnapshotByDate,
+  getPublicMenuPageByDate,
+} from '../services/menu-service'
 
 const connectionString = process.env.TEST_DATABASE_URL
 const canRun = Boolean(connectionString && process.env.DATABASE_URL === connectionString)
@@ -71,10 +76,10 @@ integration('food discovery PostgreSQL behavior', () => {
     menuId = menus[0]!.id
     await sql`
       INSERT INTO daily_menu_items
-        (daily_menu_id, food_id, price, capacity_portions, sold_portions, is_available, created_at)
+        (daily_menu_id, food_id, price, discount_price, capacity_portions, sold_portions, is_available, created_at)
       VALUES
-        (${menuId}, ${foodId}, 150, 5, 1, true, NOW()),
-        (${menuId}, ${relatedFoodId}, 120, 3, 0, true, NOW())
+        (${menuId}, ${foodId}, 150, 120, 5, 1, true, NOW()),
+        (${menuId}, ${relatedFoodId}, 120, NULL, 3, 0, true, NOW())
     `
     const users = await sql<{ id: number }[]>`
       INSERT INTO users
@@ -131,6 +136,8 @@ integration('food discovery PostgreSQL behavior', () => {
       images: [],
       defaultPrice: 100,
       imageUrl: null,
+      allowsPersianRice: false,
+      isPersianRice: false,
       isActive: true,
     }
     await expect(createFood(request)).rejects.toThrow('نام غذا تکراری است.')
@@ -175,5 +182,62 @@ integration('food discovery PostgreSQL behavior', () => {
     expect(detail.relatedFoods.some((food) => food.slug === slug)).toBe(false)
     expect(detail.relatedFoods.some((food) => food.slug === `related-${suffix}`)).toBe(true)
     expect(detail.remainingCapacity).toBe(4)
+  })
+
+  it('exposes only active customer-visible tags in the daily menu', async () => {
+    const menu = await getMenuByDate('2099-02-01', true)
+    const item = menu?.items.find((candidate) => candidate.foodId === foodId)
+
+    expect(item?.tags.map((tag) => tag.id)).toEqual([visibleTagId])
+    expect(item?.tags.some((tag) => tag.id === internalTagId)).toBe(false)
+  })
+
+  it('searches visible tags on the server and paginates with a cursor', async () => {
+    const category = `category-${suffix}`
+    const first = await getPublicMenuPageByDate('2099-02-01', {
+      q: 'Visible', category, limit: 1,
+    })
+    expect(first?.totalItems).toBe(2)
+    expect(first?.items).toHaveLength(1)
+    expect(first?.nextCursor).not.toBeNull()
+
+    const second = await getPublicMenuPageByDate('2099-02-01', {
+      q: 'Visible', category, cursor: first!.nextCursor!, limit: 1,
+    })
+    expect(second?.items).toHaveLength(1)
+    expect(second?.items[0]?.id).not.toBe(first?.items[0]?.id)
+    expect(second?.nextCursor).toBeNull()
+
+    const hidden = await getPublicMenuPageByDate('2099-02-01', {
+      q: 'Internal', category, limit: 12,
+    })
+    expect(hidden?.totalItems).toBe(0)
+  })
+
+  it('returns discounted foods only on the unfiltered first menu page', async () => {
+    const initial = await getPublicMenuPageByDate('2099-02-01', {
+      q: '', category: '', limit: 12,
+    })
+    expect(initial?.discountItems).toHaveLength(1)
+    expect(initial?.discountItems[0]).toMatchObject({
+      foodId,
+      price: 120,
+      originalPrice: 150,
+      discountPercentage: 20,
+    })
+    expect(initial?.items.some((item) => item.foodId === foodId)).toBe(true)
+
+    const filtered = await getPublicMenuPageByDate('2099-02-01', {
+      q: 'Visible', category: '', limit: 12,
+    })
+    expect(filtered?.discountItems).toEqual([])
+  })
+
+  it('loads a cart snapshot only for requested menu items', async () => {
+    const menu = await getMenuByDate('2099-02-01', true)
+    const requestedId = menu!.items.find((item) => item.foodId === foodId)!.id
+    const snapshot = await getMenuCartSnapshotByDate('2099-02-01', [{ dailyMenuItemId: requestedId }])
+    expect(snapshot?.isOpen).toBe(true)
+    expect(snapshot?.items.map((item) => item.id)).toEqual([requestedId])
   })
 })

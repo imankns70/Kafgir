@@ -1,5 +1,6 @@
 import {
   createOrderSchema,
+  accountTransferSchema,
   dailyMenuItemWriteSchema,
   financialAccountWriteSchema,
   financialEntrySchema,
@@ -10,6 +11,9 @@ import {
   inventoryAdjustmentSchema,
   purchaseWriteSchema,
   paymentStatusWriteSchema,
+  paymentWriteSchema,
+  posTerminalWriteSchema,
+  purchasePaymentWriteSchema,
   recipeWriteSchema,
   shoppingListCreateSchema,
   stockCountSchema,
@@ -31,6 +35,7 @@ import {
   createFoodTag,
   createOrder,
   createPurchase,
+  createPayment,
   createShoppingList,
   cancelPurchase,
   getDashboard,
@@ -38,6 +43,7 @@ import {
   getOrder,
   getRecipe,
   listFinancialAccounts,
+  listExpenseCategories,
   listFinancialTransactions,
   listFoodCategories,
   listFoods,
@@ -45,14 +51,18 @@ import {
   listIngredients,
   listInventoryMovements,
   listPayments,
+  listPosTerminals,
   listPurchases,
+  listShoppingLists,
   listSuppliers,
   listUnits,
   managerialReports,
   refundPayment,
   registerWaste,
+  registerPurchasePayment,
   removeMenuItem,
   saveFinancialAccount,
+  savePosTerminal,
   saveIngredient,
   saveRecipe,
   saveSupplier,
@@ -67,12 +77,14 @@ import {
   updateOrderStatus,
   v15Dashboard,
   changePaymentStatus,
+  transfer,
   closeDatabase,
   testDatabaseConnection,
   type AdminPrincipal,
 } from '@kafgir/server-core'
 import { readServerLogs } from '@kafgir/server-core/logging/read-logs'
 import type { AdminOperation } from '../shared/admin-operations'
+import { isAdminOperationAllowed } from '../shared/admin-permissions'
 
 type RecordPayload = Record<string, unknown>
 
@@ -88,6 +100,12 @@ const textField = (payload: unknown, key: string) => {
   return value
 }
 
+function authorizeOperation(operation: AdminOperation, principal: AdminPrincipal) {
+  if (!isAdminOperationAllowed(operation, principal.roles)) {
+    throw new Error('برای انجام این عملیات مجوز کافی ندارید.')
+  }
+}
+
 export async function dispatchAdminOperation(
   operation: AdminOperation,
   payload: unknown,
@@ -98,6 +116,7 @@ export async function dispatchAdminOperation(
     return { status: 'ok' }
   }
   if (!principal) throw new Error('ابتدا وارد حساب مدیریت شوید.')
+  authorizeOperation(operation, principal)
   const body = payloadRecord(payload)
   switch (operation) {
     case 'dashboard.today': return getDashboard()
@@ -152,6 +171,8 @@ export async function dispatchAdminOperation(
       return { id: await createPurchase(purchaseWriteSchema.parse(body.value), principal.userId) }
     case 'purchases.confirm': return confirmPurchase(numberField(body, 'id'), principal.userId)
     case 'purchases.cancel': return cancelPurchase(numberField(body, 'id'), principal.userId)
+    case 'purchases.pay':
+      return registerPurchasePayment(purchasePaymentWriteSchema.parse(body.value), principal.userId)
     case 'inventory.movements':
       return listInventoryMovements(
         body.ingredientId === undefined ? undefined : Number(body.ingredientId),
@@ -169,8 +190,11 @@ export async function dispatchAdminOperation(
         principal.userId,
       )
     case 'finance.accounts': return listFinancialAccounts()
+    case 'finance.expenseCategories': return listExpenseCategories()
     case 'finance.createAccount':
       return saveFinancialAccount(null, financialAccountWriteSchema.parse(body.value))
+    case 'finance.updateAccount':
+      return saveFinancialAccount(numberField(body, 'id'), financialAccountWriteSchema.parse(body.value))
     case 'finance.transactions': return listFinancialTransactions()
     case 'finance.createEntry':
       return createFinancialEntry(
@@ -178,11 +202,20 @@ export async function dispatchAdminOperation(
         body.kind === 'income' ? 'income' : 'expense',
         principal.userId,
       )
+    case 'finance.transfer':
+      return transfer(accountTransferSchema.parse(body.value), principal.userId)
+    case 'finance.posTerminals': return listPosTerminals()
+    case 'finance.createPosTerminal': return savePosTerminal(null, posTerminalWriteSchema.parse(body.value))
+    case 'finance.updatePosTerminal':
+      return savePosTerminal(numberField(body, 'id'), posTerminalWriteSchema.parse(body.value))
+    case 'shopping.list': return listShoppingLists()
     case 'shopping.requirements':
       return shoppingRequirements(textField(body, 'from'), textField(body, 'to'))
     case 'shopping.create':
       return { id: await createShoppingList(shoppingListCreateSchema.parse(body.value), principal.userId) }
     case 'payments.list': return listPayments()
+    case 'payments.create':
+      return { id: await createPayment(paymentWriteSchema.parse(body.value), principal.userId) }
     case 'payments.changeStatus':
       return changePaymentStatus(
         numberField(body, 'id'),

@@ -5,6 +5,7 @@ import {
   PaymentStatus,
   PurchasePaymentStatus,
   PurchaseStatus,
+  OrderStatus,
   type AccountTransferRequest,
   type FinancialAccountWriteRequest,
   type FinancialEntryRequest,
@@ -21,15 +22,52 @@ import {
   type WasteWriteRequest,
   type PurchasePaymentWriteRequest,
   type ShoppingListCreateRequest,
+  type ShoppingListSummaryDto,
+  type CustomerPaymentDto,
 } from '@kafgir/contracts'
 import type { TransactionSql } from 'postgres'
 import { sqlClient } from '../db/client'
 import { AppError, NotFoundError } from '../errors'
 import { logger } from '../logging/logger'
+import { isAllowedPaymentTransition } from '../domain/v15-rules'
 
 type Tx = TransactionSql<Record<string, unknown>>
 const nowIso = () => new Date().toISOString()
 const nullable = (value: string | null | undefined) => value?.trim() || null
+
+type IngredientLock = { id: number; isActive: boolean; isInventoryTracked: boolean }
+
+async function lockIngredients(tx: Tx, ingredientIds: number[]) {
+  const result = new Map<number, IngredientLock>()
+  for (const ingredientId of [...new Set(ingredientIds)].sort((left, right) => left - right)) {
+    const rows = await tx<IngredientLock[]>`
+      SELECT id,is_active AS "isActive",is_inventory_tracked AS "isInventoryTracked"
+      FROM ingredients WHERE id=${ingredientId} FOR UPDATE`
+    if (!rows[0]) throw new NotFoundError('ماده اولیه یافت نشد.')
+    result.set(ingredientId, rows[0])
+  }
+  return result
+}
+
+async function lockFinancialAccounts(tx: Tx, accountIds: number[]) {
+  const result = new Map<number, { id: number; isActive: boolean }>()
+  for (const accountId of [...new Set(accountIds)].sort((left, right) => left - right)) {
+    const rows = await tx<{ id: number; isActive: boolean }[]>`
+      SELECT id,is_active AS "isActive" FROM financial_accounts WHERE id=${accountId} FOR UPDATE`
+    if (!rows[0]) throw new NotFoundError('حساب مالی یافت نشد.')
+    result.set(accountId, rows[0])
+  }
+  return result
+}
+
+async function accountBalance(tx: Tx, accountId: number) {
+  const rows = await tx<{ balance: number }[]>`
+    SELECT (a.opening_balance+COALESCE(SUM(t.amount),0))::float8 balance
+    FROM financial_accounts a LEFT JOIN financial_transactions t ON t.financial_account_id=a.id
+    WHERE a.id=${accountId} GROUP BY a.id`
+  if (!rows[0]) throw new NotFoundError('حساب مالی یافت نشد.')
+  return rows[0].balance
+}
 
 export async function listUnits() {
   return sqlClient`SELECT id, name, symbol, is_active AS "isActive",
@@ -70,9 +108,9 @@ export async function listIngredients(search = '', active?: boolean) {
       i.preferred_stock_level::text AS "preferredStockLevel",
       i.is_inventory_tracked AS "isInventoryTracked",i.is_active AS "isActive",i.notes,
       COALESCE(SUM(t.quantity_in_base_unit),0)::text AS "currentStock",
-      (SELECT pi.unit_price::float8 FROM purchase_items pi JOIN purchases p ON p.id=pi.purchase_id
-       WHERE pi.ingredient_id=i.id AND p.status=${PurchaseStatus.Confirmed}
-       ORDER BY p.confirmed_at DESC LIMIT 1) AS "latestPurchasePrice",
+      (SELECT it.unit_cost::float8 FROM inventory_transactions it
+       WHERE it.ingredient_id=i.id AND it.transaction_type=${InventoryTransactionType.PurchaseIn}
+       ORDER BY it.transaction_date DESC,it.id DESC LIMIT 1) AS "latestPurchasePrice",
       COALESCE((SELECT SUM(it.total_cost)/NULLIF(SUM(it.quantity_in_base_unit),0)
         FROM inventory_transactions it WHERE it.ingredient_id=i.id
         AND it.transaction_type IN (${InventoryTransactionType.PurchaseIn},${InventoryTransactionType.PurchaseReversal})),0)::float8
@@ -141,19 +179,26 @@ export async function createPurchase(input: PurchaseWriteRequest, userId: number
   return sqlClient.begin(async (tx) => {
     const now = nowIso()
     const number = await purchaseNumber(tx)
+    if (input.supplierId) {
+      const supplier = await tx<{ isActive: boolean }[]>`
+        SELECT is_active AS "isActive" FROM suppliers WHERE id=${input.supplierId}`
+      if (!supplier[0]?.isActive) throw new AppError('تأمین‌کننده غیرفعال یا نامعتبر است.')
+    }
     const purchase = await tx<{ id: number }[]>`
       INSERT INTO purchases
         (purchase_number,supplier_id,invoice_number,purchase_date,status,subtotal_amount,
          discount_amount,additional_cost_amount,total_amount,paid_amount,payment_status,notes,
          attachment_url,created_by_user_id,created_at,updated_at)
       VALUES (${number},${input.supplierId ?? null},${nullable(input.invoiceNumber)},${input.purchaseDate},
-        ${PurchaseStatus.Draft},0,${input.discountAmount},${input.additionalCostAmount},0,0,
+        ${PurchaseStatus.Draft},0,0,0,0,0,
         ${PurchasePaymentStatus.Unpaid},${nullable(input.notes)},${nullable(input.attachmentUrl)},${userId},${now},${now})
       RETURNING id`
     for (const item of input.items) {
-      const ingredient = await tx<{ isActive: boolean }[]>`
-        SELECT is_active AS "isActive" FROM ingredients WHERE id=${item.ingredientId}`
-      if (!ingredient[0]?.isActive) throw new AppError('ماده اولیه غیرفعال یا نامعتبر است.')
+      const references = await tx<{ ingredientActive: boolean; unitActive: boolean }[]>`
+        SELECT i.is_active AS "ingredientActive",u.is_active AS "unitActive"
+        FROM ingredients i CROSS JOIN units u WHERE i.id=${item.ingredientId} AND u.id=${item.purchaseUnitId}`
+      if (!references[0]?.ingredientActive) throw new AppError('ماده اولیه غیرفعال یا نامعتبر است.')
+      if (!references[0].unitActive) throw new AppError('واحد خرید غیرفعال یا نامعتبر است.')
       await tx`INSERT INTO purchase_items
         (purchase_id,ingredient_id,purchase_unit_id,quantity,conversion_factor_to_base_unit,
          base_unit_quantity,unit_price,line_discount_amount,line_total_amount,expiration_date,batch_number,notes)
@@ -161,16 +206,18 @@ export async function createPurchase(input: PurchaseWriteRequest, userId: number
           ${item.conversionFactorToBaseUnit}::numeric,
           (${item.quantity}::numeric*${item.conversionFactorToBaseUnit}::numeric),
           ${item.unitPrice},${item.lineDiscountAmount},
-          (${item.quantity}::numeric*${item.unitPrice}::numeric-${item.lineDiscountAmount}::numeric),
+          ROUND(${item.quantity}::numeric*${item.unitPrice}::numeric-${item.lineDiscountAmount}::numeric,2),
           ${item.expirationDate ?? null},${nullable(item.batchNumber)},${nullable(item.notes)})`
     }
-    await tx`UPDATE purchases p SET
-      subtotal_amount=x.subtotal,total_amount=x.subtotal-p.discount_amount+p.additional_cost_amount
+    await tx`UPDATE purchases p SET subtotal_amount=x.subtotal,
+      discount_amount=${input.discountAmount},additional_cost_amount=${input.additionalCostAmount},
+      total_amount=x.subtotal-${input.discountAmount}+${input.additionalCostAmount}
       FROM (SELECT purchase_id,SUM(line_total_amount) subtotal FROM purchase_items
         WHERE purchase_id=${purchase[0]!.id} GROUP BY purchase_id) x
       WHERE p.id=x.purchase_id`
     const valid = await tx<{ total: number }[]>`SELECT total_amount::float8 total FROM purchases WHERE id=${purchase[0]!.id}`
     if (valid[0]!.total < 0) throw new AppError('مبلغ نهایی خرید نمی‌تواند منفی باشد.')
+    await audit(tx, userId, 'purchase.create', 'purchase', purchase[0]!.id)
     return purchase[0]!.id
   })
 }
@@ -178,7 +225,9 @@ export async function listPurchases(status?: number) {
   return sqlClient`SELECT p.id,p.purchase_number AS "purchaseNumber",p.purchase_date AS "purchaseDate",
     p.status,p.total_amount::float8 AS "totalAmount",p.paid_amount::float8 AS "paidAmount",
     p.payment_status AS "paymentStatus",p.supplier_id AS "supplierId",s.name AS "supplierName",
-    p.created_at AS "createdAt",p.confirmed_at AS "confirmedAt"
+    p.invoice_number AS "invoiceNumber",p.subtotal_amount::float8 AS "subtotalAmount",
+    p.discount_amount::float8 AS "discountAmount",p.additional_cost_amount::float8 AS "additionalCostAmount",
+    p.notes,p.attachment_url AS "attachmentUrl",p.created_at AS "createdAt",p.confirmed_at AS "confirmedAt"
     FROM purchases p LEFT JOIN suppliers s ON s.id=p.supplier_id
     WHERE (${status ?? null}::int IS NULL OR p.status=${status ?? null}) ORDER BY p.purchase_date DESC,p.id DESC`
 }
@@ -188,15 +237,27 @@ export async function confirmPurchase(id: number, userId: number) {
     if (!purchase[0]) throw new NotFoundError('خرید یافت نشد.')
     if (purchase[0].status === PurchaseStatus.Confirmed) return
     if (purchase[0].status !== PurchaseStatus.Draft) throw new AppError('فقط خرید پیش‌نویس قابل تأیید است.')
+    const ingredients = await tx<{ ingredientId: number }[]>`
+      SELECT DISTINCT ingredient_id AS "ingredientId" FROM purchase_items WHERE purchase_id=${id}`
+    await lockIngredients(tx, ingredients.map((item) => item.ingredientId))
     const now = nowIso()
     await tx`
       INSERT INTO inventory_transactions
         (ingredient_id,transaction_type,quantity_in_base_unit,unit_cost,total_cost,reference_type,
          reference_id,transaction_group,transaction_date,created_by_user_id,created_at)
-      SELECT ingredient_id,${InventoryTransactionType.PurchaseIn},base_unit_quantity,
-        CASE WHEN base_unit_quantity=0 THEN 0 ELSE line_total_amount/base_unit_quantity END,
-        line_total_amount,'purchase',${id},${`purchase:${id}`},${now},${userId},${now}
-      FROM purchase_items WHERE purchase_id=${id}`
+       SELECT pi.ingredient_id,${InventoryTransactionType.PurchaseIn},pi.base_unit_quantity,
+        CASE WHEN pi.base_unit_quantity=0 THEN 0 ELSE allocated.total_cost/pi.base_unit_quantity END,
+        allocated.total_cost,'purchase',${id},${`purchase:${id}`},${now},${userId},${now}
+       FROM purchase_items pi JOIN purchases p ON p.id=pi.purchase_id
+       JOIN ingredients i ON i.id=pi.ingredient_id AND i.is_inventory_tracked=true
+       CROSS JOIN LATERAL (
+         SELECT CASE WHEN p.subtotal_amount>0
+           THEN pi.line_total_amount*p.total_amount/p.subtotal_amount
+           ELSE p.total_amount*pi.base_unit_quantity/
+             NULLIF((SELECT SUM(other.base_unit_quantity) FROM purchase_items other WHERE other.purchase_id=p.id),0)
+           END AS total_cost
+       ) allocated
+       WHERE pi.purchase_id=${id}`
     await tx`UPDATE purchases SET status=${PurchaseStatus.Confirmed},confirmed_by_user_id=${userId},
       confirmed_at=${now},updated_at=${now} WHERE id=${id}`
     await audit(tx, userId, 'purchase.confirm', 'purchase', id)
@@ -215,7 +276,8 @@ export async function cancelPurchase(id: number, userId: number) {
         SELECT id,ingredient_id AS "ingredientId",quantity_in_base_unit::text quantity,
           unit_cost::float8 AS "unitCost",total_cost::float8 AS "totalCost"
         FROM inventory_transactions WHERE reference_type='purchase' AND reference_id=${id}
-          AND transaction_type=${InventoryTransactionType.PurchaseIn} FOR UPDATE`
+           AND transaction_type=${InventoryTransactionType.PurchaseIn} FOR UPDATE`
+      await lockIngredients(tx, source.map((movement) => movement.ingredientId))
       for (const movement of source) {
         const stock = await currentStock(tx, movement.ingredientId)
         if (Number(stock) < Number(movement.quantity)) throw new AppError('به دلیل مصرف شدن موجودی، برگشت این خرید امن نیست.')
@@ -223,7 +285,7 @@ export async function cancelPurchase(id: number, userId: number) {
           (ingredient_id,transaction_type,quantity_in_base_unit,unit_cost,total_cost,reference_type,
            reference_id,transaction_group,transaction_date,created_by_user_id,reversed_transaction_id,created_at)
           VALUES (${movement.ingredientId},${InventoryTransactionType.PurchaseReversal},
-            -${movement.quantity}::numeric,${movement.unitCost},-${movement.totalCost},'purchase',${id},
+            -${movement.quantity}::numeric,${movement.unitCost},${-movement.totalCost},'purchase',${id},
             ${`purchase-reversal:${id}`},${now},${userId},${movement.id},${now})`
       }
     }
@@ -269,6 +331,9 @@ export async function listInventoryMovements(ingredientId?: number) {
 }
 export async function adjustInventory(input: InventoryAdjustmentRequest, userId: number) {
   await sqlClient.begin(async (tx) => {
+    const ingredient = (await lockIngredients(tx, [input.ingredientId])).get(input.ingredientId)!
+    if (!ingredient.isActive) throw new AppError('ماده اولیه غیرفعال است.')
+    if (!ingredient.isInventoryTracked) throw new AppError('کنترل موجودی برای این ماده فعال نیست.')
     const signed = input.type === 'increase' ? input.quantity : `-${input.quantity}`
     if (input.type === 'decrease' && Number(await currentStock(tx, input.ingredientId)) < Number(input.quantity)) {
       throw new AppError('موجودی برای این کاهش کافی نیست.')
@@ -282,6 +347,9 @@ export async function adjustInventory(input: InventoryAdjustmentRequest, userId:
 }
 export async function registerWaste(input: WasteWriteRequest, userId: number) {
   await sqlClient.begin(async (tx) => {
+    const ingredient = (await lockIngredients(tx, [input.ingredientId])).get(input.ingredientId)!
+    if (!ingredient.isActive) throw new AppError('ماده اولیه غیرفعال است.')
+    if (!ingredient.isInventoryTracked) throw new AppError('کنترل موجودی برای این ماده فعال نیست.')
     if (Number(await currentStock(tx, input.ingredientId)) < Number(input.quantity)) throw new AppError('موجودی کافی نیست.')
     await insertMovement(tx, { ingredientId: input.ingredientId, type: InventoryTransactionType.WasteOut,
       quantity: `-${input.quantity}`, userId, referenceType: 'waste',
@@ -292,10 +360,18 @@ export async function registerWaste(input: WasteWriteRequest, userId: number) {
 export async function confirmStockCount(input: StockCountRequest, userId: number) {
   await sqlClient.begin(async (tx) => {
     const group = `stock-count:${crypto.randomUUID()}`
+    const locked = await lockIngredients(tx, input.items.map((item) => item.ingredientId))
     for (const item of input.items) {
+      const ingredient = locked.get(item.ingredientId)!
+      if (!ingredient.isActive) throw new AppError('ماده اولیه غیرفعال است.')
+      if (!ingredient.isInventoryTracked) {
+        throw new AppError('انبارگردانی برای ماده بدون کنترل موجودی مجاز نیست.')
+      }
       const current = await currentStock(tx, item.ingredientId)
-      const difference = await tx<{ value: string }[]>`SELECT (${item.countedQuantity}::numeric-${current}::numeric)::text value`
-      if (difference[0]!.value !== '0.000000') await insertMovement(tx, {
+      const difference = await tx<{ value: string; changed: boolean }[]>`
+        SELECT (${item.countedQuantity}::numeric-${current}::numeric)::text value,
+          (${item.countedQuantity}::numeric-${current}::numeric)<>0 changed`
+      if (difference[0]!.changed) await insertMovement(tx, {
         ingredientId: item.ingredientId, type: InventoryTransactionType.StockCountAdjustment,
         quantity: difference[0]!.value, userId, referenceType: 'stock-count', notes: input.notes, group,
       })
@@ -314,10 +390,13 @@ export async function getRecipe(foodId: number) {
   const items = await sqlClient`
     SELECT ri.id,ri.ingredient_id AS "ingredientId",i.name AS "ingredientName",u.name AS "unitName",
       ri.quantity_in_base_unit::text AS "quantityInBaseUnit",
-      (ri.quantity_in_base_unit/r.yield_quantity)::text AS "quantityPerPortion",
+      (ri.quantity_in_base_unit/r.yield_quantity/
+        (1-COALESCE(ri.waste_percent,0)/100)/(1-COALESCE(r.preparation_loss_percent,0)/100))::text
+        AS "quantityPerPortion",
       ri.waste_percent::float8 AS "wastePercent",
       COALESCE(c.cost,0)::float8 AS "weightedAverageCost",
-      (ri.quantity_in_base_unit*COALESCE(c.cost,0)*(1+COALESCE(ri.waste_percent,0)/100))::float8 AS "ingredientCost",
+      (ri.quantity_in_base_unit*COALESCE(c.cost,0)/(1-COALESCE(ri.waste_percent,0)/100)/
+        (1-COALESCE(r.preparation_loss_percent,0)/100))::float8 AS "ingredientCost",
       ri.notes
     FROM recipe_items ri JOIN recipes r ON r.id=ri.recipe_id
     JOIN ingredients i ON i.id=ri.ingredient_id JOIN units u ON u.id=i.base_unit_id
@@ -329,7 +408,8 @@ export async function getRecipe(foodId: number) {
   const row = recipe[0] as { yieldQuantity: number; overheadPerPortion: number }
   const costPerPortion = total / row.yieldQuantity + row.overheadPerPortion
   const price = await sqlClient<{ price: number | null }[]>`
-    SELECT price::float8 FROM daily_menu_items WHERE food_id=${foodId} ORDER BY id DESC LIMIT 1`
+    SELECT COALESCE(discount_price, price)::float8 AS price
+    FROM daily_menu_items WHERE food_id=${foodId} ORDER BY id DESC LIMIT 1`
   const salePrice = price[0]?.price ?? null
   return { ...recipe[0], items, totalRecipeCost: total, costPerPortion, salePrice,
     estimatedGrossProfit: salePrice === null ? null : salePrice - costPerPortion,
@@ -363,10 +443,18 @@ export async function saveRecipe(foodId: number, input: RecipeWriteRequest, user
 }
 
 export async function consumeOrderInventory(tx: Tx, orderId: number, userId: number) {
+  // Rice is a food with its own active recipe, so it needs no special handling here.
   const lines = await tx<{ orderItemId: number; foodId: number; quantity: number; recipeId: number | null }[]>`
     SELECT oi.id AS "orderItemId",d.food_id AS "foodId",oi.quantity,r.id AS "recipeId"
     FROM order_items oi JOIN daily_menu_items d ON d.id=oi.daily_menu_item_id
-    LEFT JOIN recipes r ON r.food_id=d.food_id AND r.is_active=true WHERE oi.order_id=${orderId}`
+    LEFT JOIN recipes r ON r.food_id=d.food_id AND r.is_active=true
+    WHERE oi.order_id=${orderId}`
+  const ingredientRows = await tx<{ ingredientId: number }[]>`
+    SELECT DISTINCT ri.ingredient_id AS "ingredientId"
+    FROM order_items oi JOIN daily_menu_items d ON d.id=oi.daily_menu_item_id
+    JOIN recipes r ON r.food_id=d.food_id AND r.is_active=true
+    JOIN recipe_items ri ON ri.recipe_id=r.id WHERE oi.order_id=${orderId}`
+  const lockedIngredients = await lockIngredients(tx, ingredientRows.map((item) => item.ingredientId))
   for (const line of lines) {
     const existing = await tx`SELECT id FROM order_inventory_consumptions WHERE order_item_id=${line.orderItemId}`
     if (existing[0]) continue
@@ -376,13 +464,18 @@ export async function consumeOrderInventory(tx: Tx, orderId: number, userId: num
         (order_id,order_item_id,food_id,recipe_id,quantity_produced,transaction_group,recipe_missing,consumed_at)
       VALUES (${orderId},${line.orderItemId},${line.foodId},${line.recipeId},${line.quantity},${group},
         ${line.recipeId === null},${nowIso()}) RETURNING id`
-    if (!line.recipeId) continue
-    const recipeItems = await tx<{ ingredientId: number; needed: string }[]>`
+    const recipeItems: Array<{ ingredientId: number; needed: string }> = line.recipeId ? await tx<{ ingredientId: number; needed: string }[]>`
       SELECT ri.ingredient_id AS "ingredientId",
-        (ri.quantity_in_base_unit*${line.quantity}::numeric/r.yield_quantity*
-          (1+COALESCE(ri.waste_percent,0)/100))::numeric(20,6)::text needed
-      FROM recipe_items ri JOIN recipes r ON r.id=ri.recipe_id WHERE ri.recipe_id=${line.recipeId}`
+        (ri.quantity_in_base_unit*${line.quantity}::numeric/r.yield_quantity/
+          (1-COALESCE(ri.waste_percent,0)/100)/
+          (1-COALESCE(r.preparation_loss_percent,0)/100))::numeric(20,6)::text needed
+      FROM recipe_items ri JOIN recipes r ON r.id=ri.recipe_id WHERE ri.recipe_id=${line.recipeId}` : []
     for (const item of recipeItems) {
+      const ingredient = lockedIngredients.get(item.ingredientId)!
+      if (!ingredient.isInventoryTracked) continue
+      if (Number(await currentStock(tx, item.ingredientId)) < Number(item.needed)) {
+        throw new AppError('موجودی مواد اولیه برای تأیید سفارش کافی نیست.')
+      }
       await insertMovement(tx, { ingredientId: item.ingredientId,
         type: InventoryTransactionType.ProductionConsumption, quantity: `-${item.needed}`, userId,
         referenceType: 'order-consumption', referenceId: consumption[0]!.id, group })
@@ -396,13 +489,14 @@ export async function reverseOrderInventory(tx: Tx, orderId: number, userId: num
     const sources = await tx<{ id: number; ingredientId: number; quantity: string; unitCost: number; totalCost: number }[]>`
       SELECT id,ingredient_id AS "ingredientId",quantity_in_base_unit::text quantity,
         unit_cost::float8 AS "unitCost",total_cost::float8 AS "totalCost"
-      FROM inventory_transactions WHERE reference_type='order-consumption' AND reference_id=${consumption.id}`
+       FROM inventory_transactions WHERE reference_type='order-consumption' AND reference_id=${consumption.id}`
+    await lockIngredients(tx, sources.map((source) => source.ingredientId))
     for (const source of sources) {
       await tx`INSERT INTO inventory_transactions
         (ingredient_id,transaction_type,quantity_in_base_unit,unit_cost,total_cost,reference_type,
          reference_id,transaction_group,transaction_date,created_by_user_id,reversed_transaction_id,created_at)
         VALUES (${source.ingredientId},${InventoryTransactionType.OrderCancellationReversal},
-          -${source.quantity}::numeric,${source.unitCost},-${source.totalCost},'order-consumption',
+          -${source.quantity}::numeric,${source.unitCost},${-source.totalCost},'order-consumption',
           ${consumption.id},${`order-reversal:${orderId}`},${nowIso()},${userId},${source.id},${nowIso()})`
     }
     await tx`UPDATE order_inventory_consumptions SET reversed_at=${nowIso()} WHERE id=${consumption.id}`
@@ -418,19 +512,34 @@ export async function listFinancialAccounts() {
     FROM financial_accounts a LEFT JOIN financial_transactions t ON t.financial_account_id=a.id
     GROUP BY a.id ORDER BY a.name`
 }
+export async function listExpenseCategories() {
+  return sqlClient`SELECT id,name,is_active AS "isActive",created_at AS "createdAt"
+    FROM expense_categories WHERE is_active=true ORDER BY name`
+}
 export async function saveFinancialAccount(id: number | null, input: FinancialAccountWriteRequest) {
   const now = nowIso()
-  if (id) await sqlClient`UPDATE financial_accounts SET name=${input.name},type=${input.type},
-    bank_name=${nullable(input.bankName)},card_number_masked=${nullable(input.cardNumberMasked)},
-    account_number_masked=${nullable(input.accountNumberMasked)},iban_masked=${nullable(input.ibanMasked)},
-    opening_balance=${input.openingBalance},is_active=${input.isActive},notes=${nullable(input.notes)},
-    updated_at=${now} WHERE id=${id}`
-  else await sqlClient`INSERT INTO financial_accounts
-    (name,type,bank_name,card_number_masked,account_number_masked,iban_masked,opening_balance,
-     is_active,notes,created_at,updated_at)
-    VALUES (${input.name},${input.type},${nullable(input.bankName)},${nullable(input.cardNumberMasked)},
-      ${nullable(input.accountNumberMasked)},${nullable(input.ibanMasked)},${input.openingBalance},
-      ${input.isActive},${nullable(input.notes)},${now},${now})`
+  if (id) {
+    await sqlClient.begin(async (tx) => {
+      const current = await tx<{ openingBalance: number }[]>`
+        SELECT opening_balance::float8 AS "openingBalance" FROM financial_accounts WHERE id=${id} FOR UPDATE`
+      if (!current[0]) throw new NotFoundError('حساب مالی یافت نشد.')
+      const transactions = await tx<{ count: number }[]>`
+        SELECT COUNT(*)::int count FROM financial_transactions WHERE financial_account_id=${id}`
+      if (transactions[0]!.count > 0 && current[0].openingBalance !== input.openingBalance) {
+        throw new AppError('پس از ثبت گردش مالی، مانده افتتاحیه قابل تغییر نیست.')
+      }
+      await tx`UPDATE financial_accounts SET name=${input.name},type=${input.type},
+        bank_name=${nullable(input.bankName)},card_number_masked=${nullable(input.cardNumberMasked)},
+        account_number_masked=${nullable(input.accountNumberMasked)},iban_masked=${nullable(input.ibanMasked)},
+        opening_balance=${input.openingBalance},is_active=${input.isActive},notes=${nullable(input.notes)},
+        updated_at=${now} WHERE id=${id}`
+    })
+  } else await sqlClient`INSERT INTO financial_accounts
+      (name,type,bank_name,card_number_masked,account_number_masked,iban_masked,opening_balance,
+       is_active,notes,created_at,updated_at)
+      VALUES (${input.name},${input.type},${nullable(input.bankName)},${nullable(input.cardNumberMasked)},
+        ${nullable(input.accountNumberMasked)},${nullable(input.ibanMasked)},${input.openingBalance},
+        ${input.isActive},${nullable(input.notes)},${now},${now})`
 }
 export async function listPosTerminals() {
   return sqlClient`SELECT p.id,p.title,p.terminal_number AS "terminalNumber",
@@ -439,19 +548,48 @@ export async function listPosTerminals() {
     FROM pos_terminals p JOIN financial_accounts a ON a.id=p.financial_account_id ORDER BY p.title`
 }
 export async function savePosTerminal(id: number | null, input: PosTerminalWriteRequest) {
-  const now = nowIso()
-  if (id) await sqlClient`UPDATE pos_terminals SET title=${input.title},terminal_number=${input.terminalNumber},
-    merchant_number=${nullable(input.merchantNumber)},financial_account_id=${input.financialAccountId},
-    is_active=${input.isActive},notes=${nullable(input.notes)},updated_at=${now} WHERE id=${id}`
-  else await sqlClient`INSERT INTO pos_terminals
-    (title,terminal_number,merchant_number,financial_account_id,is_active,notes,created_at,updated_at)
-    VALUES (${input.title},${input.terminalNumber},${nullable(input.merchantNumber)},${input.financialAccountId},
-      ${input.isActive},${nullable(input.notes)},${now},${now})`
+  await sqlClient.begin(async (tx) => {
+    const account = (await lockFinancialAccounts(tx, [input.financialAccountId])).get(input.financialAccountId)!
+    if (!account.isActive) throw new AppError('حساب مالی دستگاه پوز غیرفعال است.')
+    const now = nowIso()
+    if (id) {
+      const rows = await tx`UPDATE pos_terminals SET title=${input.title},terminal_number=${input.terminalNumber},
+        merchant_number=${nullable(input.merchantNumber)},financial_account_id=${input.financialAccountId},
+        is_active=${input.isActive},notes=${nullable(input.notes)},updated_at=${now} WHERE id=${id} RETURNING id`
+      if (!rows[0]) throw new NotFoundError('دستگاه پوز یافت نشد.')
+    } else await tx`INSERT INTO pos_terminals
+      (title,terminal_number,merchant_number,financial_account_id,is_active,notes,created_at,updated_at)
+      VALUES (${input.title},${input.terminalNumber},${nullable(input.merchantNumber)},${input.financialAccountId},
+        ${input.isActive},${nullable(input.notes)},${now},${now})`
+  })
 }
 export async function createPayment(input: PaymentWriteRequest, userId: number) {
   return sqlClient.begin(async (tx) => {
+    const order = await tx<{ status: number; totalAmount: number }[]>`
+      SELECT status,total_amount::float8 AS "totalAmount" FROM orders WHERE id=${input.orderId} FOR UPDATE`
+    if (!order[0]) throw new NotFoundError('سفارش یافت نشد.')
+    if (order[0].status === OrderStatus.Cancelled) throw new AppError('برای سفارش لغوشده نمی‌توان پرداخت ثبت کرد.')
+    const account = (await lockFinancialAccounts(tx, [input.financialAccountId])).get(input.financialAccountId)!
+    if (!account.isActive) throw new AppError('حساب مالی انتخاب‌شده غیرفعال است.')
     if (input.paymentMethod === CustomerPaymentMethod.Pos && !input.posTerminalId) {
       throw new AppError('برای پرداخت پوز، انتخاب دستگاه الزامی است.')
+    }
+    if (input.paymentMethod !== CustomerPaymentMethod.Pos && input.posTerminalId) {
+      throw new AppError('دستگاه پوز فقط برای روش پرداخت پوز مجاز است.')
+    }
+    if (input.posTerminalId) {
+      const terminal = await tx<{ accountId: number; isActive: boolean }[]>`
+        SELECT financial_account_id AS "accountId",is_active AS "isActive"
+        FROM pos_terminals WHERE id=${input.posTerminalId} FOR UPDATE`
+      if (!terminal[0]?.isActive) throw new AppError('دستگاه پوز غیرفعال یا نامعتبر است.')
+      if (terminal[0].accountId !== input.financialAccountId) throw new AppError('حساب مالی با دستگاه پوز مطابقت ندارد.')
+    }
+    const allocated = await tx<{ amount: number }[]>`
+      SELECT COALESCE(SUM(amount),0)::float8 amount FROM payments
+      WHERE order_id=${input.orderId} AND status IN
+        (${PaymentStatus.Pending},${PaymentStatus.AwaitingVerification},${PaymentStatus.Paid})`
+    if (allocated[0]!.amount + input.amount > order[0].totalAmount) {
+      throw new AppError('مجموع پرداخت‌ها از مبلغ سفارش بیشتر می‌شود.')
     }
     const status = input.paymentMethod === CustomerPaymentMethod.CardToCard
       ? PaymentStatus.AwaitingVerification : PaymentStatus.Pending
@@ -461,6 +599,7 @@ export async function createPayment(input: PaymentWriteRequest, userId: number) 
       VALUES (${input.orderId},${input.paymentMethod},${input.financialAccountId},${input.posTerminalId ?? null},
         ${input.amount},${status},${nullable(input.trackingNumber)},${nullable(input.referenceNumber)},
         ${nullable(input.receiptImageUrl)},${nullable(input.description)},${nowIso()},${nowIso()}) RETURNING id`
+    await audit(tx, userId, 'payment.create', 'payment', rows[0]!.id)
     return rows[0]!.id
   })
 }
@@ -470,6 +609,9 @@ export async function changePaymentStatus(id: number, input: PaymentStatusWriteR
       SELECT status,amount::float8 amount,financial_account_id AS "accountId" FROM payments WHERE id=${id} FOR UPDATE`
     if (!payment[0]) throw new NotFoundError('پرداخت یافت نشد.')
     if (payment[0].status === input.status) return
+    if (!isAllowedPaymentTransition(payment[0].status, input.status)) {
+      throw new AppError('انتقال وضعیت پرداخت مجاز نیست.')
+    }
     if (input.status === PaymentStatus.Paid) {
       await tx`INSERT INTO financial_transactions
         (transaction_type,financial_account_id,amount,transaction_date,reference_type,reference_id,
@@ -478,15 +620,26 @@ export async function changePaymentStatus(id: number, input: PaymentStatusWriteR
           ${nowIso()},'payment',${id},'دریافت وجه سفارش',${userId},${nowIso()}) ON CONFLICT DO NOTHING`
     }
     await tx`UPDATE payments SET status=${input.status},description=COALESCE(${nullable(input.description)},description),
-      paid_at=CASE WHEN ${input.status}=${PaymentStatus.Paid} THEN ${nowIso()} ELSE paid_at END,
-      confirmed_at=CASE WHEN ${input.status}=${PaymentStatus.Paid} THEN ${nowIso()} ELSE confirmed_at END,
-      confirmed_by_user_id=CASE WHEN ${input.status}=${PaymentStatus.Paid} THEN ${userId} ELSE confirmed_by_user_id END,
+      paid_at=CASE WHEN ${input.status}::int=${PaymentStatus.Paid}::int THEN ${nowIso()} ELSE paid_at END,
+      confirmed_at=CASE WHEN ${input.status}::int=${PaymentStatus.Paid}::int THEN ${nowIso()} ELSE confirmed_at END,
+      confirmed_by_user_id=CASE WHEN ${input.status}::int=${PaymentStatus.Paid}::int THEN ${userId}::int ELSE confirmed_by_user_id END,
       updated_at=${nowIso()} WHERE id=${id}`
     await audit(tx, userId, 'payment.status', 'payment', id, String(input.status))
   })
 }
 export async function createFinancialEntry(input: FinancialEntryRequest, kind: 'income' | 'expense', userId: number) {
   await sqlClient.begin(async (tx) => {
+    const account = (await lockFinancialAccounts(tx, [input.financialAccountId])).get(input.financialAccountId)!
+    if (!account.isActive) throw new AppError('حساب مالی انتخاب‌شده غیرفعال است.')
+    if (kind === 'income' && input.categoryId) throw new AppError('دسته هزینه برای درآمد مجاز نیست.')
+    if (kind === 'expense' && input.categoryId) {
+      const category = await tx<{ isActive: boolean }[]>`
+        SELECT is_active AS "isActive" FROM expense_categories WHERE id=${input.categoryId}`
+      if (!category[0]?.isActive) throw new AppError('دسته هزینه غیرفعال یا نامعتبر است.')
+    }
+    if (kind === 'expense' && await accountBalance(tx, input.financialAccountId) < input.amount) {
+      throw new AppError('مانده حساب برای ثبت این هزینه کافی نیست.')
+    }
     const signed = kind === 'income' ? input.amount : -input.amount
     await tx`INSERT INTO financial_transactions
       (transaction_type,financial_account_id,amount,transaction_date,category_id,reference_type,
@@ -499,13 +652,16 @@ export async function createFinancialEntry(input: FinancialEntryRequest, kind: '
 }
 export async function transfer(input: AccountTransferRequest, userId: number) {
   await sqlClient.begin(async (tx) => {
+    const accounts = await lockFinancialAccounts(tx, [input.fromAccountId, input.toAccountId])
+    if (![...accounts.values()].every((account) => account.isActive)) throw new AppError('هر دو حساب انتقال باید فعال باشند.')
+    if (await accountBalance(tx, input.fromAccountId) < input.amount) throw new AppError('مانده حساب مبدأ برای انتقال کافی نیست.')
     const group = `transfer:${crypto.randomUUID()}`
     const date = input.transactionDate ?? nowIso()
     await tx`INSERT INTO financial_transactions
       (transaction_type,financial_account_id,amount,transaction_date,reference_type,transaction_group,
        description,created_by_user_id,created_at)
       VALUES
-      (${FinancialTransactionType.TransferOut},${input.fromAccountId},-${input.amount},${date},'transfer',${group},
+      (${FinancialTransactionType.TransferOut},${input.fromAccountId},${-input.amount},${date},'transfer',${group},
        ${input.description},${userId},${nowIso()}),
       (${FinancialTransactionType.TransferIn},${input.toAccountId},${input.amount},${date},'transfer',${group},
        ${input.description},${userId},${nowIso()})`
@@ -518,8 +674,10 @@ export async function listFinancialTransactions(from?: string, to?: string) {
     c.name AS "categoryName",t.reference_type AS "referenceType",t.reference_id AS "referenceId",t.description
     FROM financial_transactions t JOIN financial_accounts a ON a.id=t.financial_account_id
     LEFT JOIN expense_categories c ON c.id=t.category_id
-    WHERE (${from ?? null}::date IS NULL OR t.transaction_date>=${from ?? null}::date)
-      AND (${to ?? null}::date IS NULL OR t.transaction_date<(${to ?? null}::date+1))
+    WHERE (${from ?? null}::date IS NULL OR
+      t.transaction_date>=(${from ?? null}::date AT TIME ZONE 'Asia/Tehran'))
+      AND (${to ?? null}::date IS NULL OR
+      t.transaction_date<((${to ?? null}::date+1) AT TIME ZONE 'Asia/Tehran'))
     ORDER BY t.transaction_date DESC,t.id DESC LIMIT 1000`
 }
 export async function registerPurchasePayment(input: PurchasePaymentWriteRequest, userId: number) {
@@ -530,31 +688,44 @@ export async function registerPurchasePayment(input: PurchasePaymentWriteRequest
     if (!purchase[0]) throw new NotFoundError('خرید یافت نشد.')
     if (purchase[0].status !== PurchaseStatus.Confirmed) throw new AppError('پرداخت فقط برای خرید تأییدشده ثبت می‌شود.')
     if (purchase[0].paid + input.amount > purchase[0].total) throw new AppError('مبلغ پرداخت از مانده خرید بیشتر است.')
+    const account = (await lockFinancialAccounts(tx, [input.financialAccountId])).get(input.financialAccountId)!
+    if (!account.isActive) throw new AppError('حساب مالی انتخاب‌شده غیرفعال است.')
+    if (await accountBalance(tx, input.financialAccountId) < input.amount) {
+      throw new AppError('مانده حساب برای پرداخت خرید کافی نیست.')
+    }
     const now = nowIso()
     const row = await tx<{ id: number }[]>`INSERT INTO purchase_payments
       (purchase_id,financial_account_id,amount,payment_method,paid_at,tracking_number,notes,
        created_by_user_id,created_at)
-      VALUES (${input.purchaseId},${input.financialAccountId},${input.amount},1,${input.paidAt ?? now},
+       VALUES (${input.purchaseId},${input.financialAccountId},${input.amount},${input.paymentMethod},${input.paidAt ?? now},
         ${nullable(input.trackingNumber)},${nullable(input.notes)},${userId},${now}) RETURNING id`
     await tx`INSERT INTO financial_transactions
       (transaction_type,financial_account_id,amount,transaction_date,reference_type,reference_id,
        description,created_by_user_id,created_at)
-      VALUES (${FinancialTransactionType.PurchaseExpense},${input.financialAccountId},-${input.amount},
+      VALUES (${FinancialTransactionType.PurchaseExpense},${input.financialAccountId},${-input.amount},
         ${input.paidAt ?? now},'purchase-payment',${row[0]!.id},'پرداخت خرید',${userId},${now})`
     await tx`UPDATE purchases SET paid_amount=paid_amount+${input.amount},
-      payment_status=CASE WHEN paid_amount+${input.amount}>=total_amount THEN ${PurchasePaymentStatus.Paid}
-        ELSE ${PurchasePaymentStatus.PartiallyPaid} END,updated_at=${now} WHERE id=${input.purchaseId}`
+      payment_status=CASE WHEN paid_amount+${input.amount}>=total_amount THEN ${PurchasePaymentStatus.Paid}::int
+        ELSE ${PurchasePaymentStatus.PartiallyPaid}::int END,updated_at=${now} WHERE id=${input.purchaseId}`
     await audit(tx,userId,'purchase.payment','purchase',input.purchaseId)
   })
 }
-export async function listPayments() {
-  return sqlClient`SELECT p.id,p.order_id AS "orderId",o.order_number AS "orderNumber",
+export async function listPayments(): Promise<CustomerPaymentDto[]> {
+  const rows = await sqlClient<Array<Omit<CustomerPaymentDto, 'createdAt' | 'paidAt'> & { createdAt: Date | string; paidAt: Date | string | null }>>`SELECT p.id,p.order_id AS "orderId",o.order_number AS "orderNumber",
+    o.delivery_full_name AS "customerFullName",o.delivery_phone_number AS "customerPhoneNumber",
+    o.total_amount::float8 AS "orderTotalAmount",
     p.payment_method AS "paymentMethod",p.amount::float8 amount,p.status,
     p.financial_account_id AS "financialAccountId",a.name AS "financialAccountName",
     p.pos_terminal_id AS "posTerminalId",p.tracking_number AS "trackingNumber",
-    p.receipt_image_url AS "receiptImageUrl",p.created_at AS "createdAt"
+    p.reference_number AS "referenceNumber",p.receipt_image_url AS "receiptImageUrl",
+    p.description,p.paid_at AS "paidAt",p.created_at AS "createdAt"
     FROM payments p JOIN orders o ON o.id=p.order_id JOIN financial_accounts a ON a.id=p.financial_account_id
     ORDER BY p.created_at DESC LIMIT 500`
+  return rows.map((row) => ({
+    ...row,
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    paidAt: row.paidAt instanceof Date ? row.paidAt.toISOString() : row.paidAt,
+  }))
 }
 export async function refundPayment(id: number, userId: number) {
   await sqlClient.begin(async (tx) => {
@@ -563,10 +734,15 @@ export async function refundPayment(id: number, userId: number) {
     if(!p[0])throw new NotFoundError('پرداخت یافت نشد.')
     if(p[0].status===PaymentStatus.Refunded)return
     if(p[0].status!==PaymentStatus.Paid)throw new AppError('فقط پرداخت تأییدشده قابل استرداد است.')
+    const account = (await lockFinancialAccounts(tx, [p[0].accountId])).get(p[0].accountId)!
+    if (!account.isActive) throw new AppError('حساب مالی پرداخت غیرفعال است.')
+    if (await accountBalance(tx, p[0].accountId) < p[0].amount) {
+      throw new AppError('مانده حساب برای استرداد وجه کافی نیست.')
+    }
     await tx`INSERT INTO financial_transactions
       (transaction_type,financial_account_id,amount,transaction_date,reference_type,reference_id,
        description,created_by_user_id,created_at)
-      VALUES (${FinancialTransactionType.Refund},${p[0].accountId},-${p[0].amount},${nowIso()},
+      VALUES (${FinancialTransactionType.Refund},${p[0].accountId},${-p[0].amount},${nowIso()},
         'payment-refund',${id},'استرداد وجه سفارش',${userId},${nowIso()}) ON CONFLICT DO NOTHING`
     await tx`UPDATE payments SET status=${PaymentStatus.Refunded},updated_at=${nowIso()} WHERE id=${id}`
     await audit(tx,userId,'payment.refund','payment',id)
@@ -576,14 +752,18 @@ export async function shoppingRequirements(from: string, to: string) {
   return sqlClient`
     WITH demand AS (
       SELECT ri.ingredient_id,
-        SUM(ri.quantity_in_base_unit*oi.quantity::numeric/r.yield_quantity*
-          (1+COALESCE(ri.waste_percent,0)/100)) required
+        SUM(ri.quantity_in_base_unit*oi.quantity::numeric/r.yield_quantity/
+          (1-COALESCE(ri.waste_percent,0)/100)/
+          (1-COALESCE(r.preparation_loss_percent,0)/100)) required
       FROM orders o JOIN order_items oi ON oi.order_id=o.id
       JOIN daily_menu_items dmi ON dmi.id=oi.daily_menu_item_id
       JOIN daily_menus dm ON dm.id=dmi.daily_menu_id
       JOIN recipes r ON r.food_id=dmi.food_id AND r.is_active=true
       JOIN recipe_items ri ON ri.recipe_id=r.id
-      WHERE dm.menu_date BETWEEN ${from}::date AND ${to}::date AND o.status<>6
+      LEFT JOIN order_inventory_consumptions consumed ON consumed.order_item_id=oi.id
+        AND consumed.reversed_at IS NULL AND consumed.recipe_missing=false
+      WHERE dm.menu_date BETWEEN ${from}::date AND ${to}::date
+        AND o.status<>${OrderStatus.Cancelled} AND consumed.id IS NULL
       GROUP BY ri.ingredient_id
     ), stock AS (
       SELECT ingredient_id,COALESCE(SUM(quantity_in_base_unit),0) quantity
@@ -601,7 +781,22 @@ export async function shoppingRequirements(from: string, to: string) {
       COALESCE(c.cost,0)::float8 AS "estimatedUnitCost",
       (GREATEST(d.required-COALESCE(s.quantity,0),0)*COALESCE(c.cost,0))::float8 AS "estimatedPurchaseCost"
     FROM demand d JOIN ingredients i ON i.id=d.ingredient_id JOIN units u ON u.id=i.base_unit_id
-    LEFT JOIN stock s ON s.ingredient_id=i.id LEFT JOIN costs c ON c.ingredient_id=i.id ORDER BY i.name`
+    LEFT JOIN stock s ON s.ingredient_id=i.id LEFT JOIN costs c ON c.ingredient_id=i.id
+    WHERE i.is_active AND i.is_inventory_tracked ORDER BY i.name`
+}
+export async function listShoppingLists(): Promise<ShoppingListSummaryDto[]> {
+  return sqlClient<ShoppingListSummaryDto[]>`
+    SELECT l.id,l.title,l.target_date::text AS "targetDate",l.status,l.notes,
+      COUNT(li.id)::int AS "itemCount",
+      COALESCE(SUM(li.suggested_purchase_quantity*li.estimated_unit_cost),0)::float8 AS "estimatedTotal",
+      COALESCE(string_agg(i.name,'، ' ORDER BY i.name),'') AS "itemSummary",
+      l.created_at::text AS "createdAt"
+    FROM shopping_lists l
+    LEFT JOIN shopping_list_items li ON li.shopping_list_id=l.id
+    LEFT JOIN ingredients i ON i.id=li.ingredient_id
+    GROUP BY l.id
+    ORDER BY l.target_date DESC,l.id DESC
+    LIMIT 100`
 }
 export async function createShoppingList(input: ShoppingListCreateRequest,userId:number){
   return sqlClient.begin(async tx=>{
@@ -620,26 +815,46 @@ export async function createShoppingList(input: ShoppingListCreateRequest,userId
 }
 export async function managerialReports(from:string,to:string){
   const [sales,expenses,profit,usage,waste]=await Promise.all([
-    sqlClient`SELECT payment_method AS "paymentMethod",COUNT(*)::int count,
-      COALESCE(SUM(amount) FILTER(WHERE status=${PaymentStatus.Paid}),0)::float8 AS "paidAmount",
-      COALESCE(SUM(amount) FILTER(WHERE status=${PaymentStatus.Refunded}),0)::float8 AS "refundedAmount"
-      FROM payments WHERE created_at>=${from}::date AND created_at<(${to}::date+1) GROUP BY payment_method`,
+    sqlClient`SELECT p.payment_method AS "paymentMethod",
+      COUNT(DISTINCT p.id) FILTER(WHERE t.transaction_type=${FinancialTransactionType.SalesIncome})::int count,
+      COALESCE(SUM(t.amount) FILTER(WHERE t.transaction_type=${FinancialTransactionType.SalesIncome}),0)::float8 AS "paidAmount",
+      COALESCE(-SUM(t.amount) FILTER(WHERE t.transaction_type=${FinancialTransactionType.Refund}),0)::float8 AS "refundedAmount"
+      FROM financial_transactions t JOIN payments p ON p.id=t.reference_id
+      WHERE ((t.transaction_type=${FinancialTransactionType.SalesIncome} AND t.reference_type='payment') OR
+        (t.transaction_type=${FinancialTransactionType.Refund} AND t.reference_type='payment-refund'))
+      AND t.transaction_date>=(${from}::date AT TIME ZONE 'Asia/Tehran')
+      AND t.transaction_date<((${to}::date+1) AT TIME ZONE 'Asia/Tehran') GROUP BY p.payment_method`,
     sqlClient`SELECT COALESCE(c.name,'بدون دسته') category,COALESCE(-SUM(t.amount),0)::float8 amount
       FROM financial_transactions t LEFT JOIN expense_categories c ON c.id=t.category_id
-      WHERE t.amount<0 AND t.transaction_type IN (2,4) AND t.transaction_date>=${from}::date
-      AND t.transaction_date<(${to}::date+1) GROUP BY c.name`,
-    sqlClient`SELECT COALESCE(SUM(CASE WHEN transaction_type=1 THEN amount WHEN transaction_type=7 THEN amount ELSE 0 END),0)::float8 income,
-      COALESCE(-SUM(CASE WHEN transaction_type IN (2,4) THEN amount ELSE 0 END),0)::float8 expense
-      FROM financial_transactions WHERE transaction_date>=${from}::date AND transaction_date<(${to}::date+1)`,
-    sqlClient`SELECT i.name,u.name unit,SUM(t.quantity_in_base_unit) FILTER(WHERE t.transaction_type=1)::text purchase,
-      SUM(t.quantity_in_base_unit) FILTER(WHERE t.transaction_type=2)::text consumption,
-      SUM(t.quantity_in_base_unit) FILTER(WHERE t.transaction_type=3)::text waste,
+      WHERE t.amount<0 AND t.transaction_type IN (${FinancialTransactionType.PurchaseExpense},${FinancialTransactionType.ManualExpense})
+      AND t.transaction_date>=(${from}::date AT TIME ZONE 'Asia/Tehran')
+      AND t.transaction_date<((${to}::date+1) AT TIME ZONE 'Asia/Tehran') GROUP BY c.name`,
+    sqlClient`SELECT COALESCE(SUM(CASE WHEN transaction_type IN
+        (${FinancialTransactionType.SalesIncome},${FinancialTransactionType.ManualIncome},${FinancialTransactionType.Refund})
+        THEN amount ELSE 0 END),0)::float8 income,
+      COALESCE(-SUM(CASE WHEN transaction_type IN
+        (${FinancialTransactionType.PurchaseExpense},${FinancialTransactionType.ManualExpense}) THEN amount ELSE 0 END),0)::float8 expense
+      FROM financial_transactions
+      WHERE transaction_date>=(${from}::date AT TIME ZONE 'Asia/Tehran')
+        AND transaction_date<((${to}::date+1) AT TIME ZONE 'Asia/Tehran')`,
+    sqlClient`SELECT i.name,u.name unit,
+      SUM(t.quantity_in_base_unit) FILTER(WHERE t.transaction_type IN
+        (${InventoryTransactionType.PurchaseIn},${InventoryTransactionType.PurchaseReversal})
+        AND t.transaction_date>=(${from}::date AT TIME ZONE 'Asia/Tehran'))::text purchase,
+      (-SUM(t.quantity_in_base_unit) FILTER(WHERE t.transaction_type IN
+        (${InventoryTransactionType.ProductionConsumption},${InventoryTransactionType.OrderCancellationReversal})
+        AND t.transaction_date>=(${from}::date AT TIME ZONE 'Asia/Tehran')))::text consumption,
+      (-SUM(t.quantity_in_base_unit) FILTER(WHERE t.transaction_type=${InventoryTransactionType.WasteOut}
+        AND t.transaction_date>=(${from}::date AT TIME ZONE 'Asia/Tehran')))::text waste,
       SUM(t.quantity_in_base_unit)::text closing FROM inventory_transactions t
       JOIN ingredients i ON i.id=t.ingredient_id JOIN units u ON u.id=i.base_unit_id
-      WHERE t.transaction_date<(${to}::date+1) GROUP BY i.id,u.name ORDER BY i.name`,
+      WHERE t.transaction_date<((${to}::date+1) AT TIME ZONE 'Asia/Tehran')
+      GROUP BY i.id,u.name ORDER BY i.name`,
     sqlClient`SELECT i.name,SUM(-t.quantity_in_base_unit)::text quantity,SUM(-t.total_cost)::float8 cost
       FROM inventory_transactions t JOIN ingredients i ON i.id=t.ingredient_id
-      WHERE t.transaction_type=3 AND t.transaction_date>=${from}::date AND t.transaction_date<(${to}::date+1)
+      WHERE t.transaction_type=${InventoryTransactionType.WasteOut}
+      AND t.transaction_date>=(${from}::date AT TIME ZONE 'Asia/Tehran')
+      AND t.transaction_date<((${to}::date+1) AT TIME ZONE 'Asia/Tehran')
       GROUP BY i.id ORDER BY cost DESC`,
   ])
   return {sales,expenses,profit:profit[0],usage,waste}
@@ -647,18 +862,20 @@ export async function managerialReports(from:string,to:string){
 export async function v15Dashboard() {
   const rows = await sqlClient`
     SELECT
-      COALESCE((SELECT SUM(total_amount) FROM orders WHERE created_at>=(CURRENT_DATE AT TIME ZONE 'Asia/Tehran')
-        AND status<>6),0)::float8 AS "todaySales",
+      COALESCE((SELECT SUM(amount) FROM financial_transactions
+        WHERE transaction_type IN (${FinancialTransactionType.SalesIncome},${FinancialTransactionType.Refund})
+        AND transaction_date>=(((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date) AT TIME ZONE 'Asia/Tehran')),0)::float8 AS "todaySales",
       (SELECT COUNT(*)::int FROM payments WHERE status IN (1,2)) AS "unverifiedPayments",
       COALESCE(-(SELECT SUM(amount) FROM financial_transactions WHERE amount<0
-        AND transaction_date>=(CURRENT_DATE AT TIME ZONE 'Asia/Tehran')),0)::float8 AS "todayExpense",
-      (SELECT COUNT(*)::int FROM ingredients i WHERE i.is_active AND
+        AND transaction_type IN (${FinancialTransactionType.PurchaseExpense},${FinancialTransactionType.ManualExpense})
+        AND transaction_date>=(((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date) AT TIME ZONE 'Asia/Tehran')),0)::float8 AS "todayExpense",
+      (SELECT COUNT(*)::int FROM ingredients i WHERE i.is_active AND i.is_inventory_tracked AND
         COALESCE((SELECT SUM(quantity_in_base_unit) FROM inventory_transactions t WHERE t.ingredient_id=i.id),0)
         <=i.minimum_stock_level) AS "lowStockCount",
       (SELECT COUNT(*)::int FROM purchases WHERE status=2 AND payment_status<>3) AS "unpaidPurchases",
       (SELECT COUNT(*)::int FROM order_inventory_consumptions WHERE recipe_missing AND reversed_at IS NULL) AS "missingRecipeOrders",
       COALESCE(-(SELECT SUM(total_cost) FROM inventory_transactions WHERE transaction_type=3
-        AND transaction_date>=(CURRENT_DATE AT TIME ZONE 'Asia/Tehran')),0)::float8 AS "todayWasteCost"`
+        AND transaction_date>=(((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Tehran')::date) AT TIME ZONE 'Asia/Tehran')),0)::float8 AS "todayWasteCost"`
   return rows[0]
 }
 

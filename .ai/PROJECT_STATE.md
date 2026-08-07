@@ -140,3 +140,151 @@
 - Electron Admin form controls explicitly use the bundled Vazir Farsi-digits family, including
   Chromium's date-input editing fields, so typed ASCII numeric values use the same visible glyphs
   as read-only Admin content without changing their underlying characters.
+- Private Telegram testing is supported through a Pinggy HTTPS tunnel targeting only Next.js port
+  `3000`. Signed Telegram `initData` is required locally, and a token-safe PowerShell helper checks
+  Kafgir health and updates the bot's rotating default Mini App menu URL.
+- Kitchen/inventory and finance were audited and repaired on 2026-08-01. PostgreSQL migrations
+  `0008_square_tinkerer.sql` and `0009_eminent_terrax.sql` align customer payment-method values,
+  add enum/value/sign constraints, and protect purchase-line arithmetic.
+- Inventory mutations now serialize on ingredient rows, reject insufficient tracked stock, skip
+  untracked ingredients, correctly treat waste/preparation percentages as yield losses, and avoid
+  zero-value stock-count movements. Purchase confirmation allocates header discounts/additional
+  costs into inventory valuation and is idempotent.
+- Electron Admin now exposes multi-line purchasing and recipes, stock counting, purchase payments,
+  account transfers, expense categories, editable financial accounts/POS terminals, customer
+  payment creation/verification/refunds, and complete finance/inventory report tables.
+- Financial mutations serialize on account rows, enforce active accounts and sufficient balances,
+  keep payment verification/refund ledger entries consistent, and report Tehran business-day
+  boundaries from financial transaction dates. Per-operation Owner/KitchenAdmin/OrderManager
+  authorization is enforced in Electron main.
+- The seven operational Admin pages for Ingredients, Inventory, Purchases, Suppliers, Shopping,
+  Finance, and Payments now include an initially expanded, keyboard-accessible Persian guide with
+  workflow steps, a concrete example, and page-specific safeguards against duplicate ledger work.
+- Those pages now use consistent titled data panels with record counts and empty states. Table
+  action cells remain real table cells, forms align to their card tops, and wide grids scroll inside
+  their own panels without detaching headers from row values.
+- The customer cart no longer silently removes sold-out/unavailable foods or reduces requested
+  quantities when capacity changes. It retains and labels invalid lines, excludes them from the
+  orderable total, blocks checkout until resolved, and refreshes menu capacity on cart entry and
+  after a rejected order attempt.
+- Order-capacity and availability errors returned by the shared transactional order service are
+  now Persian and name the affected food/remaining portions where available.
+- The Ingredients form presents inventory tracking as a compact «ثبت گردش انبار» option and labels
+  preferred stock as an optional planning target, explicitly noting that it does not currently drive
+  shopping-list calculations.
+- Direct-browser customers can browse, open food details, and build a persistent guest cart without
+  authentication. Checkout requests mobile OTP only after the completed order form is submitted;
+  the cart and delivery fields remain intact throughout login. Valid Telegram Mini App users still
+  authenticate silently, and the order route now rejects anonymous development fallback as well as
+  anonymous production requests.
+- Checkout and Profile now show the signed Telegram identity (username when present plus numeric
+  Telegram user ID), verified-phone state, and an explicit `اتصال موبایل و بازیابی آدرس‌ها` action.
+  A successful OTP link keeps the Telegram session active and immediately reloads the canonical
+  profile, saved addresses, and order history.
+- Customer identity linking now serializes per normalized phone and rejects reassignment when that
+  verified phone already belongs to a different Telegram account. A phone value used only as an
+  unverified Telegram delivery contact can no longer be used from a browser to claim that Telegram
+  account; only phone-only historical profiles may be claimed after OTP proof.
+- Verified login phones are no longer overwritten by alternate delivery-contact numbers submitted
+  with Telegram orders. Customer profile reads prefer the verified login mapping over stale contact
+  defaults.
+- The Ingredients editor is a compact two-row responsive grid: identification/stock fields share one
+  aligned row, while notes, tracking/activity options, and actions share the second row.
+- Cart reconciliation is intentionally quiet when the cart is valid: the guest-cart explanation and
+  successful-sync banner are no longer shown. Only actionable availability/capacity failures appear;
+  affected rows stay visible and checkout remains disabled until the customer removes the item,
+  lowers its quantity, or refreshes inventory successfully.
+- Customer-facing page-level «منوی امروز» and «بازگشت» actions now reuse the same themed back-link
+  treatment and RTL text/icon order as the cart's «ادامه خرید» action.
+- Daily-menu items support an optional immediate discount price through migration
+  `0010_sturdy_ego.sql`. The regular daily price remains the reference price, while orders,
+  manual orders, carts, food discovery, and finance costing consume the effective discounted price.
+- Electron Admin's Today Menu editor provides a dedicated «تخفیف فوری» control with live percentage
+  and savings feedback, quick discount actions, and original/final price presentation in the grid.
+- The Web menu, food detail, related foods, and cart use a shared discount-aware price display with a
+  struck-through original price, semantic discount badge, and emphasized final price. Open menu and
+  food-detail views refresh unobtrusively every 15 seconds and on focus so Admin price changes appear
+  without a manual reload.
+- Successful customer checkout now presents a branded invoice immediately, with a prominent order
+  number, immutable item snapshots, delivery/payment details, totals, and browser print/PDF support.
+  The same invoice remains available from the customer's authenticated order-history details.
+- Electron Admin order details expose a dedicated invoice preview and A4 print/PDF action. Because
+  Orders and the full report share `OrderDetails`, both operational flows use the same invoice.
+- Orders created from cryptographically validated Telegram `initData` or an existing Telegram
+  customer session enqueue a full plain-text invoice to that Telegram chat through the durable
+  notification outbox. Delivery remains asynchronous and retryable, so Telegram failure never rolls
+  back an otherwise valid customer order.
+- PostgreSQL migration `0011_powerful_sleeper.sql` changes notification text storage from the legacy
+  2,000-character limit to `text`, allowing complete multi-line invoices within Telegram's safe size.
+- Local PostgreSQL now contains a versioned operational learning scenario created by
+  `npm run db:seed-demo`: 17 ingredients, 5 suppliers, 6 purchases, 18 inventory movements,
+  1 saved shopping list, 3 financial accounts and 3 customer payment examples. The dataset is
+  realistic but fictional, is protected from accidental production execution, and reuses shared
+  transactional services rather than bypassing business rules.
+- Electron Admin's Shopping page now lists saved shopping-list snapshots with their status, item
+  count, estimated purchase total and ingredient summary; previously only the shortage calculator
+  was visible even though lists were persisted.
+- Mini App mobile navigation is flush with the physical top/bottom viewport edges while keeping
+  safe-area padding inside the bars. Bottom navigation explicitly centers its two compact rows with
+  a 4px icon/label gap; the first label is `خانه`, and the account label changes from `ورود` to
+  `کفگیر من` as soon as a phone or Telegram customer session becomes authenticated.
+- Operational demo seed version 2 adds an `افزودنی و تک‌پرس` category and five independently
+  orderable current-menu items: extra saffron rice, ghormeh-sabzi without rice, gheimeh without
+  rice, saffron chicken thigh without rice, and saffron chicken breast without rice. Each has its
+  own price, capacity, customer copy and active inventory recipe.
+- The Mini App now provides live food-first search below the home carousel. It filters only today's
+  orderable menu and combines Persian-normalized matching across food name, short description,
+  category and active customer-visible tags; category chips and search terms work together.
+- Today's public menu is now delivered as cursor-paginated server results (12 foods per request).
+  Search runs in PostgreSQL after a 300ms debounce and requires two meaningful characters; an
+  `IntersectionObserver` loads later pages near the viewport, with an accessible manual fallback.
+  Cart reconciliation uses a separate ID-scoped snapshot so unloaded foods remain valid and visible.
+- Electron invoice printing now crosses the preload boundary through an authenticated, trusted-sender
+  IPC operation and opens Electron's native print/PDF dialog with background colors enabled. Web and
+  Admin invoice print styles preserve table headers and avoid splitting key invoice blocks.
+- Removing the final remaining food from the Web cart now requires an inline themed confirmation.
+  It applies to decrementing the last single portion and to explicitly removing the only food, while
+  ordinary quantity changes and removals from multi-food carts stay uninterrupted.
+- The Web home page now uses a compact pill search below the hero and a dedicated `تخفیف‌های امروز`
+  showcase. The initial menu response includes up to eight orderable discounted foods while keeping
+  the same foods in the normal cursor-paginated menu grid.
+- Rice-based foods can now expose a mandatory Iranian/foreign rice choice from one product card.
+  Migration `0012_nifty_mandarin.sql` adds food-level rice/inventory configuration, daily-menu price
+  and capacity controls, and immutable order-line snapshots. Capacity confirmation/cancellation and
+  inventory consumption are transactional for both the base dish and selected rice ingredient.
+- Electron Admin now has an isolated `تنظیم برنج` editor, per-menu rice surcharge/capacity controls,
+  mandatory rice selection in manual ordering, and rice labels in order details and printed invoices.
+  The Web uses a desktop dialog/mobile bottom sheet, composite cart identities, rice-aware stock
+  reconciliation, food-detail selection, invoices and Telegram invoice text.
+- Local demo data now contains independent `برنج ایرانی` and `برنج خارجی` ingredients through
+  `npm run db:seed-rice-options --workspace @kafgir/web`; linking those rice ingredients to foods
+  is intentionally handled by the Admin `تنظیم برنج` page. Rice ingredients use `گرم` as their base
+  unit, so per-portion rice consumption is entered as whole grams instead of decimal kilograms.
+- Electron Admin's customer-payment page now separates successful, failed, pending-review and
+  refunded payments into filterable summary cards. The detailed grid includes order number,
+  customer identity, method, destination account, tracking/reference number, timestamp and actions.
+- The Web development server now runs with `next dev --hostname 0.0.0.0`, so local mobile devices
+  and Pinggy tunnels can reach the customer app on port `3000`.
+- Order-number generation bound its substring offset untyped, so PostgreSQL resolved the POSIX-regex
+  overload `substring(text FROM text)` and every order in a Persian year collapsed to one counter
+  value. The offset is now cast to `int`. Local data already showed the damage: `14051` then `14056`,
+  with the next order guaranteed to collide.
+- Rice is a single optional upgrade. Every dish is served with foreign rice, already priced into the
+  dish; Persian rice is one standalone food carrying `foods.is_persian_rice`, sold at the upgrade
+  difference and offered only on dishes whose `foods.allows_persian_rice` is set.
+- Migrations `0014_marvelous_tony_stark.sql` and `0015_amused_ben_urich.sql` rename
+  `requires_rice_selection` to `allows_persian_rice`, replace `rice_addon_type` with
+  `is_persian_rice`, retire the «برنج خارجی» food, and drop the old columns. Dish prices are
+  unchanged: they still include foreign rice, so nothing needs repricing.
+- The client sends `withPersianRice: true|false` per dish; `createOrder` resolves today's Persian rice
+  menu item, prices it, aggregates it across dishes and expands it into its own order line. Nothing is
+  mandatory, so a dish stays fully orderable when Persian rice sells out.
+- `packages/contracts/src/rice.ts` and `RiceOptionPicker.tsx` were deleted. The upgrade is one inline
+  checkbox on the menu card and food detail, and one checkbox per food in the Electron food editor
+  alongside a second «این غذا خودِ برنج ایرانی است» flag.
+- `npm run db:seed-rice-options --workspace @kafgir/web` now prepares only «برنج ایرانی», priced as
+  the ۵۵٬۰۰۰ upgrade difference, and still leaves menu placement and dish flags to Admin.
+- Order-number generation bound its substring offset untyped, so PostgreSQL resolved the POSIX-regex
+  overload `substring(text FROM text)` and every order in a Persian year collapsed to one counter
+  value. The offset is now cast to `int`. Local data already showed the damage: `14051` then `14056`,
+  with the next order guaranteed to collide.

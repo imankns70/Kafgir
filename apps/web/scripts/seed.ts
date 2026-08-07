@@ -21,6 +21,7 @@ const seedCategories = [
   ['سالاد و مخلفات', 'salad-and-sides', '🥗'],
   ['دسر', 'dessert', '🍰'],
   ['نوشیدنی', 'beverage', '🥤'],
+  ['افزودنی و تک‌پرس', 'extras', '🍽️'],
 ] as const
 
 const seedTags = [
