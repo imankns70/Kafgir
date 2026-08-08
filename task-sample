@@ -1,11 +1,4 @@
-Implement ingredient purchasing management.
-
-Start by following CLAUDE.md.
-Inspect only the files relevant to this task.
-Do not scan the entire repository.
-
-Before implementation, briefly tell me:
-1. What you found
-2. What you plan to change
-
-Then implement it.
+ 
+Follow CLAUDE.md.
+Use the minimum necessary project context.
+Do not scan or read unrelated files.
