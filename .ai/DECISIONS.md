@@ -370,3 +370,188 @@
 - The Persian rice menu price is the upgrade DIFFERENCE, not a full portion, because the dish price
   already covers rice. Charging a full portion would bill the customer for two rices.
 - Dish prices therefore stay rice-inclusive and need no repricing, unlike the previous design.
+
+## 2026-08-08 — Confirming the Persian rice upgrade
+
+- Turning the upgrade on changes what every later add costs, so it is confirmed against an explicit
+  price breakdown. Turning it off only lowers the price and applies immediately; confirming a
+  cheaper outcome would be friction without a purpose.
+- The dialog states the resulting per-portion price on the confirm button itself, so the figure the
+  customer agrees to is the figure they press.
+- It must say that the amount is the difference and not a full rice portion. That is the one thing
+  the pricing model makes counter-intuitive, and the checkbox label alone cannot carry it.
+- Mobile and desktop share one component and one markup; only CSS differs (bottom sheet under 640px,
+  centred modal above). A JS media query would risk a server/client render disagreement and would
+  need resize handling to stay correct.
+- The dialog is portalled to `document.body` because menu cards carry transforms that would otherwise
+  become the containing block for `position: fixed`.
+
+## 2026-08-08 — Customer-selected delivery windows
+
+- Delivery windows are master data plus an optional per-date override, not a row per day. Requiring
+  operators to populate a calendar before ordinary days work would guarantee days with no windows.
+  Absent override means "follow the master flag, no order limit".
+- The delivery date is the menu date of the basket, not client input. `daily_menus.menu_date` already
+  models the day; a second date model would let today's food be paired with tomorrow's delivery. A
+  basket spanning two menus is rejected — previously the rice lookup merely assumed it could not.
+- `daily_menus.order_deadline` is kept and still gates the menu as a whole. It cannot express a lead
+  time per window, so `order_cutoff_minutes_before_start` was added to the slot and both gates apply.
+- Delivery capacity counts every non-Cancelled order, unlike food capacity which is consumed at
+  confirmation. A pending order still needs a courier on that run, so counting only confirmed orders
+  would let a window be oversold while the operator works the queue. Cancelling frees the seat.
+- Concurrency uses `pg_advisory_xact_lock` keyed on date+slot, matching the existing order-number
+  lock. `SELECT ... FOR UPDATE` cannot work here: the capacity is a count of order rows that do not
+  exist yet, so there is nothing to lock against a concurrent insert.
+- Start and end are PostgreSQL `time`, never display strings, so ordering, cutoff arithmetic and
+  kitchen dispatch sorting happen in the database. Persian formatting is built in the client.
+- The order carries a title/start/end snapshot. Order details render the snapshot, so re-timing a
+  window never rewrites what a customer agreed to. The slot id is kept for grouping only.
+- Availability is exposed as available/unavailable plus a reason code. Remaining seat counts are
+  operational data and are not customer-facing.
+- Unavailable windows are shown disabled with their reason rather than hidden, except windows switched
+  off in master data — those are not useful context, only noise.
+- Overlapping windows are rejected. Two windows covering the same minute would split capacity the
+  kitchen planned as one run, and a customer could not tell them apart.
+- Slot selection is optional in the contract so Electron manual phone orders can still be created
+  without one; the customer checkout requires it.
+
+## 2026-08-08 — Toolchain
+
+- All four workspaces pin TypeScript `7.0.2`, and `npm run lint` is that workspace's `tsc --noEmit`.
+
+## 2026-08-09 — Social publishing belongs to Electron main and shared server-core
+
+- Social publishing is an owner/kitchen workflow, so the UI is in Electron while authoritative
+  drafts, rules, persistence and transactions remain framework-independent in `packages/server-core`.
+  Next.js receives no Admin publishing API and Electron renderer receives no database capability.
+- Channel credentials are encrypted with Windows `safeStorage` in Electron main. The database keeps
+  ciphertext and read DTOs expose only `credentialConfigured`; a future worker needs its own secret store.
+- Rules are seeded disabled and in Suggestion mode. AutoPublish is opt-in and runs only while an Owner
+  session and Electron process exist; no hidden scheduler or new Worker was introduced.
+- Publication state is per target. Failure never resends successful targets. A crash after network
+  send becomes Unknown and requires explicit retry because blind retry could duplicate an accepted post.
+- Capacity thresholds may trigger an internal rule, but exact counts and percentages are prohibited
+  in customer-visible templates and drafts. Public output is limited to semantic scarcity language.
+- Provider differences stay behind `SocialPublisher`: Telegram and Bale use Bot-style APIs; Eitaa
+  degrades media/action features to public URLs when necessary.
+
+## 2026-08-09 — Customer order history uses snapshots and an isolated read model
+
+- Customer order endpoints do not reuse the Admin order DTO. A dedicated customer summary/detail read
+  model prevents `adminNote`, financial-account identifiers, receipt URLs and internal payment fields
+  from crossing the browser boundary.
+- The list query is deliberately summary-shaped and paginated: one count query plus one aggregate query
+  for items, latest payment state, actual histories and review. Full items/payments are fetched only when
+  one order is opened, using a fixed number of queries rather than one query per list card.
+- `orders.created_at` is the persisted event for the initial PendingConfirmation step. All later timeline
+  timestamps require an `order_status_histories` row; null history is rendered as missing, not inferred
+  from convenience columns or fabricated by the UI.
+- The immutable delivery city/address and item prices stored on the order are authoritative for history.
+  Current customer addresses and current food prices are never joined into historical order presentation.
+- Delivered is the only review-eligible status. Reviews are editable through an upsert and one unique
+  `order_id`, so editing is convenient without permitting duplicate reviews. Ownership and eligibility
+  are checked transactionally on the server, independently of button visibility.
+- Order status and payment status remain independent enums. Cash/POS without a transaction is described
+  as payment at delivery instead of displaying empty gateway fields.
+
+## 2026-08-09 — Trusted client IP
+
+- `X-Forwarded-For` is read from the right, never the left. Proxies append, so only the rightmost
+  entries are written by our own infrastructure; a caller may prepend anything, and doing so pushes
+  the genuine value further left instead of into the position we read.
+- The number of proxies is configuration (`TRUSTED_PROXY_HOPS`), not detection. A wrong value is a
+  security failure in both directions, so an invalid setting throws rather than falling back.
+- A chain shorter than the configured hop count, or no usable header at all, resolves to one shared
+  `unknown` value. Callers that cannot be identified must not each receive a private allowance.
+- This is the identification layer only; the rate limiting that consumes it is a later phase.
+
+## 2026-08-09 — Lightweight first-party customer analytics
+
+- Visitor identity is a random first-party UUID, not a user record, fingerprint, IP-derived value or
+  external analytics identifier. This includes guests while keeping the data intentionally minimal.
+- VisitorId survives authentication; the current session gains UserId. Replacing VisitorId at login
+  would lose the guest → login → order journey and inflate unique visitor counts.
+- A visible-document heartbeat every two minutes plus a 60-second server write throttle is sufficient
+  for a five-minute approximate online window without turning browsing into write-heavy telemetry.
+- Sessions roll over only after more than 30 minutes idle. The boundary is explicit so browser and
+  server behavior agree and exactly 30 minutes does not create a duplicate session.
+- Orders keep nullable visitor/session attribution rather than requiring an analytics event. Business
+  persistence remains authoritative and analytics absence or association failure cannot reject an order.
+- Today's eight metrics come from one PostgreSQL aggregate and one typed Electron IPC operation. All
+  day-based clauses use the centralized Tehran business date; conversion counts converted visitors,
+  never order count.
+- Electron Admin is excluded from tracking and polls its aggregate every 30 seconds only while visible.
+  No Redis, external analytics service, event stream, chart or historical reporting was introduced.
+
+## 2026-08-09 — Rate-limit storage and boundary
+
+- The store contract is async from day one although the in-memory implementation resolves
+  synchronously. Redis is genuinely async, and retrofitting `await` later would touch every caller.
+- Fixed windows, not sliding. One counter and one timestamp per key keeps the memory bound trivial
+  and expiration deterministic; the cost is that up to twice the limit can pass across a window
+  boundary, which is acceptable for these tiers.
+- The read-modify-write in `consumeSync` must contain no `await`. Node's single thread makes an
+  uninterrupted synchronous run atomic; one `await` between reading and writing the counter would
+  let concurrent requests observe the same pre-state and all pass. `consume` wraps the synchronous
+  result rather than being async itself.
+- Only lapsed windows are ever reclaimed. A live entry is never evicted to make room, because
+  evicting one that had reached its limit would hand the caller behind it a fresh budget and turn
+  the memory bound into a bypass. When the cap is reached and nothing has lapsed, new keys are
+  refused — fail closed, at the cost of refusing genuine new callers during a key flood.
+- 429 responses carry `Retry-After` and nothing else. `X-RateLimit-*` headers would tell an attacker
+  the exact limit, remaining budget and window so they could pace themselves just under it.
+- Policies live in one module and routes name a tier. Endpoints never carry their own numbers, so
+  thresholds stay reviewable in a single diff.
+- Applied at the API boundary via `withRateLimit`, not in services and not in `middleware.ts`; Next
+  middleware runs on the Edge runtime where the Node APIs this depends on are unavailable.
+
+## 2026-08-09 — OTP rate limiting
+
+- OTP send quotas live in `customer_otp_challenges`, not the process store. Every send spends SMS
+  credit and in-memory state resets on each deploy, so the durable table — which already records one
+  row per send with `created_at` and `request_ip_digest` — remains the authority. No generic counter
+  table and no migration.
+- The check and the reservation share one transaction behind an advisory lock keyed on the phone
+  number, because the quota counts rows the same statement is about to insert. Row locks cannot help
+  when the contended rows do not exist yet.
+- The challenge row is inserted before the provider call, so a send cannot happen uncounted. The
+  earlier order — send, then record — meant a provider outage produced unlimited retries.
+- A delivery failure keeps the reservation. Refunding it would let a failing provider be hammered;
+  the cost is that a genuine user waits out the cooldown after an outage.
+- Verify limits use the process store because a verify attempt has no durable row, and giving one to
+  every guess would mean a database write per request.
+- Reaching the per-challenge attempt cap consumes the challenge instead of parking it at the cap, so
+  the code is dead even if it was guessed on the final attempt.
+- Send limits are checked cooldown-first so the reason a legitimate caller most often meets is the
+  one reported, and fewer other dimensions are consumed on a refusal.
+
+## 2026-08-09 — Customer mutation rate limiting
+
+- Protect only sensitive customer business mutations in Phase 4; do not add global throttling and do
+  not include health, Admin HTTP routes or Electron IPC.
+- Use an HMAC-derived authenticated customer bucket as the primary dimension and a separately scoped
+  trusted-client-IP bucket as defense in depth. Signed Telegram user ID is the equivalent primary
+  identity for Telegram order creation. Anonymous cart reconciliation uses the first-party VisitorId
+  and falls back to trusted IP, while retaining a separate IP safety bucket.
+- Share one moderate account-write policy across profile and saved-address create/update/delete, and
+  one interaction policy across like/favorite toggles. This prevents endpoint hopping from multiplying
+  a caller's allowance while keeping ordinary UI use far below the threshold.
+- Keep order limiting outside idempotency, capacity and transactional validation. Five attempts per
+  minute per identity and twenty per IP permit normal checkout retries without turning throttling into
+  a substitute for business correctness.
+- Add same-origin validation to like/favorite writes before identity resolution or database work.
+
+## 2026-08-09 — Rate-limit observability and final boundary
+
+- Emit exactly one `rate_limit.rejected` warning for rejected requests and no event for allowed
+  requests. Build the payload from an explicit safe-field allowlist: policy, stable operation,
+  Retry-After, distribution state and status. Do not attach request or identity data.
+- Treat endpoint classification as documentation of actual enforcement, not a reason to attach a
+  generic limiter. Public/customer reads remain unrestricted in V1; health, Admin and Electron IPC
+  remain outside the feature; the secret-protected notification processor is the sole current
+  external processor route.
+- Keep the generic store fixed-window, bounded, expiring and per-process for the current single web
+  instance. It resets on restart and is not safe as a cluster-wide limit.
+- A future multi-instance deployment must supply an atomic Redis-backed `IRateLimitStore` with
+  `isDistributed = true`. HMAC key derivation, policies and route integrations remain unchanged.
+  Redis is not added in V1, and durable OTP-send reservations remain PostgreSQL-backed.

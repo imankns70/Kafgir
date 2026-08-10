@@ -1,7 +1,7 @@
 import type { AdminOperation } from './admin-operations'
 
 const kitchenOperations = new Set<AdminOperation>([
-  'dashboard.today', 'dashboard.v15',
+  'dashboard.today', 'dashboard.v15', 'dashboard.analytics',
   'foodCategories.list', 'foodCategories.create', 'foodCategories.update',
   'foodTags.list', 'foodTags.create', 'foodTags.update',
   'foods.list', 'foods.create', 'foods.update', 'foods.setActive',
@@ -13,13 +13,18 @@ const kitchenOperations = new Set<AdminOperation>([
   'inventory.movements', 'inventory.adjust', 'inventory.waste', 'inventory.count',
   'recipes.get', 'recipes.save', 'finance.accounts',
   'shopping.list', 'shopping.requirements', 'shopping.create', 'reports.v15', 'logs.server',
+  'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',
+  'social.dashboard', 'social.channels.list', 'social.templates.list',
+  'social.draft.generate', 'social.preview', 'social.posts.create',
+  'social.suggestions.list', 'social.history',
 ])
 
 const orderOperations = new Set<AdminOperation>([
-  'dashboard.today', 'dashboard.v15', 'menus.get',
+  'dashboard.today', 'dashboard.v15', 'dashboard.analytics', 'menus.get',
   'orders.search', 'orders.get', 'orders.create', 'orders.updateStatus',
   'finance.accounts', 'finance.posTerminals',
   'payments.list', 'payments.create', 'payments.changeStatus', 'logs.server',
+  'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',
 ])
 
 export function isAdminOperationAllowed(operation: AdminOperation, roles: readonly string[]): boolean {

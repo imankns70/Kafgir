@@ -1,10 +1,12 @@
 import type {
   CustomerAddressWriteRequest,
+  CustomerOrderDetailDto,
   CustomerOrdersPageDto,
   CustomerProfileDto,
   CustomerProfileLookupRequest,
   CustomerSessionDto,
-  OrderDto,
+  OrderReviewDto,
+  OrderReviewWriteRequest,
 } from '../types'
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from './apiClient'
 
@@ -48,4 +50,7 @@ export const getCustomerOrders = (page = 1) =>
   apiGet<CustomerOrdersPageDto>(`/api/customers/me/orders?page=${page}`)
 
 export const getCustomerOrder = (id: number) =>
-  apiGet<OrderDto>(`/api/customers/me/orders/${id}`)
+  apiGet<CustomerOrderDetailDto>(`/api/customers/me/orders/${id}`)
+
+export const saveCustomerOrderReview = (id: number, value: OrderReviewWriteRequest) =>
+  apiPut<OrderReviewDto>(`/api/customers/me/orders/${id}/review`, value)

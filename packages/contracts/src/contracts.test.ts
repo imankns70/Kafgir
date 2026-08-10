@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   createOrderSchema,
+  analyticsHeartbeatSchema,
+  customerAnalyticsTodaySchema,
   dailyMenuSchema,
   dailyMenuItemWriteSchema,
   DeliveryMethod,
@@ -163,5 +165,25 @@ describe('shared contracts', () => {
     expect(plain.success && plain.data.items[0]?.withPersianRice).toBe(false)
     const upgraded = order([{ dailyMenuItemId: 7, withPersianRice: true, quantity: 2 }])
     expect(upgraded.success && upgraded.data.items[0]?.withPersianRice).toBe(true)
+  })
+
+  it('validates anonymous analytics identifiers and the aggregate dashboard response', () => {
+    expect(analyticsHeartbeatSchema.safeParse({
+      visitorId: 'bd84c4a6-94aa-4d70-87df-a134fac56b13',
+      sessionId: '841ee0f5-2386-40d8-8d77-bda0b4c21ba7',
+    }).success).toBe(true)
+    expect(analyticsHeartbeatSchema.safeParse({ visitorId: 'not-a-uuid', sessionId: 'invalid' }).success)
+      .toBe(false)
+    expect(customerAnalyticsTodaySchema.parse({
+      uniqueVisitorsToday: 7,
+      onlineNow: 3,
+      guestVisitorsToday: 4,
+      authenticatedUsersToday: 2,
+      newUsersToday: 1,
+      returningUsersToday: 1,
+      sessionsToday: 8,
+      conversionRate: 28.6,
+      calculatedAt: '2098-06-17T12:00:00.000Z',
+    }).conversionRate).toBe(28.6)
   })
 })

@@ -21,11 +21,24 @@ import {
   updateDailyMenuItemSchema,
   updateDailyMenuSettingsSchema,
   updateOrderStatusSchema,
+  deliveryTimeSlotWriteSchema,
+  deliveryDayOverrideWriteSchema,
   wasteWriteSchema,
+  socialChannelWriteSchema,
+  socialPostWriteSchema,
+  socialRuleWriteSchema,
+  socialSettingsWriteSchema,
+  socialTemplateWriteSchema,
   type OrderReportQuery,
 } from '@kafgir/contracts'
 import {
   addMenuItem,
+  createDeliveryTimeSlot,
+  getDeliveryDay,
+  listDeliveryTimeSlots,
+  setDeliveryDayOverride,
+  setDeliveryTimeSlotActive,
+  updateDeliveryTimeSlot,
   adjustInventory,
   confirmPurchase,
   confirmStockCount,
@@ -39,6 +52,7 @@ import {
   createShoppingList,
   cancelPurchase,
   getDashboard,
+  getCustomerAnalyticsToday,
   getMenuByDate,
   getOrder,
   getRecipe,
@@ -81,10 +95,30 @@ import {
   closeDatabase,
   testDatabaseConnection,
   type AdminPrincipal,
+  createSocialPost,
+  dismissSocialSuggestion,
+  evaluateSocialAutomation,
+  generateSocialDraft,
+  getSocialDashboard,
+  getSocialSettings,
+  listSocialChannels,
+  listSocialHistory,
+  listSocialRules,
+  listSocialSuggestions,
+  listSocialTemplates,
+  previewSocialPost,
+  publishSocialPost,
+  retrySocialTarget,
+  saveSocialChannel,
+  saveSocialRule,
+  saveSocialSettings,
+  saveSocialTemplate,
+  testSocialChannelConnection,
 } from '@kafgir/server-core'
 import { readServerLogs } from '@kafgir/server-core/logging/read-logs'
 import type { AdminOperation } from '../shared/admin-operations'
 import { isAdminOperationAllowed } from '../shared/admin-permissions'
+import { encryptSocialCredential, resolveSocialCredential } from './social-credentials'
 
 type RecordPayload = Record<string, unknown>
 
@@ -121,6 +155,7 @@ export async function dispatchAdminOperation(
   switch (operation) {
     case 'dashboard.today': return getDashboard()
     case 'dashboard.v15': return v15Dashboard()
+    case 'dashboard.analytics': return getCustomerAnalyticsToday()
     case 'foodCategories.list': return listFoodCategories(true)
     case 'foodCategories.create': return createFoodCategory(foodCategoryWriteSchema.parse(body.value))
     case 'foodCategories.update':
@@ -141,6 +176,16 @@ export async function dispatchAdminOperation(
     case 'menus.updateItem':
       return updateMenuItem(numberField(body, 'id'), updateDailyMenuItemSchema.parse(body.value))
     case 'menus.removeItem': return removeMenuItem(numberField(body, 'id'))
+    case 'deliverySlots.list': return listDeliveryTimeSlots()
+    case 'deliverySlots.create':
+      return createDeliveryTimeSlot(deliveryTimeSlotWriteSchema.parse(body.value))
+    case 'deliverySlots.update':
+      return updateDeliveryTimeSlot(numberField(body, 'id'), deliveryTimeSlotWriteSchema.parse(body.value))
+    case 'deliverySlots.setActive':
+      return setDeliveryTimeSlotActive(numberField(body, 'id'), Boolean(body.isActive))
+    case 'deliveryDays.get': return getDeliveryDay(textField(body, 'date'))
+    case 'deliveryDays.setOverride':
+      return setDeliveryDayOverride(deliveryDayOverrideWriteSchema.parse(body.value))
     case 'orders.search': return searchOrders((body.query ?? {}) as OrderReportQuery)
     case 'orders.get': return getOrder(numberField(body, 'id'))
     case 'orders.create':
@@ -225,6 +270,41 @@ export async function dispatchAdminOperation(
     case 'payments.refund': return refundPayment(numberField(body, 'id'), principal.userId)
     case 'reports.v15': return managerialReports(textField(body, 'from'), textField(body, 'to'))
     case 'logs.server': return readServerLogs(Number(body.limit ?? 500))
+    case 'social.dashboard': return getSocialDashboard()
+    case 'social.channels.list': return listSocialChannels()
+    case 'social.channels.save': {
+      const value = socialChannelWriteSchema.parse(body.value)
+      const encrypted = value.credential ? encryptSocialCredential(value.credential) : undefined
+      return saveSocialChannel(body.id == null ? null : numberField(body, 'id'), value, encrypted)
+    }
+    case 'social.channels.test':
+      return testSocialChannelConnection(numberField(body, 'id'), resolveSocialCredential)
+    case 'social.templates.list': return listSocialTemplates()
+    case 'social.templates.save': return saveSocialTemplate(socialTemplateWriteSchema.parse(body.value))
+    case 'social.draft.generate': return generateSocialDraft(body.value)
+    case 'social.preview': return previewSocialPost(socialPostWriteSchema.parse(body.value))
+    case 'social.posts.create': return createSocialPost(socialPostWriteSchema.parse(body.value), principal.userId)
+    case 'social.posts.publish':
+      return publishSocialPost(numberField(body, 'id'), resolveSocialCredential)
+    case 'social.suggestions.list':
+      return listSocialSuggestions(typeof body.date === 'string' ? body.date : undefined)
+    case 'social.suggestions.dismiss':
+      return dismissSocialSuggestion(numberField(body, 'id'), principal.userId)
+    case 'social.automation.evaluate': {
+      const result = await evaluateSocialAutomation(new Date(), principal.userId)
+      for (const postId of result.autoPublishPostIds) {
+        await publishSocialPost(postId, resolveSocialCredential)
+      }
+      return result
+    }
+    case 'social.rules.list': return listSocialRules()
+    case 'social.rules.save':
+      return saveSocialRule(body.id == null ? null : numberField(body, 'id'), socialRuleWriteSchema.parse(body.value))
+    case 'social.settings.get': return getSocialSettings()
+    case 'social.settings.save': return saveSocialSettings(socialSettingsWriteSchema.parse(body.value))
+    case 'social.history': return listSocialHistory(body.query ?? {})
+    case 'social.targets.retry':
+      return retrySocialTarget(numberField(body, 'id'), resolveSocialCredential)
   }
 }
 

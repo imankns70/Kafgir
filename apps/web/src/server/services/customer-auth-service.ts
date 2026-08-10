@@ -2,8 +2,12 @@ import { createHmac, randomInt, timingSafeEqual } from 'node:crypto'
 import type { TransactionSql } from 'postgres'
 import { sqlClient } from '../db/client'
 import { AppError, UnauthorizedError } from '../errors'
-import { logger } from '../logging/logger'
+import { errorFields, logger } from '../logging/logger'
 import { normalizeIranianMobile } from '../auth/customer-phone'
+import { otpSendLimits, rateLimitPolicies } from '../rate-limit/policies'
+import { rateLimitKey } from '../rate-limit/key'
+import { rateLimitStore } from '../rate-limit'
+import { RateLimitError } from '../rate-limit/store'
 import {
   isConflictingVerifiedPhoneLink,
   selectVerifiedPhoneCanonicalUserId,
@@ -34,36 +38,135 @@ const equalDigest = (left: string, right: string) => {
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
-export function requestIp(request: Request) {
-  return request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-    ?? request.headers.get('x-real-ip')
-    ?? 'unknown'
+const tooManyOtpRequests = 'درخواست‌های زیادی ثبت شده است. کمی بعد دوباره تلاش کنید.'
+
+type OtpSendQuota = {
+  cooldownSeconds: number
+  phoneShort: number
+  phoneShortReset: number
+  phoneDay: number
+  phoneDayReset: number
+  ipShort: number
+  ipShortReset: number
+  ipHour: number
+  ipHourReset: number
+}
+
+/**
+ * Reserves one OTP send, or refuses it.
+ *
+ * The whole check-and-reserve runs inside one transaction behind advisory locks keyed on the phone
+ * and IP digest, because both quotas count rows that the same statement is about to insert. Without
+ * both locks, concurrent requests for one phone OR many phones behind one IP can all read the same
+ * pre-insert counts and pass. Every request acquires phone then IP, keeping lock order deterministic.
+ *
+ * The inserted row IS the reservation. It is committed before the provider is called, so a send can
+ * never happen without having been counted.
+ */
+async function reserveOtpSend(phone: string, ipDigest: string, codeDigest: string) {
+  return sqlClient.begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(hashtext(${`kafgir-otp-send:${phone}`}))`
+    await tx`SELECT pg_advisory_xact_lock(hashtext(${`kafgir-otp-send-ip:${ipDigest}`}))`
+
+    const rows = await tx<OtpSendQuota[]>`
+      WITH scoped AS (
+        SELECT created_at, normalized_phone_number, request_ip_digest
+        FROM customer_otp_challenges
+        WHERE created_at > NOW() - INTERVAL '24 hours'
+      )
+      SELECT
+        GREATEST(0, CEIL(EXTRACT(EPOCH FROM (
+          COALESCE(MAX(created_at) FILTER (WHERE normalized_phone_number = ${phone}),
+                   NOW() - INTERVAL '1 year')
+          + ${`${otpSendLimits.perPhoneCooldownSeconds} seconds`}::interval - NOW()))))::int
+          AS "cooldownSeconds",
+
+        COUNT(*) FILTER (WHERE normalized_phone_number = ${phone}
+          AND created_at > NOW() - ${`${otpSendLimits.perPhoneShort.windowMinutes} minutes`}::interval)::int
+          AS "phoneShort",
+        GREATEST(1, CEIL(EXTRACT(EPOCH FROM (
+          COALESCE(MIN(created_at) FILTER (WHERE normalized_phone_number = ${phone}
+            AND created_at > NOW() - ${`${otpSendLimits.perPhoneShort.windowMinutes} minutes`}::interval), NOW())
+          + ${`${otpSendLimits.perPhoneShort.windowMinutes} minutes`}::interval - NOW()))))::int
+          AS "phoneShortReset",
+
+        COUNT(*) FILTER (WHERE normalized_phone_number = ${phone})::int AS "phoneDay",
+        GREATEST(1, CEIL(EXTRACT(EPOCH FROM (
+          COALESCE(MIN(created_at) FILTER (WHERE normalized_phone_number = ${phone}), NOW())
+          + ${`${otpSendLimits.perPhoneDay.windowHours} hours`}::interval - NOW()))))::int
+          AS "phoneDayReset",
+
+        COUNT(*) FILTER (WHERE request_ip_digest = ${ipDigest}
+          AND created_at > NOW() - ${`${otpSendLimits.perIpShort.windowMinutes} minutes`}::interval)::int
+          AS "ipShort",
+        GREATEST(1, CEIL(EXTRACT(EPOCH FROM (
+          COALESCE(MIN(created_at) FILTER (WHERE request_ip_digest = ${ipDigest}
+            AND created_at > NOW() - ${`${otpSendLimits.perIpShort.windowMinutes} minutes`}::interval), NOW())
+          + ${`${otpSendLimits.perIpShort.windowMinutes} minutes`}::interval - NOW()))))::int
+          AS "ipShortReset",
+
+        COUNT(*) FILTER (WHERE request_ip_digest = ${ipDigest}
+          AND created_at > NOW() - ${`${otpSendLimits.perIpHour.windowMinutes} minutes`}::interval)::int
+          AS "ipHour",
+        GREATEST(1, CEIL(EXTRACT(EPOCH FROM (
+          COALESCE(MIN(created_at) FILTER (WHERE request_ip_digest = ${ipDigest}
+            AND created_at > NOW() - ${`${otpSendLimits.perIpHour.windowMinutes} minutes`}::interval), NOW())
+          + ${`${otpSendLimits.perIpHour.windowMinutes} minutes`}::interval - NOW()))))::int
+          AS "ipHourReset"
+      FROM scoped
+    `
+    const quota = rows[0]!
+    // Ordered so the reason a caller is most likely to hit is reported first.
+    const exceeded =
+      quota.cooldownSeconds > 0
+        ? { retryAfterSeconds: quota.cooldownSeconds, policy: 'customer-otp-send-phone-cooldown' }
+      : quota.phoneShort >= otpSendLimits.perPhoneShort.limit
+        ? { retryAfterSeconds: quota.phoneShortReset, policy: 'customer-otp-send-phone-short' }
+      : quota.phoneDay >= otpSendLimits.perPhoneDay.limit
+        ? { retryAfterSeconds: quota.phoneDayReset, policy: 'customer-otp-send-phone-day' }
+      : quota.ipShort >= otpSendLimits.perIpShort.limit
+        ? { retryAfterSeconds: quota.ipShortReset, policy: 'customer-otp-send-ip-short' }
+      : quota.ipHour >= otpSendLimits.perIpHour.limit
+        ? { retryAfterSeconds: quota.ipHourReset, policy: 'customer-otp-send-ip-hour' }
+      : null
+    if (exceeded !== null) {
+      throw new RateLimitError(tooManyOtpRequests, exceeded.retryAfterSeconds, {
+        policy: exceeded.policy,
+        operation: 'customerOtpRequest',
+        storeDistributed: true,
+      })
+    }
+
+    await tx`
+      INSERT INTO customer_otp_challenges
+        (normalized_phone_number, code_digest, request_ip_digest, attempts, expires_at, created_at)
+      VALUES (${phone}, ${codeDigest}, ${ipDigest}, 0,
+              ${new Date(Date.now() + otpLifetimeMs).toISOString()}, NOW())
+    `
+  })
 }
 
 export async function requestCustomerOtp(rawPhone: string, ip: string) {
   const phone = normalizeIranianMobile(rawPhone)
   const ipDigest = digest('ip', ip)
-  const limits = await sqlClient<{ phoneMinute: number; phoneHour: number; ipHour: number }[]>`
-    SELECT
-      COUNT(*) FILTER (WHERE normalized_phone_number = ${phone} AND created_at > NOW() - INTERVAL '1 minute')::int AS "phoneMinute",
-      COUNT(*) FILTER (WHERE normalized_phone_number = ${phone} AND created_at > NOW() - INTERVAL '1 hour')::int AS "phoneHour",
-      COUNT(*) FILTER (WHERE request_ip_digest = ${ipDigest} AND created_at > NOW() - INTERVAL '1 hour')::int AS "ipHour"
-    FROM customer_otp_challenges
-    WHERE created_at > NOW() - INTERVAL '1 hour'
-  `
-  const limit = limits[0]!
-  if (limit.phoneMinute > 0 || limit.phoneHour >= 5 || limit.ipHour >= 20) {
-    throw new AppError('درخواست‌های زیادی ثبت شده است. کمی بعد دوباره تلاش کنید.', 429)
-  }
-
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0')
-  await sendCustomerOtp(phone, code)
-  await sqlClient`
-    INSERT INTO customer_otp_challenges
-      (normalized_phone_number, code_digest, request_ip_digest, attempts, expires_at, created_at)
-    VALUES (${phone}, ${digest(`otp:${phone}`, code)}, ${ipDigest}, 0,
-            ${new Date(Date.now() + otpLifetimeMs).toISOString()}, NOW())
-  `
+
+  // Reserve first. A refusal throws here, so a blocked request never reaches the provider.
+  await reserveOtpSend(phone, ipDigest, digest(`otp:${phone}`, code))
+
+  try {
+    await sendCustomerOtp(phone, code)
+  } catch (error) {
+    // The reservation stays. Rolling it back would let a failing provider be retried without limit,
+    // which is the more expensive failure. The distinct event keeps delivery failure separable from
+    // a successful send, so a future retry policy can be built without changing the stored model.
+    logger.warn({
+      event: 'customer.otp.delivery_failed',
+      phoneSuffix: phone.slice(-4),
+      ...errorFields(error),
+    }, 'ارسال کد ورود مشتری ناموفق بود ولی سهمیه مصرف شد')
+    throw error
+  }
   logger.info({ event: 'customer.otp.requested', phoneSuffix: phone.slice(-4) }, 'کد ورود مشتری درخواست شد')
 }
 
@@ -204,8 +307,53 @@ async function resolveVerifiedPhoneUser(tx: TransactionSql, phone: string, prefe
   return canonicalUserId
 }
 
-export async function verifyCustomerOtp(rawPhone: string, code: string, preferredUserId?: number | null) {
+/**
+ * Throttles verification attempts.
+ *
+ * The per-challenge counter below only limits guesses against a challenge that exists, so on its own
+ * it does nothing to stop one host spreading guesses thinly across many phone numbers. These two
+ * dimensions close that gap. They use the process store rather than the database because a verify
+ * attempt has no durable row to count, and giving one to every guess would be a write per request.
+ *
+ * The IP is consumed before the phone number is normalized, so malformed input still costs budget.
+ */
+async function guardOtpVerifyRate(rawPhone: string, ip: string) {
+  const store = rateLimitStore()
+
+  const byIp = await store.consume(
+    rateLimitKey(rateLimitPolicies.otpVerifyPerIp.name, ip),
+    rateLimitPolicies.otpVerifyPerIp,
+  )
+  if (!byIp.allowed) {
+    throw new RateLimitError(rateLimitPolicies.otpVerifyPerIp.message!, byIp.retryAfterSeconds, {
+      policy: rateLimitPolicies.otpVerifyPerIp.name,
+      operation: 'customerOtpVerify',
+      storeDistributed: store.isDistributed,
+    })
+  }
+
   const phone = normalizeIranianMobile(rawPhone)
+  const byPhone = await store.consume(
+    rateLimitKey(rateLimitPolicies.otpVerifyPerPhone.name, phone),
+    rateLimitPolicies.otpVerifyPerPhone,
+  )
+  if (!byPhone.allowed) {
+    throw new RateLimitError(rateLimitPolicies.otpVerifyPerPhone.message!, byPhone.retryAfterSeconds, {
+      policy: rateLimitPolicies.otpVerifyPerPhone.name,
+      operation: 'customerOtpVerify',
+      storeDistributed: store.isDistributed,
+    })
+  }
+  return phone
+}
+
+export async function verifyCustomerOtp(
+  rawPhone: string,
+  code: string,
+  preferredUserId?: number | null,
+  ip = 'unknown',
+) {
+  const phone = await guardOtpVerifyRate(rawPhone, ip)
   if (preferredUserId) {
     const existingPhone = await confirmedPhoneForUser(preferredUserId)
     if (existingPhone && existingPhone !== phone) {
@@ -213,8 +361,15 @@ export async function verifyCustomerOtp(rawPhone: string, code: string, preferre
     }
   }
   const result = await sqlClient.begin(async (tx) => {
-    const challenges = await tx<{ id: number; codeDigest: string; attempts: number; expiresAt: Date | string }[]>`
-      SELECT id, code_digest AS "codeDigest", attempts, expires_at AS "expiresAt"
+    const challenges = await tx<{
+      id: number
+      codeDigest: string
+      attempts: number
+      expiresAt: Date | string
+      createdAt: Date | string
+    }[]>`
+      SELECT id, code_digest AS "codeDigest", attempts, expires_at AS "expiresAt",
+             created_at AS "createdAt"
       FROM customer_otp_challenges
       WHERE normalized_phone_number = ${phone} AND consumed_at IS NULL
       ORDER BY created_at DESC
@@ -225,17 +380,42 @@ export async function verifyCustomerOtp(rawPhone: string, code: string, preferre
     if (!challenge || new Date(challenge.expiresAt).getTime() <= Date.now()) {
       return { error: 'expired' as const }
     }
-    if (challenge.attempts >= maxAttempts) return { error: 'attempts' as const }
     const valid = equalDigest(challenge.codeDigest, digest(`otp:${phone}`, code))
     if (!valid) {
-      await tx`UPDATE customer_otp_challenges SET attempts = attempts + 1 WHERE id = ${challenge.id}`
+      const attempts = challenge.attempts + 1
+      if (attempts >= maxAttempts) {
+        // Burn the challenge rather than leaving it sitting at the cap. Consuming it makes the code
+        // permanently unusable even if it was guessed on this very attempt, and forces a fresh send
+        // — which is itself governed by the per-phone cooldown and quotas.
+        await tx`
+          UPDATE customer_otp_challenges
+          SET attempts = ${attempts}, consumed_at = NOW()
+          WHERE id = ${challenge.id}
+        `
+        const retryAfterSeconds = Math.max(1, Math.ceil(
+          (new Date(challenge.createdAt).getTime() +
+            otpSendLimits.perPhoneCooldownSeconds * 1_000 - Date.now()) / 1_000,
+        ))
+        return { error: 'locked' as const, retryAfterSeconds }
+      }
+      await tx`UPDATE customer_otp_challenges SET attempts = ${attempts} WHERE id = ${challenge.id}`
       return { error: 'invalid' as const }
     }
     await tx`UPDATE customer_otp_challenges SET consumed_at = NOW() WHERE id = ${challenge.id}`
     return { userId: await resolveVerifiedPhoneUser(tx, phone, preferredUserId) }
   })
   if ('error' in result) {
-    if (result.error === 'attempts') throw new AppError('تعداد تلاش مجاز تمام شده است.', 429)
+    if (result.error === 'locked') {
+      throw new RateLimitError(
+        'تعداد تلاش مجاز تمام شد. لطفاً کد تازه‌ای درخواست کنید.',
+        result.retryAfterSeconds,
+        {
+          policy: 'customer-otp-verify-challenge',
+          operation: 'customerOtpVerify',
+          storeDistributed: true,
+        },
+      )
+    }
     if (result.error === 'expired') throw new UnauthorizedError('کد تایید منقضی شده است.')
     throw new UnauthorizedError('کد تایید نادرست است.')
   }

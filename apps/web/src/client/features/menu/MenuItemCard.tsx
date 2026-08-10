@@ -4,6 +4,7 @@ import { formatMoney, formatNumber } from '../../utils/format'
 import { FoodImage } from '../../design-system/FoodImage'
 import { Icon } from '../../design-system/Icon'
 import { PriceDisplay } from '../../design-system/PriceDisplay'
+import { RiceUpgradeDialog } from '../../design-system/RiceUpgradeDialog'
 
 type Props = {
   item: DailyMenuItemDto
@@ -17,7 +18,10 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
   // The checkbox chooses what the next add puts in the basket. The dish can sit in the basket both
   // ways at once, so the stepper follows the selected variant and the other one is named explicitly
   // — otherwise toggling the box looks like the basket just lost a portion.
+  // Turning the upgrade on changes what every later add costs, so it is confirmed in a dialog that
+  // spells the difference out. Turning it off is harmless and applies straight away.
   const [withPersianRice, setWithPersianRice] = useState(false)
+  const [confirmingRice, setConfirmingRice] = useState(false)
   const lines = cartItems.filter((cartItem) => cartItem.dailyMenuItemId === item.id)
   const upgradedInCart = lines.some((cartItem) => cartItem.withPersianRice)
   const riceAvailable = Boolean(persianRice?.isAvailable && persianRice.remainingPortions > 0)
@@ -49,15 +53,24 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
 
       <div className="menu-card-meta" aria-label="اطلاعات غذا">
         <span><Icon name="freshIngredients" size="xs" /> پخت تازه امروز</span>
-        <span><Icon name="packaging" size="xs" /> {formatNumber(item.remainingPortions)} پرس موجود</span>
       </div>
       {offersRice && <label className="rice-upgrade-option">
         <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
-          onChange={(event) => setWithPersianRice(event.target.checked)} />
+          onChange={(event) => event.target.checked ? setConfirmingRice(true) : setWithPersianRice(false)} />
         <span>{riceAvailable || upgradedInCart
           ? `با برنج ایرانی (+${formatMoney(persianRice.price)})`
           : 'برنج ایرانی امروز تمام شده است'}</span>
       </label>}
+      {/* Both answers add the dish right away — the dialog is the add action, not just a toggle — so
+          the customer never has to check a box and then hunt for a separate add button. */}
+      {confirmingRice && persianRice && <RiceUpgradeDialog
+        foodName={item.foodName}
+        basePrice={item.price}
+        ricePrice={persianRice.price}
+        riceTitle={persianRice.title}
+        onConfirm={() => { setWithPersianRice(true); onAdd(item, true); setConfirmingRice(false) }}
+        onCancel={() => { setWithPersianRice(false); onAdd(item, false); setConfirmingRice(false) }}
+      />}
       {otherLine && <small className="cart-variant-hint">
         {formatNumber(otherLine.quantity)} پرس {otherLine.withPersianRice ? 'با برنج ایرانی' : 'بدون برنج ایرانی'} هم در سبد شماست
       </small>}

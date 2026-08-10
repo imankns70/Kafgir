@@ -6,6 +6,7 @@ import { readJson, routeError } from '@/server/http'
 import { loginTelegramCustomer } from '@/server/services/customer-auth-service'
 import { getCustomerProfileByUserId } from '@/server/services/customer-service'
 import { validateTelegramInitData } from '@/server/telegram/validation'
+import { safelyAssociateAnalyticsSession } from '@/server/analytics-request'
 
 export async function POST(request: Request) {
   try {
@@ -21,6 +22,7 @@ export async function POST(request: Request) {
       profile: await getCustomerProfileByUserId(userId),
     })
     setCustomerCookie(response, session.token, session.expiresAt)
+    await safelyAssociateAnalyticsSession(request, userId, response)
     return response
   } catch (error) {
     return routeError(error)

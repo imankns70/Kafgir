@@ -1,13 +1,11 @@
 import type {
   CustomerAddressDto,
   CustomerAddressWriteRequest,
-  CustomerOrdersPageDto,
   CustomerProfileDto,
 } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
-import { AppError, NotFoundError } from '../errors'
+import { NotFoundError } from '../errors'
 import { logger } from '../logging/logger'
-import { getOrder } from './order-service'
 
 type ProfileRecord = {
   id: number
@@ -139,44 +137,4 @@ export async function deleteCustomerAddress(userId: number, id: number) {
   `
   if (!hasDefault[0]?.value && next[0]) await ensureSingleDefault(profileId, next[0].id)
   logger.info({ event: 'customer.address.deleted', userId, addressId: id }, 'آدرس مشتری حذف شد')
-}
-
-export async function listCustomerOrders(userId: number, page: number, pageSize = 10): Promise<CustomerOrdersPageDto> {
-  const profileId = await customerProfileId(userId)
-  const safePage = Math.max(1, page)
-  const safePageSize = Math.min(25, Math.max(1, pageSize))
-  const counts = await sqlClient<{ count: number }[]>`
-    SELECT COUNT(*)::int AS count FROM orders WHERE customer_profile_id = ${profileId}
-  `
-  const totalItems = counts[0]?.count ?? 0
-  const items = await sqlClient<CustomerOrdersPageDto['items']>`
-    SELECT o.id, o.order_number AS "orderNumber", o.delivery_full_name AS "customerFullName",
-           o.delivery_phone_number AS "customerPhoneNumber", o.status,
-           o.total_amount::float8 AS "totalAmount", o.payment_method AS "paymentMethod",
-           o.delivery_method AS "deliveryMethod", o.created_at::text AS "createdAt",
-           COALESCE(SUM(oi.quantity), 0)::int AS "totalQuantity",
-           COALESCE(string_agg(oi.food_name || ' × ' || oi.quantity, '، ' ORDER BY oi.id), '') AS "foodSummary"
-    FROM orders o
-    LEFT JOIN order_items oi ON oi.order_id = o.id
-    WHERE o.customer_profile_id = ${profileId}
-    GROUP BY o.id
-    ORDER BY o.created_at DESC
-    LIMIT ${safePageSize} OFFSET ${(safePage - 1) * safePageSize}
-  `
-  return {
-    items,
-    page: safePage,
-    pageSize: safePageSize,
-    totalItems,
-    totalPages: Math.ceil(totalItems / safePageSize),
-  }
-}
-
-export async function getCustomerOrder(userId: number, orderId: number) {
-  const profileId = await customerProfileId(userId)
-  const allowed = await sqlClient<{ value: boolean }[]>`
-    SELECT EXISTS(SELECT 1 FROM orders WHERE id = ${orderId} AND customer_profile_id = ${profileId}) AS value
-  `
-  if (!allowed[0]?.value) throw new NotFoundError('سفارش پیدا نشد.')
-  return getOrder(orderId)
 }

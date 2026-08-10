@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { BrandedState } from '../../design-system/BrandedState'
 import { Icon } from '../../design-system/Icon'
-import { StatusBadge } from '../../design-system/StatusBadge'
 import {
   createCustomerAddress,
   deleteCustomerAddress,
@@ -11,21 +10,23 @@ import {
   loginCustomerWithTelegram,
   logoutCustomer,
   requestCustomerOtp,
+  saveCustomerOrderReview,
   updateCustomerAddress,
   updateCustomerProfile,
   verifyCustomerOtp,
 } from '../../services/customerApi'
 import { getTelegramInitData } from '../../services/telegram'
-import {
-  DeliveryMethod,
-  type CustomerAddressDto,
-  type CustomerAddressWriteRequest,
-  type CustomerOrdersPageDto,
-  type CustomerProfileDto,
-  type OrderDto,
+import type {
+  CustomerAddressDto,
+  CustomerAddressWriteRequest,
+  CustomerOrderDetailDto,
+  CustomerOrderSummaryDto,
+  CustomerOrdersPageDto,
+  CustomerProfileDto,
+  OrderReviewDto,
 } from '../../types'
-import { formatMoney, formatNumber, formatPersianDateTime } from '../../utils/format'
-import { OrderInvoice } from '../orders/OrderInvoice'
+import { formatNumber } from '../../utils/format'
+import { CustomerOrderDetails, CustomerOrdersList, OrderReviewDialog } from './CustomerOrders'
 
 type LoginStep = 'phone' | 'code'
 const emptyAddress: CustomerAddressWriteRequest = {
@@ -45,7 +46,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
 }) {
   const [profile, setProfile] = useState<CustomerProfileDto | null>(null)
   const [orders, setOrders] = useState<CustomerOrdersPageDto | null>(null)
-  const [selectedOrder, setSelectedOrder] = useState<OrderDto | null>(null)
+  const [selectedOrder, setSelectedOrder] = useState<CustomerOrderDetailDto | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [phone, setPhone] = useState('')
@@ -56,6 +57,9 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   const [editingName, setEditingName] = useState('')
   const [address, setAddress] = useState<CustomerAddressWriteRequest>(emptyAddress)
   const [editingAddressId, setEditingAddressId] = useState<number | null>(null)
+  const [reviewTarget, setReviewTarget] = useState<{ id: number; orderNumber: string; review: OrderReviewDto | null } | null>(null)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [isReviewSubmitting, setIsReviewSubmitting] = useState(false)
 
   const loadAccount = async () => {
     setIsLoading(true)
@@ -171,6 +175,30 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
     finally { setIsLoading(false) }
   }
 
+  const openReview = (order: CustomerOrderSummaryDto | CustomerOrderDetailDto) => {
+    setReviewError(null)
+    setReviewTarget({ id: order.id, orderNumber: order.orderNumber, review: order.review })
+  }
+
+  const submitReview = async (rating: number, comment: string) => {
+    if (!reviewTarget) return
+    setIsReviewSubmitting(true)
+    setReviewError(null)
+    try {
+      const review = await saveCustomerOrderReview(reviewTarget.id, { rating, comment: comment.trim() || null })
+      setOrders((current) => current ? {
+        ...current,
+        items: current.items.map((item) => item.id === reviewTarget.id ? { ...item, review } : item),
+      } : current)
+      setSelectedOrder((current) => current?.id === reviewTarget.id ? { ...current, review } : current)
+      setReviewTarget(null)
+    } catch (submitError) {
+      setReviewError(submitError instanceof Error ? submitError.message : 'ثبت امتیاز و نظر ممکن نشد.')
+    } finally {
+      setIsReviewSubmitting(false)
+    }
+  }
+
   const logout = async () => {
     await logoutCustomer()
     setProfile(null)
@@ -210,40 +238,10 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
     </main>
   )
 
-  if (selectedOrder) return (
-    <main className="customer-order-detail">
-      <div className="page-actions">
-        <div><p className="eyebrow">شماره سفارش {formatNumber(selectedOrder.orderNumber)}</p><h1 className="section-title">جزئیات سفارش</h1></div>
-        <button className="checkout-back-link" onClick={() => setSelectedOrder(null)}>سفارش‌ها <Icon name="back" size="sm" /></button>
-      </div>
-      <section className="panel order-detail-summary">
-        <div><span>وضعیت</span><StatusBadge status={selectedOrder.status} /></div>
-        <div><span>زمان ثبت</span><strong>{formatPersianDateTime(selectedOrder.createdAt)}</strong></div>
-        <div><span>روش دریافت</span><strong>{selectedOrder.deliveryMethod === DeliveryMethod.Delivery ? 'ارسال' : 'تحویل حضوری'}</strong></div>
-        <div><span>مبلغ کل</span><strong className="price">{formatMoney(selectedOrder.totalAmount)}</strong></div>
-      </section>
-      <section className="panel">
-        <h2 className="section-title">اقلام سفارش</h2>
-        {selectedOrder.items.map((item) => <div className="customer-order-line" key={item.id}>
-          <strong>{item.foodName}</strong><span>{formatNumber(item.quantity)} پرس</span><span>{formatMoney(item.totalPrice)}</span>
-        </div>)}
-      </section>
-      <section className="panel">
-        <h2 className="section-title">تحویل سفارش</h2>
-        <p>{selectedOrder.customerFullName}، <bdi>{selectedOrder.customerPhoneNumber}</bdi></p>
-        {selectedOrder.addressLine && <p>{selectedOrder.addressLine}</p>}
-      </section>
-      <OrderInvoice order={selectedOrder} />
-      <section className="panel">
-        <h2 className="section-title">تاریخچه وضعیت</h2>
-        <ol className="order-timeline">
-          {selectedOrder.statusHistories.map((item, index) => <li key={`${item.changedAt}-${index}`}>
-            <StatusBadge status={item.toStatus} /><time>{formatPersianDateTime(item.changedAt)}</time>{item.note && <small>{item.note}</small>}
-          </li>)}
-        </ol>
-      </section>
-    </main>
-  )
+  if (selectedOrder) return <>
+    <CustomerOrderDetails order={selectedOrder} onBack={() => setSelectedOrder(null)} onReview={() => openReview(selectedOrder)} />
+    {reviewTarget && <OrderReviewDialog key={reviewTarget.id} orderNumber={reviewTarget.orderNumber} review={reviewTarget.review} busy={isReviewSubmitting} error={reviewError} onClose={() => setReviewTarget(null)} onSave={(rating, comment) => void submitReview(rating, comment)} />}
+  </>
 
   return (
     <main className="customer-profile-page">
@@ -301,23 +299,12 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
           <button className="outline-button danger-outline profile-logout" onClick={() => void logout()}><Icon name="logout" size="sm" /> خروج از حساب</button>
         </div>
 
-        <section className="panel customer-orders-panel">
-          <h2 className="section-title">سفارش‌های من</h2>
-          {!orders?.items.length && <p className="muted">هنوز سفارشی برای این حساب ثبت نشده است.</p>}
-          <div className="customer-order-list">
-            {orders?.items.map((item) => <button className="customer-order-card" key={item.id} onClick={() => void openOrder(item.id)}>
-              <div><strong>سفارش {formatNumber(item.orderNumber)}</strong><StatusBadge status={item.status} /></div>
-              <p>{item.foodSummary}</p>
-              <div><span>{formatPersianDateTime(item.createdAt)}</span><strong>{formatMoney(item.totalAmount)}</strong></div>
-            </button>)}
-          </div>
-          {orders && orders.totalPages > 1 && <div className="pagination-actions">
-            <button className="outline-button" disabled={orders.page <= 1} onClick={async () => setOrders(await getCustomerOrders(orders.page - 1))}>قبلی</button>
-            <span>صفحه {formatNumber(orders.page)} از {formatNumber(orders.totalPages)}</span>
-            <button className="outline-button" disabled={orders.page >= orders.totalPages} onClick={async () => setOrders(await getCustomerOrders(orders.page + 1))}>بعدی</button>
-          </div>}
+        <section className="panel customer-orders-panel" aria-labelledby="my-orders-title">
+          <div className="orders-section-heading"><div><p className="eyebrow"><Icon name="orders" size="sm" /> سابقه خرید</p><h2 id="my-orders-title" className="section-title">سفارش‌های من</h2></div>{orders && <span>{formatNumber(orders.totalItems)} سفارش</span>}</div>
+          <CustomerOrdersList orders={orders} error={error} onRetry={() => void loadAccount()} onOpen={(id) => void openOrder(id)} onReview={openReview} onBrowse={onBack} onPage={(page) => void getCustomerOrders(page).then(setOrders).catch((loadError) => setError(loadError instanceof Error ? loadError.message : 'دریافت سفارش‌ها ممکن نشد.'))} />
         </section>
       </div>
+      {reviewTarget && <OrderReviewDialog key={reviewTarget.id} orderNumber={reviewTarget.orderNumber} review={reviewTarget.review} busy={isReviewSubmitting} error={reviewError} onClose={() => setReviewTarget(null)} onSave={(rating, comment) => void submitReview(rating, comment)} />}
     </main>
   )
 }

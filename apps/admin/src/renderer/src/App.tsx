@@ -4,6 +4,7 @@ import {
   OrderStatus,
   PaymentMethod,
   type AdminDashboardSummaryDto,
+  type CustomerAnalyticsTodayDto,
   type CreateOrderRequest,
   type DailyMenuDto,
   type FoodCategoryDto,
@@ -21,7 +22,17 @@ import { adminApi } from './api'
 import { PersianDatePicker } from './PersianDatePicker'
 import { formatMoney as money, formatNumber, persianDateWithLatinDigitsLocale } from './number-format'
 import { FinancePage, IngredientsPage, InventoryPage, PaymentsPage, PurchasesPage, RecipesPage, ShoppingPage, SuppliersPage, V15ReportsPage } from './V15Pages'
+import { DeliveryDaysPage, DeliverySlotsPage } from './DeliveryPages'
 import { LogsPage } from './LogsPage'
+import {
+  SocialChannelsPage,
+  SocialComposerPage,
+  SocialDashboardPage,
+  SocialHistoryPage,
+  SocialRulesPage,
+  SocialSuggestionsPage,
+  SocialTemplatesPage,
+} from './SocialPages'
 import {
   navigationGroupForPage,
   navigationGroups,
@@ -118,6 +129,19 @@ const deliveryMethodLabel: Record<DeliveryMethod, string> = {
   [DeliveryMethod.Delivery]: 'ارسال',
 }
 
+/** Delivery window from the order's own snapshot; master-data edits never rewrite an old order. */
+const deliveryWindowLabel = (order: {
+  deliveryDate?: string | null
+  deliveryStartTime?: string | null
+  deliveryEndTime?: string | null
+}) => order.deliveryDate && order.deliveryStartTime && order.deliveryEndTime
+  // The stored value is an ISO business date; operators read Jalali everywhere else in Admin.
+  ? `${new Intl.DateTimeFormat(persianDateWithLatinDigitsLocale, {
+      timeZone: 'Asia/Tehran', weekday: 'long', day: 'numeric', month: 'long',
+    }).format(new Date(`${order.deliveryDate}T12:00:00+03:30`))} — ${order.deliveryStartTime} تا ${order.deliveryEndTime}`
+  : 'زمان تحویل ثبت نشده'
+
+
 type ToastMessage = {
   id: number
   kind: 'success' | 'error'
@@ -182,6 +206,7 @@ function AdminOrderInvoice({ order }: { order: OrderDto }) {
       <div><span>نام مشتری</span><strong>{order.customerFullName}</strong></div>
       <div><span>شماره تماس</span><strong dir="ltr">{order.customerPhoneNumber}</strong></div>
       <div><span>روش دریافت</span><strong>{deliveryMethodLabel[order.deliveryMethod]}</strong></div>
+      <div><span>زمان تحویل</span><strong>{deliveryWindowLabel(order)}</strong></div>
       <div><span>روش پرداخت</span><strong>{paymentMethodLabel[order.paymentMethod]}</strong></div>
       {order.addressLine && <div className="admin-invoice-address"><span>آدرس</span><strong>{order.addressLine}</strong></div>}
     </section>
@@ -377,6 +402,10 @@ function PageFrame({ title, actions, children }: { title: string; actions?: Reac
 function DashboardPage() {
   const [data, setData] = useState<AdminDashboardSummaryDto | null>(null)
   const [operations, setOperations] = useState<Awaited<ReturnType<typeof adminApi.v15Dashboard>> | null>(null)
+  const [analytics, setAnalytics] = useState<CustomerAnalyticsTodayDto | null>(null)
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null)
+  const [analyticsLoaded, setAnalyticsLoaded] = useState(false)
+  const analyticsLoading = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(async () => {
     setError(null)
@@ -385,7 +414,30 @@ function DashboardPage() {
       setData(summary); setOperations(operational)
     } catch (reason) { setError(String(reason)) }
   }, [])
+  const loadAnalytics = useCallback(async () => {
+    if (analyticsLoading.current || document.visibilityState !== 'visible') return
+    analyticsLoading.current = true
+    try {
+      setAnalytics(await adminApi.customerAnalytics())
+      setAnalyticsError(null)
+    } catch {
+      setAnalyticsError('به‌روزرسانی آمار کاربران انجام نشد؛ آخرین مقادیر معتبر نمایش داده می‌شوند.')
+    } finally {
+      analyticsLoading.current = false
+      setAnalyticsLoaded(true)
+    }
+  }, [])
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    void loadAnalytics()
+    const timer = window.setInterval(() => void loadAnalytics(), 30_000)
+    const onVisibility = () => { if (document.visibilityState === 'visible') void loadAnalytics() }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [loadAnalytics])
   const cards = data ? [
     ['کل سفارش‌ها', plainNumber(data.totalOrders)],
     ['در انتظار تایید', plainNumber(data.pendingOrders)],
@@ -396,11 +448,21 @@ function DashboardPage() {
     ['فروش تایید شده', money(data.confirmedSales)],
     ['فروش تحویل داده شده', money(data.deliveredSales)],
   ] : []
+  const analyticsCards: Array<[string, string, string, string]> = analytics ? [
+    ['unique-visitors', 'بازدیدکنندگان یکتای امروز', groupedNumber(analytics.uniqueVisitorsToday), 'تعداد بازدیدکنندگان یکتایی که از ابتدای امروز تا اکنون حداقل یک فعالیت در کفگیر داشته‌اند. برای شمارش بازدیدکننده، ورود به حساب کاربری الزامی نیست.'],
+    ['online-now', 'آنلاین الان', groupedNumber(analytics.onlineNow), 'تعداد بازدیدکنندگانی که در ۵ دقیقه اخیر در کفگیر فعال بوده‌اند. این عدد تقریبی است و بر اساس آخرین زمان فعالیت کاربر محاسبه می‌شود.'],
+    ['guest-visitors', 'مهمان‌های امروز', groupedNumber(analytics.guestVisitorsToday), 'تعداد بازدیدکنندگان یکتای امروز که در طول فعالیت امروز خود به حساب کاربری وارد نشده‌اند.'],
+    ['authenticated-users', 'کاربران واردشده امروز', groupedNumber(analytics.authenticatedUsersToday), 'تعداد کاربران یکتایی که امروز با حساب کاربری خود حداقل یک فعالیت در کفگیر داشته‌اند.'],
+    ['new-users', 'کاربران جدید', groupedNumber(analytics.newUsersToday), 'تعداد کاربران واردشده امروز که حساب کاربری آن‌ها نیز امروز ایجاد شده است.'],
+    ['returning-users', 'کاربران بازگشتی', groupedNumber(analytics.returningUsersToday), 'تعداد کاربران واردشده امروز که حساب کاربری آن‌ها قبل از امروز ایجاد شده است.'],
+    ['sessions', 'نشست‌های امروز', groupedNumber(analytics.sessionsToday), 'تعداد نشست‌های کاربری که امروز شروع شده‌اند. اگر کاربر بیش از ۳۰ دقیقه فعالیت نداشته باشد، فعالیت بعدی یک نشست جدید محسوب می‌شود.'],
+    ['conversion', 'نرخ تبدیل به سفارش', `${formatNumber(analytics.conversionRate, 1)}٪`, 'درصد بازدیدکنندگان یکتای امروز که حداقل یک سفارش ثبت کرده‌اند. تعداد سفارش‌ها ملاک نیست؛ تعداد بازدیدکنندگان سفارش‌دهنده محاسبه می‌شود.'],
+  ] : []
   return <PageFrame
     title="داشبورد امروز"
     actions={<>
       {data && <div className="panel menu-state menu-state-inline"><strong>سفارش‌گیری امروز</strong><StatusPill active={data.isTodayMenuOpen} /></div>}
-      <button onClick={() => void load()}>تازه‌سازی</button>
+      <button onClick={() => { void load(); void loadAnalytics() }}>تازه‌سازی</button>
     </>}
   >
     <Message error={error} />
@@ -416,7 +478,27 @@ function DashboardPage() {
         ['ضایعات امروز', money(operations.todayWasteCost)],
       ].map(([label, value]) => <article className="metric" key={label}><span>{label}</span><strong>{value}</strong></article>)}
     </div></>}
+    <section className="customer-analytics-section" aria-labelledby="customer-analytics-title">
+      <div className="customer-analytics-heading">
+        <div><h2 id="customer-analytics-title">آمار کاربران امروز</h2><p>فعالیت مشتریان و مهمان‌های وب و مینی‌اپ</p></div>
+        {analyticsError && <span role="status">{analyticsError}</span>}
+      </div>
+      {analytics ? <div className="metric-grid analytics-metric-grid">{analyticsCards.map(([id, label, value, help]) => <article className={`metric analytics-metric ${id === 'online-now' ? 'online-metric' : ''}`} key={id}>
+        <div className="analytics-metric-title"><span>{label}</span><MetricHelp id={id} text={help} /></div>
+        <strong>{value}</strong>
+      </article>)}</div> : analyticsLoaded
+        ? <div className="message error" role="status">آمار کاربران فعلاً در دسترس نیست.</div>
+        : <div className="analytics-skeleton" aria-label="در حال دریافت آمار کاربران">{Array.from({ length: 8 }, (_, index) => <span key={index} />)}</div>}
+    </section>
   </PageFrame>
+}
+
+function MetricHelp({ id, text }: { id: string; text: string }) {
+  const tooltipId = `analytics-tooltip-${id}`
+  return <span className="metric-help">
+    <button type="button" aria-label="روش محاسبه" aria-describedby={tooltipId}>؟</button>
+    <span id={tooltipId} className="metric-help-tooltip" role="tooltip">{text}</span>
+  </span>
 }
 
 function StatusPill({ active }: { active: boolean }) {
@@ -509,6 +591,7 @@ function OrderDetails({ order }: { order: OrderDto }) {
         <dl>
           <div><dt>زمان ثبت</dt><dd>{dateTime(order.createdAt)}</dd></div>
           <div><dt>روش دریافت</dt><dd>{deliveryMethodLabel[order.deliveryMethod]}</dd></div>
+          <div><dt>زمان تحویل</dt><dd>{deliveryWindowLabel(order)}</dd></div>
           <div><dt>روش فروش</dt><dd>{paymentMethodLabel[order.paymentMethod]}</dd></div>
           <div><dt>جمع اقلام</dt><dd>{money(order.subtotalAmount)}</dd></div>
           <div><dt>هزینه ارسال</dt><dd>{money(order.deliveryFee)}</dd></div>
@@ -1472,7 +1555,7 @@ function ReportOrderTable({ orders, onOpen, rowOffset }: {
 }) {
   return <table className="report-table"><thead><tr>
     <th>#</th><th>شماره سفارش</th><th>نام مشتری</th><th>شماره تماس</th><th>وضعیت</th>
-    <th>نوع دریافت</th><th>نوع فروش</th><th>غذاها</th><th>تعداد</th><th>مبلغ</th><th>زمان و تاریخ</th><th>جزئیات</th>
+    <th>نوع دریافت</th><th>زمان تحویل</th><th>نوع فروش</th><th>غذاها</th><th>تعداد</th><th>مبلغ</th><th>زمان و تاریخ</th><th>جزئیات</th>
   </tr></thead><tbody>{orders.map((order, index) => <tr key={order.id} onDoubleClick={() => onOpen(order.id)}>
     <td>{plainNumber(rowOffset + index + 1)}</td>
     <td dir="ltr">{order.orderNumber}</td>
@@ -1530,6 +1613,8 @@ export function App() {
   }
   const pages: Record<Page, ReactNode> = {
     dashboard: <DashboardPage />,
+    'delivery-slots': <DeliverySlotsPage />,
+    'delivery-days': <DeliveryDaysPage />,
     orders: <OrdersPage />,
     manual: <ManualOrderPage />,
     foods: <FoodsPage onCreate={() => openFoodEditor(null)} onEdit={openFoodEditor} onPhotos={openFoodPhotos} onTags={openFoodTags} />,
@@ -1550,6 +1635,13 @@ export function App() {
     payments: <PaymentsPage />,
     'v15-reports': <V15ReportsPage />,
     logs: <LogsPage />,
+    'social-dashboard': <SocialDashboardPage />,
+    'social-channels': <SocialChannelsPage />,
+    'social-publish': <SocialComposerPage />,
+    'social-templates': <SocialTemplatesPage />,
+    'social-rules': <SocialRulesPage />,
+    'social-suggestions': <SocialSuggestionsPage />,
+    'social-history': <SocialHistoryPage />,
   }
   return <div className={`admin-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
     <ToastViewport />

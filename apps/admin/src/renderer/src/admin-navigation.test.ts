@@ -14,6 +14,8 @@ describe('grouped admin navigation', () => {
       'orders', 'manual', 'menu', 'report', 'foods', 'categories', 'tags', 'recipes',
       'ingredients', 'inventory', 'purchases', 'suppliers', 'shopping',
       'finance', 'payments', 'v15-reports', 'logs',
+      'social-dashboard', 'social-channels', 'social-publish', 'social-templates',
+      'social-rules', 'social-suggestions', 'social-history',
     ]))
   })
 

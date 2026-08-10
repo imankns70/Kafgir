@@ -73,6 +73,13 @@ const seedExpenseCategories = [
   'آب، برق و گاز', 'اجاره', 'تعمیرات', 'تجهیزات', 'متفرقه',
 ] as const
 
+/** Starting delivery windows. Plain editable defaults, not a business commitment. */
+const seedDeliverySlots = [
+  ['ظهر', '12:00', '14:00'],
+  ['بعدازظهر', '14:00', '16:00'],
+  ['عصر', '16:00', '18:00'],
+] as const
+
 async function main() {
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) throw new Error('DATABASE_URL is required.')
@@ -94,6 +101,20 @@ async function main() {
   for (const name of seedExpenseCategories) {
     await sql`INSERT INTO expense_categories (name,is_active,created_at)
       VALUES (${name},true,${now}) ON CONFLICT (name) DO UPDATE SET is_active=true`
+  }
+  // Starting delivery windows, seeded only into an empty table. Existing rows are the operator's,
+  // so re-running the seed never resurrects a window they deleted or overwrites edited hours.
+  const existingSlots = await sql<{ value: boolean }[]>`
+    SELECT EXISTS(SELECT 1 FROM delivery_time_slots) AS value
+  `
+  if (!existingSlots[0]?.value) {
+    for (const [index, [title, startTime, endTime]] of seedDeliverySlots.entries()) {
+      await sql`
+        INSERT INTO delivery_time_slots
+          (title, start_time, end_time, sort_order, order_cutoff_minutes_before_start, is_active, created_at)
+        VALUES (${title}, ${startTime}::time, ${endTime}::time, ${index + 1}, 60, true, ${now})
+      `
+    }
   }
   for (const [index, [title, slug, icon]] of seedCategories.entries()) {
     await sql`

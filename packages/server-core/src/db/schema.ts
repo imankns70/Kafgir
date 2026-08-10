@@ -8,12 +8,14 @@ import {
   pgTable,
   serial,
   text,
+  time,
   timestamp,
   uniqueIndex,
   varchar,
   bigint,
   check,
   primaryKey,
+  uuid,
 } from 'drizzle-orm/pg-core'
 
 const utcTimestamp = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' })
@@ -156,6 +158,21 @@ export const customerOtpChallenges = pgTable('customer_otp_challenges', {
   index('customer_otp_phone_created_idx').on(table.normalizedPhoneNumber, table.createdAt),
   index('customer_otp_ip_created_idx').on(table.requestIpDigest, table.createdAt),
   check('customer_otp_attempts_check', sql`${table.attempts} >= 0 AND ${table.attempts} <= 5`),
+])
+
+export const analyticsSessions = pgTable('analytics_sessions', {
+  id: uuid('id').primaryKey(),
+  visitorId: uuid('visitor_id').notNull(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+  startedAt: utcTimestamp('started_at').notNull(),
+  lastSeenAt: utcTimestamp('last_seen_at').notNull(),
+  createdAt: utcTimestamp('created_at').notNull(),
+}, (table) => [
+  index('analytics_sessions_last_seen_idx').on(table.lastSeenAt),
+  index('analytics_sessions_started_idx').on(table.startedAt),
+  index('analytics_sessions_visitor_last_seen_idx').on(table.visitorId, table.lastSeenAt),
+  index('analytics_sessions_user_last_seen_idx').on(table.lastSeenAt, table.userId)
+    .where(sql`user_id IS NOT NULL`),
 ])
 
 export const customerAddresses = pgTable('customer_addresses', {
@@ -303,6 +320,46 @@ export const dailyMenuItems = pgTable('daily_menu_items', {
   check('daily_menu_items_discount_price_check', sql`${table.discountPrice} IS NULL OR (${table.discountPrice} > 0 AND ${table.discountPrice} < ${table.price})`),
 ])
 
+// Delivery windows are master data, edited rarely and reused every day. `start_time`/`end_time` are
+// real `time` values so ordering, cutoff arithmetic and kitchen sorting happen in PostgreSQL rather
+// than over display strings. The cutoff lives here because a noon window and an evening window close
+// at different lead times; `daily_menus.order_deadline` still gates the menu as a whole.
+export const deliveryTimeSlots = pgTable('delivery_time_slots', {
+  id: serial('id').primaryKey(),
+  title: varchar('title', { length: 100 }).notNull(),
+  startTime: time('start_time').notNull(),
+  endTime: time('end_time').notNull(),
+  sortOrder: integer('sort_order').notNull().default(0),
+  orderCutoffMinutesBeforeStart: integer('order_cutoff_minutes_before_start').notNull().default(60),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at'),
+}, (table) => [
+  check('delivery_time_slots_range_check', sql`${table.startTime} < ${table.endTime}`),
+  check('delivery_time_slots_cutoff_check', sql`${table.orderCutoffMinutesBeforeStart} >= 0`),
+  index('delivery_time_slots_active_sort_idx').on(table.isActive, table.sortOrder),
+])
+
+// A row here is an override for one date, not a requirement. Absent row means the slot behaves per
+// its master `is_active` with no slot-level capacity limit, so operators never have to populate a
+// calendar just to keep ordinary days working.
+export const deliveryTimeSlotAvailabilities = pgTable('delivery_time_slot_availabilities', {
+  id: serial('id').primaryKey(),
+  deliveryDate: date('delivery_date', { mode: 'string' }).notNull(),
+  deliveryTimeSlotId: integer('delivery_time_slot_id').notNull()
+    .references(() => deliveryTimeSlots.id, { onDelete: 'cascade' }),
+  isAvailable: boolean('is_available').notNull().default(true),
+  capacityOrders: integer('capacity_orders'),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at'),
+}, (table) => [
+  uniqueIndex('delivery_slot_availability_date_slot_uidx')
+    .on(table.deliveryDate, table.deliveryTimeSlotId),
+  index('delivery_slot_availability_date_idx').on(table.deliveryDate),
+  check('delivery_slot_availability_capacity_check',
+    sql`${table.capacityOrders} IS NULL OR ${table.capacityOrders} >= 0`),
+])
+
 export const orders = pgTable('orders', {
   id: serial('id').primaryKey(),
   orderNumber: varchar('order_number', { length: 50 }).notNull(),
@@ -320,14 +377,31 @@ export const orders = pgTable('orders', {
   totalAmount: money('total_amount').notNull(),
   customerNote: varchar('customer_note', { length: 1000 }),
   adminNote: varchar('admin_note', { length: 1000 }),
+  // Delivery-window snapshot. Nullable because orders placed before this feature have no window and
+  // must never be given a fabricated one. The title/start/end copies are what order details render,
+  // so editing a slot later cannot rewrite what a customer actually chose; the slot id is kept only
+  // for operational grouping and is deliberately `set null` on delete.
+  deliveryDate: date('delivery_date', { mode: 'string' }),
+  deliveryTimeSlotId: integer('delivery_time_slot_id')
+    .references(() => deliveryTimeSlots.id, { onDelete: 'set null' }),
+  deliveryTimeSlotTitle: varchar('delivery_time_slot_title', { length: 100 }),
+  deliveryStartTime: time('delivery_start_time'),
+  deliveryEndTime: time('delivery_end_time'),
   createdAt: utcTimestamp('created_at').notNull(),
   confirmedAt: utcTimestamp('confirmed_at'),
   deliveredAt: utcTimestamp('delivered_at'),
   cancelledAt: utcTimestamp('cancelled_at'),
+  analyticsVisitorId: uuid('analytics_visitor_id'),
+  analyticsSessionId: uuid('analytics_session_id')
+    .references(() => analyticsSessions.id, { onDelete: 'set null' }),
 }, (table) => [
   uniqueIndex('orders_order_number_uidx').on(table.orderNumber),
   index('orders_created_at_idx').on(table.createdAt),
   index('orders_status_created_at_idx').on(table.status, table.createdAt),
+  // Serves both slot-capacity counting during checkout and the kitchen's dispatch-order listing.
+  index('orders_delivery_date_slot_idx').on(table.deliveryDate, table.deliveryTimeSlotId),
+  index('orders_analytics_created_visitor_idx').on(table.createdAt, table.analyticsVisitorId)
+    .where(sql`analytics_visitor_id IS NOT NULL`),
   check('orders_status_check', sql`${table.status} BETWEEN 1 AND 6`),
   check('orders_payment_method_check', sql`${table.paymentMethod} BETWEEN 1 AND 4`),
   check('orders_delivery_method_check', sql`${table.deliveryMethod} BETWEEN 1 AND 2`),
@@ -358,6 +432,21 @@ export const orderStatusHistories = pgTable('order_status_histories', {
   changedAt: utcTimestamp('changed_at').notNull(),
 }, (table) => [
   index('order_status_histories_order_idx').on(table.orderId),
+])
+
+export const orderReviews = pgTable('order_reviews', {
+  id: serial('id').primaryKey(),
+  orderId: integer('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  customerProfileId: integer('customer_profile_id').notNull()
+    .references(() => customerProfiles.id, { onDelete: 'restrict' }),
+  rating: integer('rating').notNull(),
+  comment: varchar('comment', { length: 1000 }),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at'),
+}, (table) => [
+  uniqueIndex('order_reviews_order_uidx').on(table.orderId),
+  index('order_reviews_customer_created_idx').on(table.customerProfileId, table.createdAt),
+  check('order_reviews_rating_check', sql`${table.rating} BETWEEN 1 AND 5`),
 ])
 
 export const notificationMessages = pgTable('notification_messages', {
@@ -705,6 +794,184 @@ export const auditLogs = pgTable('audit_logs', {
   details: text('details'),
   createdAt: utcTimestamp('created_at').notNull(),
 }, (table) => [index('audit_logs_entity_idx').on(table.entityType, table.entityId, table.createdAt)])
+
+export const socialChannels = pgTable('social_channels', {
+  id: serial('id').primaryKey(),
+  platform: varchar('platform', { length: 30 }).notNull(),
+  title: varchar('title', { length: 150 }).notNull(),
+  externalChannelId: varchar('external_channel_id', { length: 200 }).notNull(),
+  username: varchar('username', { length: 150 }),
+  credentialCiphertext: text('credential_ciphertext'),
+  isActive: boolean('is_active').notNull().default(true),
+  connectionStatus: varchar('connection_status', { length: 20 }).notNull().default('Unknown'),
+  lastSuccessfulPublicationAt: utcTimestamp('last_successful_publication_at'),
+  lastPublicationError: text('last_publication_error'),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('social_channels_platform_external_uidx').on(table.platform, table.externalChannelId),
+  index('social_channels_active_platform_idx').on(table.isActive, table.platform),
+  check('social_channels_platform_check', sql`${table.platform} IN ('Telegram', 'Bale', 'Eitaa')`),
+  check('social_channels_connection_check', sql`${table.connectionStatus} IN ('Unknown', 'Connected', 'Failed')`),
+])
+
+export const socialPostTemplates = pgTable('social_post_templates', {
+  id: serial('id').primaryKey(),
+  templateType: varchar('template_type', { length: 40 }).notNull(),
+  title: varchar('title', { length: 150 }).notNull(),
+  pattern: text('pattern').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('social_post_templates_type_uidx').on(table.templateType),
+  check('social_post_templates_type_check', sql`${table.templateType} IN ('DailyMenu', 'FoodPromotion', 'Discount', 'LimitedAvailability', 'Custom')`),
+])
+
+export const socialPosts = pgTable('social_posts', {
+  id: serial('id').primaryKey(),
+  templateType: varchar('template_type', { length: 40 }).notNull(),
+  title: varchar('title', { length: 200 }),
+  sourceType: varchar('source_type', { length: 50 }),
+  sourceId: integer('source_id'),
+  defaultText: text('default_text').notNull(),
+  mediaUrl: varchar('media_url', { length: 2000 }),
+  destinationUrl: varchar('destination_url', { length: 2000 }),
+  status: varchar('status', { length: 30 }).notNull().default('Draft'),
+  origin: varchar('origin', { length: 20 }).notNull().default('Manual'),
+  createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+  publishedAt: utcTimestamp('published_at'),
+}, (table) => [
+  index('social_posts_created_idx').on(table.createdAt),
+  index('social_posts_source_idx').on(table.sourceType, table.sourceId, table.createdAt),
+  index('social_posts_status_idx').on(table.status, table.createdAt),
+  check('social_posts_template_check', sql`${table.templateType} IN ('DailyMenu', 'FoodPromotion', 'Discount', 'LimitedAvailability', 'Custom')`),
+  check('social_posts_status_check', sql`${table.status} IN ('Draft', 'Publishing', 'Published', 'PartiallyFailed', 'Failed')`),
+  check('social_posts_origin_check', sql`${table.origin} IN ('Manual', 'Suggestion', 'Automation')`),
+])
+
+export const socialPostTargets = pgTable('social_post_targets', {
+  id: serial('id').primaryKey(),
+  socialPostId: integer('social_post_id').notNull().references(() => socialPosts.id, { onDelete: 'cascade' }),
+  socialChannelId: integer('social_channel_id').notNull().references(() => socialChannels.id, { onDelete: 'restrict' }),
+  textOverride: text('text_override'),
+  mediaOverride: varchar('media_override', { length: 2000 }),
+  destinationUrlOverride: varchar('destination_url_override', { length: 2000 }),
+  status: varchar('status', { length: 20 }).notNull().default('Pending'),
+  idempotencyKey: varchar('idempotency_key', { length: 100 }).notNull(),
+  externalMessageId: varchar('external_message_id', { length: 200 }),
+  publishedAt: utcTimestamp('published_at'),
+  lastError: text('last_error'),
+  retryCount: integer('retry_count').notNull().default(0),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('social_post_targets_post_channel_uidx').on(table.socialPostId, table.socialChannelId),
+  uniqueIndex('social_post_targets_idempotency_uidx').on(table.idempotencyKey),
+  index('social_post_targets_status_idx').on(table.status, table.updatedAt),
+  check('social_post_targets_status_check', sql`${table.status} IN ('Pending', 'Publishing', 'Published', 'Failed', 'Unknown')`),
+  check('social_post_targets_retry_check', sql`${table.retryCount} >= 0 AND ${table.retryCount} <= 5`),
+])
+
+export const socialAutomationRules = pgTable('social_automation_rules', {
+  id: serial('id').primaryKey(),
+  title: varchar('title', { length: 150 }).notNull(),
+  templateType: varchar('template_type', { length: 40 }).notNull(),
+  triggerType: varchar('trigger_type', { length: 40 }).notNull(),
+  isEnabled: boolean('is_enabled').notNull().default(true),
+  executionMode: varchar('execution_mode', { length: 20 }).notNull().default('Suggestion'),
+  startTime: time('start_time'),
+  endTime: time('end_time'),
+  thresholdPercentage: integer('threshold_percentage'),
+  cooldownMinutes: integer('cooldown_minutes'),
+  maxExecutionsPerDay: integer('max_executions_per_day'),
+  maxExecutionsPerFoodPerDay: integer('max_executions_per_food_per_day'),
+  priority: integer('priority').notNull().default(100),
+  lastEvaluatedAt: utcTimestamp('last_evaluated_at'),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [
+  index('social_rules_enabled_priority_idx').on(table.isEnabled, table.priority),
+  check('social_rules_mode_check', sql`${table.executionMode} IN ('Manual', 'Suggestion', 'AutoPublish')`),
+  check('social_rules_trigger_check', sql`${table.triggerType} IN ('DailyMenu', 'FoodPromotion', 'Discount', 'LimitedAvailability')`),
+  check('social_rules_threshold_check', sql`${table.thresholdPercentage} IS NULL OR (${table.thresholdPercentage} BETWEEN 1 AND 99)`),
+  check('social_rules_limits_check', sql`(${table.cooldownMinutes} IS NULL OR ${table.cooldownMinutes} >= 0) AND (${table.maxExecutionsPerDay} IS NULL OR ${table.maxExecutionsPerDay} > 0) AND (${table.maxExecutionsPerFoodPerDay} IS NULL OR ${table.maxExecutionsPerFoodPerDay} > 0)`),
+])
+
+export const socialAutomationRuleTargets = pgTable('social_automation_rule_targets', {
+  ruleId: integer('rule_id').notNull().references(() => socialAutomationRules.id, { onDelete: 'cascade' }),
+  socialChannelId: integer('social_channel_id').notNull().references(() => socialChannels.id, { onDelete: 'cascade' }),
+}, (table) => [
+  primaryKey({ name: 'social_automation_rule_targets_pk', columns: [table.ruleId, table.socialChannelId] }),
+])
+
+export const socialSuggestions = pgTable('social_suggestions', {
+  id: serial('id').primaryKey(),
+  ruleId: integer('rule_id').notNull().references(() => socialAutomationRules.id, { onDelete: 'cascade' }),
+  templateType: varchar('template_type', { length: 40 }).notNull(),
+  sourceType: varchar('source_type', { length: 50 }).notNull(),
+  sourceId: integer('source_id'),
+  sourceTitle: varchar('source_title', { length: 200 }),
+  logicalDate: date('logical_date', { mode: 'string' }).notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('Pending'),
+  reason: text('reason').notNull(),
+  draftTitle: varchar('draft_title', { length: 200 }).notNull(),
+  draftText: text('draft_text').notNull(),
+  draftMediaUrl: varchar('draft_media_url', { length: 2000 }),
+  draftDestinationUrl: varchar('draft_destination_url', { length: 2000 }),
+  dismissedByUserId: integer('dismissed_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
+  dismissedAt: utcTimestamp('dismissed_at'),
+  publishedPostId: integer('published_post_id').references(() => socialPosts.id, { onDelete: 'set null' }),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('social_suggestions_logical_uidx')
+    .on(table.ruleId, table.sourceType, sql`COALESCE(${table.sourceId}, 0)`, table.logicalDate),
+  index('social_suggestions_status_date_idx').on(table.status, table.logicalDate, table.createdAt),
+  check('social_suggestions_status_check', sql`${table.status} IN ('Pending', 'Published', 'Dismissed', 'Expired')`),
+])
+
+export const socialPublicationAttempts = pgTable('social_publication_attempts', {
+  id: serial('id').primaryKey(),
+  socialPostTargetId: integer('social_post_target_id').notNull().references(() => socialPostTargets.id, { onDelete: 'cascade' }),
+  attemptNumber: integer('attempt_number').notNull(),
+  startedAt: utcTimestamp('started_at').notNull(),
+  completedAt: utcTimestamp('completed_at'),
+  result: varchar('result', { length: 20 }).notNull().default('Started'),
+  errorCode: varchar('error_code', { length: 100 }),
+  errorMessage: text('error_message'),
+}, (table) => [
+  uniqueIndex('social_attempts_target_number_uidx').on(table.socialPostTargetId, table.attemptNumber),
+  index('social_attempts_target_started_idx').on(table.socialPostTargetId, table.startedAt),
+  check('social_attempts_result_check', sql`${table.result} IN ('Started', 'Succeeded', 'Failed', 'Unknown')`),
+])
+
+export const socialSettings = pgTable('social_settings', {
+  id: serial('id').primaryKey(),
+  singletonKey: boolean('singleton_key').notNull().default(true),
+  minimumIntervalMinutes: integer('minimum_interval_minutes').notNull().default(90),
+  maximumPostsPerDay: integer('maximum_posts_per_day').notNull().default(5),
+  maximumFoodPromotionPerFoodPerDay: integer('maximum_food_promotion_per_food_per_day').notNull().default(1),
+  maximumLimitedAvailabilityPerFoodPerDay: integer('maximum_limited_availability_per_food_per_day').notNull().default(1),
+  quietHoursStart: time('quiet_hours_start'),
+  quietHoursEnd: time('quiet_hours_end'),
+  defaultExecutionMode: varchar('default_execution_mode', { length: 20 }).notNull().default('Suggestion'),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('social_settings_singleton_uidx').on(table.singletonKey),
+  check('social_settings_singleton_check', sql`${table.singletonKey}`),
+  check('social_settings_values_check', sql`${table.minimumIntervalMinutes} >= 0 AND ${table.maximumPostsPerDay} > 0 AND ${table.maximumFoodPromotionPerFoodPerDay} > 0 AND ${table.maximumLimitedAvailabilityPerFoodPerDay} > 0`),
+  check('social_settings_mode_check', sql`${table.defaultExecutionMode} IN ('Manual', 'Suggestion', 'AutoPublish')`),
+])
+
+export const socialSettingsDefaultTargets = pgTable('social_settings_default_targets', {
+  settingsId: integer('settings_id').notNull().references(() => socialSettings.id, { onDelete: 'cascade' }),
+  socialChannelId: integer('social_channel_id').notNull().references(() => socialChannels.id, { onDelete: 'cascade' }),
+}, (table) => [
+  primaryKey({ name: 'social_settings_default_targets_pk', columns: [table.settingsId, table.socialChannelId] }),
+])
 
 export type FoodRow = typeof foods.$inferSelect
 export type DailyMenuRow = typeof dailyMenus.$inferSelect

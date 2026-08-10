@@ -113,6 +113,34 @@
       "when": 1785963133396,
       "tag": "0015_amused_ben_urich",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786320000000,
+      "tag": "0016_lively_delivery_windows",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786348800000,
+      "tag": "0017_social_publishing",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786435200000,
+      "tag": "0018_warm_order_reviews",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786521600000,
+      "tag": "0019_lightweight_customer_analytics",
+      "breakpoints": true
     }
   ]
 }

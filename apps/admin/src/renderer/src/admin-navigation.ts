@@ -1,8 +1,10 @@
 export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' | 'food-photos' | 'food-tags'
   | 'categories' | 'tags' | 'menu' | 'report' | 'ingredients' | 'inventory' | 'purchases'
-  | 'suppliers' | 'recipes' | 'finance' | 'shopping' | 'payments' | 'v15-reports' | 'logs'
+  | 'suppliers' | 'recipes' | 'finance' | 'shopping' | 'payments' | 'v15-reports' | 'delivery-slots' | 'delivery-days' | 'logs'
+  | 'social-dashboard' | 'social-channels' | 'social-publish' | 'social-templates'
+  | 'social-rules' | 'social-suggestions' | 'social-history'
 
-export type NavigationGroupId = 'orders' | 'products' | 'kitchen' | 'finance' | 'system'
+export type NavigationGroupId = 'orders' | 'products' | 'kitchen' | 'finance' | 'social' | 'system'
 
 export interface NavigationGroup {
   id: NavigationGroupId
@@ -52,9 +54,26 @@ export const navigationGroups: NavigationGroup[] = [
     ],
   },
   {
+    id: 'social',
+    label: 'شبکه‌های اجتماعی',
+    items: [
+      { page: 'social-dashboard', label: 'داشبورد انتشار' },
+      { page: 'social-channels', label: 'کانال‌ها' },
+      { page: 'social-publish', label: 'انتشار جدید' },
+      { page: 'social-templates', label: 'قالب‌های پیام' },
+      { page: 'social-rules', label: 'قوانین خودکارسازی' },
+      { page: 'social-suggestions', label: 'پیشنهادهای انتشار' },
+      { page: 'social-history', label: 'تاریخچه ارسال' },
+    ],
+  },
+  {
     id: 'system',
     label: 'سیستم',
-    items: [{ page: 'logs', label: 'گزارش رویدادها' }],
+    items: [
+      { page: 'delivery-slots', label: 'بازه‌های ارسال' },
+      { page: 'delivery-days', label: 'ظرفیت ارسال روزانه' },
+      { page: 'logs', label: 'گزارش رویدادها' },
+    ],
   },
 ]
 

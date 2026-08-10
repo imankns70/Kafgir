@@ -6,6 +6,11 @@ import {
   createCustomerAddress,
   getCustomerProfileByUserId,
 } from '@/server/services/customer-service'
+import {
+  customerRateLimitIdentity,
+  enforceCustomerMutationIdentity,
+  enforceCustomerMutationIp,
+} from '@/server/rate-limit/customer-mutations'
 
 export async function GET(request: Request) {
   try {
@@ -20,7 +25,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     requireSameOrigin(request)
+    await enforceCustomerMutationIp(request, 'customerAccount')
     const customer = await requireCustomer(request)
+    await enforceCustomerMutationIdentity('customerAccount', customerRateLimitIdentity(customer.userId))
     const body = await readJson(request, customerAddressWriteSchema)
     await createCustomerAddress(customer.userId, body)
     return NextResponse.json(await getCustomerProfileByUserId(customer.userId), { status: 201 })

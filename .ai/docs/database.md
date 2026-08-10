@@ -10,7 +10,18 @@ Kafgir uses PostgreSQL with Drizzle ORM.
 
 ## Model
 
-The schema includes users, roles and Identity compatibility tables, Telegram accounts, customer profiles and addresses, foods, daily menus and menu items, orders and immutable order lines, status history, notification outbox messages, and application settings.
+The schema includes users, roles and Identity compatibility tables, Telegram accounts, customer profiles and addresses, foods, daily menus and menu items, delivery time slots and their per-date availability overrides, orders and immutable order lines, status history, notification outbox messages, application settings, and social-publishing channels/templates/posts/targets/attempts/rules/suggestions/settings.
+
+`order_reviews` (migration `0018_warm_order_reviews.sql`) stores the customer's single review for an
+order. `order_id` is unique, rating is constrained to 1–5, comment is nullable and bounded to 1000
+characters, and the customer profile FK records ownership. The service also verifies that the review
+profile owns the order and that the order is Delivered before inserting or updating.
+
+`analytics_sessions` (migration `0019_lightweight_customer_analytics.sql`) stores only random
+first-party visitor/session UUIDs, optional authenticated user association, and session timestamps.
+Orders have nullable visitor/session attribution for conversion reporting; this attribution is never
+required for order creation. Recent-activity, visitor/day, session-start and attributed-order indexes
+serve the one dashboard aggregate without adding a general event stream.
 
 Customer addresses and order delivery snapshots keep a single address text field. Migration `0007_mighty_kree.sql` preserves legacy note text by appending it into the address line before dropping the old `customer_addresses.description` and `orders.delivery_address_description` columns.
 
@@ -28,6 +39,12 @@ Food image binaries are not database data. In local development, new images are 
 
 Electron uses the restricted `kafgir_electron_admin` login created by `infra/postgres/create-electron-admin-role.sql`. It has application DML and sequence privileges but cannot own schemas, create databases/roles, or run migrations.
 
+Migration `0017_social_publishing.sql` owns social publishing persistence. `social_post_targets` keeps
+one idempotency key and delivery status per destination, while `social_publication_attempts` records
+each provider attempt. Rule/default destination channels use relation tables rather than serialized
+IDs. Electron main encrypts channel tokens with Windows DPAPI before writing
+`social_channels.credential_ciphertext`; renderer DTOs expose only whether a credential exists.
+
 PostgreSQL preserves:
 
 - integer primary keys and numeric enum values;
@@ -41,6 +58,12 @@ PostgreSQL preserves:
 ## Transactions
 
 Order submission starts in `PendingConfirmation` and does not reserve capacity. Confirmation locks the order and referenced menu rows before incrementing sold portions. Cancellation restores portions when required. Persian-year order-number generation is serialized with a PostgreSQL transaction advisory lock.
+
+Customer order history uses the immutable columns on `orders` and `order_items`; it never reconstructs
+historical addresses or prices from current profile/catalog rows. The list query aggregates order items,
+the latest payment state, persisted histories and review into one page query. Details enforce
+`orders.customer_profile_id` before loading item/history/payment/review records. Customer payment reads
+select an explicit safe field allowlist and omit account IDs, receipt images and descriptions.
 
 ## Testing
 

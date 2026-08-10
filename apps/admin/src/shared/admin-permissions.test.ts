@@ -15,8 +15,18 @@ describe('Admin operation permissions', () => {
   })
 
   it('keeps refunds and inventory changes outside order-manager permissions', () => {
+    expect(isAdminOperationAllowed('dashboard.analytics', ['OrderManager'])).toBe(true)
     expect(isAdminOperationAllowed('payments.changeStatus', ['OrderManager'])).toBe(true)
     expect(isAdminOperationAllowed('payments.refund', ['OrderManager'])).toBe(false)
     expect(isAdminOperationAllowed('inventory.adjust', ['OrderManager'])).toBe(false)
+  })
+
+  it('allows social review for kitchen admins but reserves publishing and configuration for owner', () => {
+    expect(isAdminOperationAllowed('social.dashboard', ['KitchenAdmin'])).toBe(true)
+    expect(isAdminOperationAllowed('social.preview', ['KitchenAdmin'])).toBe(true)
+    expect(isAdminOperationAllowed('social.posts.publish', ['KitchenAdmin'])).toBe(false)
+    expect(isAdminOperationAllowed('social.rules.save', ['KitchenAdmin'])).toBe(false)
+    expect(isAdminOperationAllowed('social.channels.save', ['KitchenAdmin'])).toBe(false)
+    expect(isAdminOperationAllowed('social.posts.publish', ['Owner'])).toBe(true)
   })
 })

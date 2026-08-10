@@ -947,11 +947,15 @@ select:disabled {
 .cart-sync-panel button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; }
 .cart-sync-icon { display: inline-grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: var(--kafgir-color-warning); background: var(--kafgir-color-surface); }
 
+/* The cart panel is ~425px even on desktop, so squeezing name, price, quantity controls, remove and
+   total onto one row left the info column at ~90px and wrapped it to shreds. Give the info its own
+   full-width row and let the controls and total share the one below. */
 .cart-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
 }
+.cart-item-info { grid-column: 1 / -1; }
 
 .cart-row-invalid {
   margin-inline: -10px;
@@ -967,27 +971,30 @@ select:disabled {
 .cart-unit-price > small { order:3 }
 .cart-item-warning { display: inline-flex; align-items: center; gap: 5px; color: var(--kafgir-color-error); font-size: var(--kafgir-type-caption); font-weight: 700; }
 .cart-item-actions { display: flex; align-items: center; gap: 8px; }
-.cart-remove-button { display: inline-flex; align-items: center; gap: 5px; min-height: 38px; color: var(--kafgir-color-error); border-color: var(--kafgir-color-error); background: var(--kafgir-color-surface); }
-.cart-remove-button:hover,
-.cart-remove-button:focus-visible { border-color: var(--kafgir-color-error); background: var(--kafgir-color-error-soft); }
+/* Carries `primary-button` in the markup, so it is the same filled control as «ورود و ثبت سفارش».
+   Only the icon/label gap is tightened for this short button. */
+.cart-remove-button { gap: 5px; }
 .cart-line-total { display: grid; justify-items: end; gap: 2px; color: var(--kafgir-color-primary); font-weight: 700; white-space: nowrap; }
 .cart-line-total small { max-width: 160px; color: var(--kafgir-color-error); font-size: .68rem; font-weight: 500; line-height: 1.45; text-align: end; white-space: normal; }
+/* The cart panel is narrow even on desktop, so an icon | text | actions row let the buttons claim
+   `auto` width and squeezed the message down to one word per line. Stack the blocks instead and let
+   each one own the full width. */
 .cart-empty-confirmation {
   grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   margin-block-start: 12px;
   border: 1px solid color-mix(in srgb, var(--kafgir-color-warning) 70%, var(--kafgir-color-border));
   border-radius: var(--kafgir-radius-md);
   padding: 12px;
   background: var(--kafgir-color-warning-soft);
 }
-.cart-empty-confirmation-icon { display: inline-grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: var(--kafgir-color-warning); background: var(--kafgir-color-surface); }
+.cart-empty-confirmation-head { display: flex; align-items: center; gap: 8px; }
+.cart-empty-confirmation-icon { display: inline-grid; flex: none; width: 32px; height: 32px; place-items: center; border-radius: 50%; color: var(--kafgir-color-warning); background: var(--kafgir-color-surface); }
 .cart-empty-confirmation strong { color: var(--kafgir-color-text-primary); }
-.cart-empty-confirmation p { margin: 3px 0 0; color: var(--kafgir-color-text-secondary); font-size: var(--kafgir-type-body-sm); }
-.cart-empty-confirmation-actions { display: flex; align-items: center; gap: 7px; }
+.cart-empty-confirmation p { margin: 0; color: var(--kafgir-color-text-secondary); font-size: var(--kafgir-type-body-sm); line-height: 1.75; }
+.cart-empty-confirmation-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .cart-empty-confirmation-actions button { min-height: 38px; padding: 7px 10px; }
 
 .form-grid { display: grid; gap: 14px; }
@@ -1356,14 +1363,12 @@ select:disabled {
   .food-placeholder-art { width: 104px; height: 68px; }
   .page-actions { align-items: center; }
   .page-actions .outline-button { min-height: 40px; padding: 7px 10px; font-size: .78rem; }
-  .cart-row { display: grid; grid-template-columns: 1fr auto; }
-  .cart-item-info { grid-column: 1 / -1; }
   .cart-item-actions { flex-wrap: wrap; }
-  .cart-line-total { grid-column: auto; }
   .cart-sync-panel { grid-template-columns: auto minmax(0, 1fr); }
   .cart-sync-panel > button { grid-column: 1 / -1; width: 100%; }
-  .cart-empty-confirmation { grid-template-columns: auto minmax(0, 1fr); }
-  .cart-empty-confirmation-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  /* The container already stacks; on phones give each button its own full-width row too, so the
+     longer «بله، سبد را خالی کن» label never has to shrink or wrap. */
+  .cart-empty-confirmation-actions { grid-template-columns: 1fr; }
 
   .mobile-bottom-nav {
     position: fixed;
@@ -1472,4 +1477,247 @@ select:disabled {
 .rice-upgrade-option:has(input:focus-visible) { outline: 2px solid var(--kafgir-color-secondary); outline-offset: 2px; }
 .rice-upgrade-hint { display: inline-flex; align-items: center; gap: .3rem; color: var(--kafgir-color-secondary); font-size: .75rem; font-weight: 700; text-decoration: none; }
 .cart-variant-hint { display: block; color: var(--kafgir-color-text-muted); font-size: .72rem; line-height: 1.7; }
-.cart-rice-option, .invoice-rice-option { display: block; margin-block-start: .2rem; color: var(--kafgir-color-secondary); font-size: .8rem; font-weight: 600; }
+/* A bare "+" icon here read as a third control next to the quantity +/- buttons. This is read-only
+   information, so it gets a solid filled chip instead — clearly a label, never a button. */
+.cart-rice-option {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+  margin-block-start: .3rem;
+  border-radius: 999px;
+  padding: .2rem .6rem;
+  color: var(--kafgir-color-text-on-secondary);
+  background: var(--kafgir-color-secondary);
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1.7;
+}
+
+/* The upgrade dialog. Mobile is the base case — a compact sheet pinned to the bottom, within thumb
+   reach and clear of the sticky purchase bar. From 640px up the same markup centres itself as an
+   ordinary modal. One layout, decided by CSS, so the server render never disagrees with the client. */
+.rice-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: color-mix(in srgb, var(--kafgir-color-text-primary) 45%, transparent);
+  backdrop-filter: blur(2px);
+  animation: fade-in .18s ease-out;
+}
+.rice-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-height: 88vh;
+  overflow-y: auto;
+  border: 1px solid var(--kafgir-color-border);
+  border-block-end: 0;
+  border-radius: var(--kafgir-radius-lg) var(--kafgir-radius-lg) 0 0;
+  padding: 10px clamp(14px, 4vw, 20px) calc(16px + env(safe-area-inset-bottom));
+  background: var(--kafgir-color-surface);
+  box-shadow: 0 -10px 40px rgb(0 0 0 / .22);
+  animation: sheet-up .22s ease-out;
+}
+.rice-dialog-grabber { justify-self: center; align-self: center; width: 42px; height: 4px; border-radius: 999px; background: var(--kafgir-color-border-strong); }
+.rice-dialog-head { display: flex; align-items: center; gap: 10px; }
+.rice-dialog-icon { display: inline-grid; flex: none; width: 36px; height: 36px; place-items: center; border-radius: 50%; color: var(--kafgir-color-secondary); background: var(--kafgir-color-secondary-soft); }
+.rice-dialog-head strong { display: block; color: var(--kafgir-color-text-primary); font-size: var(--kafgir-type-body); line-height: 1.7; }
+.rice-dialog-breakdown { display: grid; gap: 6px; margin: 0; border: 1px solid var(--kafgir-color-border); border-radius: var(--kafgir-radius-md); padding: 10px 12px; list-style: none; background: var(--kafgir-color-background-secondary); }
+.rice-dialog-breakdown li { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; color: var(--kafgir-color-text-secondary); font-size: var(--kafgir-type-body-sm); line-height: 1.9; }
+.rice-dialog-breakdown strong { color: var(--kafgir-color-text-primary); white-space: nowrap; }
+.rice-dialog-delta { color: var(--kafgir-color-secondary); }
+.rice-dialog-total { margin-block-start: 2px; border-block-start: 1px dashed var(--kafgir-color-border-strong); padding-block-start: 8px; color: var(--kafgir-color-text-primary); font-weight: 700; }
+.rice-dialog-total strong { color: var(--kafgir-color-primary); font-size: 1.05em; }
+.rice-dialog-actions { display: grid; gap: 8px; margin-block-start: 2px; }
+.rice-dialog-actions button { justify-content: center; width: 100%; min-height: 44px; }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@media (min-width: 640px) {
+  .rice-dialog-backdrop { align-items: center; padding: 20px; }
+  .rice-dialog {
+    max-width: 440px;
+    max-height: min(82vh, 640px);
+    border-block-end: 1px solid var(--kafgir-color-border);
+    border-radius: var(--kafgir-radius-lg);
+    padding: 18px 20px;
+    box-shadow: 0 24px 60px rgb(0 0 0 / .26);
+    animation-name: rise-in;
+  }
+  .rice-dialog-grabber { display: none; }
+  .rice-dialog-actions { grid-template-columns: 1fr 1fr; }
+}
+
+/* Delivery windows at checkout. Radio cards rather than a select: on a phone the options are the
+   decision, and a native select hides them behind a tap. Availability is never signalled by colour
+   alone — every disabled card states its reason in words. */
+.delivery-slot-section { display: grid; gap: 10px; border: 1px solid var(--kafgir-color-border); border-radius: var(--kafgir-radius-md); padding: 14px; background: var(--kafgir-color-background-secondary); }
+.delivery-slot-title { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--kafgir-color-text-primary); font-size: var(--kafgir-type-body); font-weight: 700; }
+.delivery-slot-title svg { color: var(--kafgir-color-secondary); }
+.delivery-slot-day { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin: 0; }
+.delivery-slot-day-label { color: var(--kafgir-color-text-muted); font-size: var(--kafgir-type-caption); }
+.delivery-slot-day strong { color: var(--kafgir-color-text-primary); font-size: var(--kafgir-type-body-sm); }
+.delivery-slot-options { display: grid; gap: 8px; }
+.delivery-slot-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  border: 1px solid var(--kafgir-color-border);
+  border-radius: var(--kafgir-radius-md);
+  padding: 10px 12px;
+  background: var(--kafgir-color-surface);
+  cursor: pointer;
+}
+.delivery-slot-option input { accent-color: var(--kafgir-color-primary); flex: none; width: 1.15rem; height: 1.15rem; cursor: pointer; }
+.delivery-slot-option-body { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.delivery-slot-window { color: var(--kafgir-color-text-primary); font-size: var(--kafgir-type-body-sm); font-weight: 700; }
+.delivery-slot-meta { color: var(--kafgir-color-text-muted); font-size: var(--kafgir-type-caption); }
+.delivery-slot-option:has(input:checked) { border-color: var(--kafgir-color-primary); background: var(--kafgir-color-primary-soft); }
+.delivery-slot-option:has(input:checked) .delivery-slot-meta { color: var(--kafgir-color-primary); }
+.delivery-slot-option:has(input:checked) svg { color: var(--kafgir-color-primary); }
+.delivery-slot-option:has(input:focus-visible) { outline: 2px solid var(--kafgir-color-primary); outline-offset: 2px; }
+.delivery-slot-option.is-unavailable { opacity: .68; cursor: not-allowed; background: transparent; }
+.delivery-slot-option.is-unavailable input { cursor: not-allowed; }
+.delivery-slot-option.is-unavailable .delivery-slot-window { text-decoration: line-through; text-decoration-thickness: 1px; }
+.delivery-slot-option.is-unavailable .delivery-slot-meta { color: var(--kafgir-color-error); font-weight: 700; }
+.delivery-slot-empty { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--kafgir-color-error); font-size: var(--kafgir-type-body-sm); font-weight: 700; }
+.delivery-slot-error { margin: 0; color: var(--kafgir-color-error); font-size: var(--kafgir-type-body-sm); }
+
+/* Customer order history: summary cards deliberately use persisted order snapshots. */
+.orders-section-heading { display:flex;align-items:center;justify-content:space-between;gap:12px;margin-block-end:14px }
+.orders-section-heading .eyebrow,.orders-section-heading .section-title { margin:0 }
+.orders-section-heading>span { border-radius:999px;padding:5px 10px;color:var(--kafgir-color-secondary);background:var(--kafgir-color-secondary-soft);font-size:var(--kafgir-type-caption);font-weight:700 }
+.customer-orders-panel { position:static;min-width:0 }
+.customer-order-list { display:grid;gap:14px;margin:0 }
+.customer-order-card { display:grid;gap:13px;width:100%;overflow:hidden;border:1px solid var(--kafgir-color-border);border-radius:var(--kafgir-radius-lg);padding:15px;color:var(--kafgir-color-text-primary);background:var(--kafgir-color-surface-elevated);box-shadow:var(--kafgir-shadow-card);text-align:start }
+.customer-order-card.active-order { border-color:color-mix(in srgb,var(--kafgir-color-primary) 52%,var(--kafgir-color-border));background:linear-gradient(145deg,var(--kafgir-color-surface-elevated),var(--kafgir-color-primary-soft)) }
+.customer-order-card.history-order { box-shadow:none }
+.order-card-header,.order-card-finance,.order-card-actions,.order-detail-hero-head,.customer-payment-list article>header { display:flex;align-items:center;justify-content:space-between;gap:12px }
+.order-card-header>div { display:grid;gap:2px }
+.order-kicker,.order-card-address span,.order-card-finance span { color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
+.order-number { font-size:var(--kafgir-type-card-title);unicode-bidi:isolate }
+.order-card-date { display:flex;align-items:center;gap:6px;color:var(--kafgir-color-text-secondary);font-size:var(--kafgir-type-caption) }
+.order-card-date svg { color:var(--kafgir-color-secondary) }
+.order-card-foods { overflow:hidden;border-block:1px dashed var(--kafgir-color-border);padding-block:10px;color:var(--kafgir-color-text-secondary);font-size:var(--kafgir-type-body-sm);text-overflow:ellipsis;white-space:nowrap }
+.order-card-address { display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:9px }
+.order-card-address>svg { margin-block-start:3px;color:var(--kafgir-color-primary) }
+.order-card-address div { display:grid;gap:3px }
+.order-card-address p { display:-webkit-box;overflow:hidden;margin:0;color:var(--kafgir-color-text-primary);font-size:var(--kafgir-type-body-sm);line-height:1.8;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal }
+.order-card-finance { border-radius:var(--kafgir-radius-md);padding:10px 12px;background:var(--kafgir-color-background-secondary) }
+.order-card-finance>div { display:grid;gap:4px }
+.order-card-finance>div:last-child { text-align:end }
+.order-card-finance>div:last-child strong { color:var(--kafgir-color-primary);font-size:var(--kafgir-type-card-title) }
+.payment-state { display:inline-flex;width:max-content;align-items:center;border-radius:999px;padding:4px 8px;font-size:var(--kafgir-type-caption);font-weight:700 }
+.payment-state.success { color:var(--kafgir-color-success);background:var(--kafgir-color-success-soft) }
+.payment-state.error { color:var(--kafgir-color-error);background:var(--kafgir-color-error-soft) }
+.payment-state.warning,.payment-state.pending { color:var(--kafgir-color-warning);background:var(--kafgir-color-warning-soft) }
+.payment-state.neutral { color:var(--kafgir-color-text-muted);background:var(--kafgir-color-surface-muted) }
+.order-card-actions { align-items:stretch }
+.order-card-actions button { flex:1;justify-content:center;min-height:44px }
+.order-detail-button svg { transform:rotate(180deg) }
+.review-action svg { fill:none }
+.order-review-summary { display:grid;grid-template-columns:auto 1fr;align-items:center;gap:6px 10px;border-radius:var(--kafgir-radius-md);padding:10px 12px;background:var(--kafgir-color-accent-soft) }
+.order-review-summary>span { font-size:var(--kafgir-type-caption);font-weight:700 }
+.order-review-summary p { grid-column:1/-1;margin:0;color:var(--kafgir-color-text-secondary);font-size:var(--kafgir-type-body-sm) }
+.review-stars { display:inline-flex;direction:ltr;gap:2px;color:var(--kafgir-color-border-strong) }
+.review-stars .selected { color:var(--kafgir-color-accent);fill:currentColor }
+.customer-orders-empty,.customer-orders-error { display:grid;justify-items:center;gap:8px;padding:32px 16px;text-align:center }
+.customer-orders-empty .empty-icon,.customer-orders-error .empty-icon { display:grid;width:64px;height:64px;place-items:center;border-radius:50%;color:var(--kafgir-color-secondary);background:var(--kafgir-color-secondary-soft) }
+.customer-orders-error .empty-icon { color:var(--kafgir-color-error);background:var(--kafgir-color-error-soft) }
+.customer-orders-empty h3,.customer-orders-empty p,.customer-orders-error h3,.customer-orders-error p { margin:0 }
+.customer-orders-empty p,.customer-orders-error p { max-width:360px;color:var(--kafgir-color-text-secondary) }
+.customer-orders-skeleton { display:grid;gap:12px }
+.customer-orders-skeleton span { height:260px;border-radius:var(--kafgir-radius-lg);background:linear-gradient(90deg,var(--kafgir-color-surface-muted),var(--kafgir-color-surface),var(--kafgir-color-surface-muted));background-size:200% 100%;animation:skeleton-pulse 1.4s ease-in-out infinite }
+@keyframes skeleton-pulse { to { background-position:-200% 0 } }
+
+.customer-progress { position:relative;display:grid;gap:11px;margin:0;padding:0;list-style:none }
+.customer-progress:not(.compact)::before { content:"";position:absolute;inset-inline-start:10px;inset-block:12px;width:2px;background:var(--kafgir-color-border) }
+.customer-progress li { position:relative;display:grid;grid-template-columns:22px minmax(0,1fr);align-items:start;gap:8px;z-index:1 }
+.progress-marker { display:grid;width:22px;height:22px;place-items:center;border:2px solid var(--kafgir-color-border-strong);border-radius:50%;color:var(--kafgir-color-text-muted);background:var(--kafgir-color-surface);font-size:10px;font-weight:800 }
+.customer-progress li.completed .progress-marker { border-color:var(--kafgir-color-success);color:var(--kafgir-color-text-on-secondary);background:var(--kafgir-color-success) }
+.customer-progress li.current .progress-marker { border-color:var(--kafgir-color-primary);color:var(--kafgir-color-primary);background:var(--kafgir-color-primary-soft) }
+.customer-progress li.cancelled .progress-marker { border-color:var(--kafgir-color-error);color:var(--kafgir-color-error);background:var(--kafgir-color-error-soft) }
+.progress-copy { display:grid;gap:2px;line-height:1.55 }
+.progress-copy strong { font-size:var(--kafgir-type-body-sm) }
+.progress-copy time,.progress-copy small { color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
+.customer-progress.compact { grid-template-columns:repeat(auto-fit,minmax(48px,1fr));gap:0;padding-block:4px;text-align:center }
+.customer-progress.compact::before { content:"";position:absolute;inset-inline:7%;inset-block-start:14px;height:2px;background:var(--kafgir-color-border) }
+.customer-progress.compact li { grid-template-columns:1fr;justify-items:center;gap:5px }
+.customer-progress.compact .progress-copy strong { font-size:10px;line-height:1.45 }
+
+.customer-order-detail { max-width:1050px;margin-inline:auto }
+.order-detail-hero { display:grid;gap:18px;border-color:color-mix(in srgb,var(--kafgir-color-primary) 38%,var(--kafgir-color-border));background:linear-gradient(145deg,var(--kafgir-color-surface),var(--kafgir-color-primary-soft)) }
+.order-detail-hero-head>div { display:flex;align-items:center;gap:9px }
+.order-detail-hero-head>div>span,.order-detail-hero-head time { color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
+.customer-order-detail-grid { display:grid;gap:14px;margin-block-start:14px }
+.customer-order-detail-grid>.panel { margin:0 }
+.customer-order-line { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 0;border-block-end:1px solid var(--kafgir-color-border) }
+.customer-order-line:last-child { border:0 }
+.customer-order-line>div { display:grid;gap:4px }
+.customer-order-line span { color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
+.customer-order-line small { color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
+.customer-order-line>strong { color:var(--kafgir-color-primary);white-space:nowrap }
+.order-detail-list,.financial-breakdown { display:grid;gap:0;margin:0 }
+.order-detail-list>div,.financial-breakdown>div { display:grid;grid-template-columns:minmax(110px,.45fr) minmax(0,1fr);gap:12px;padding:10px 0;border-block-end:1px solid var(--kafgir-color-border) }
+.order-detail-list>div:last-child,.financial-breakdown>div:last-child { border:0 }
+.order-detail-list dt,.financial-breakdown dt { color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
+.order-detail-list dd,.financial-breakdown dd { margin:0;text-align:end;overflow-wrap:anywhere }
+.financial-breakdown .grand-total { margin-block-start:5px;border-block-start:1px solid var(--kafgir-color-border-strong);border-block-end:0;padding-block-start:14px;font-weight:800 }
+.financial-breakdown .grand-total dd { color:var(--kafgir-color-primary);font-size:var(--kafgir-type-card-title) }
+.financial-breakdown .discount-value { color:var(--kafgir-color-success);font-weight:750 }
+.payment-empty { border-radius:var(--kafgir-radius-md);padding:13px;background:var(--kafgir-color-background-secondary) }
+.payment-empty p { margin:5px 0 0;color:var(--kafgir-color-text-secondary) }
+.customer-payment-list { display:grid;gap:10px }
+.customer-payment-list article { display:grid;gap:7px;border:1px solid var(--kafgir-color-border);border-radius:var(--kafgir-radius-md);padding:12px;background:var(--kafgir-color-surface-elevated) }
+.detail-review-panel { display:flex;align-items:center;justify-content:space-between;gap:16px;margin-block-start:14px }
+.detail-review-panel h2,.detail-review-panel p { margin:0 0 6px }
+
+.review-dialog { position:fixed;z-index:1200;inset:0;display:flex;align-items:flex-end;justify-content:center;background:var(--kafgir-color-overlay);padding-block-start:24px }
+.review-dialog-card { display:grid;width:100%;max-height:92vh;overflow:auto;gap:16px;border:1px solid var(--kafgir-color-border);border-radius:var(--kafgir-radius-xl) var(--kafgir-radius-xl) 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));background:var(--kafgir-color-surface-elevated);box-shadow:var(--kafgir-shadow-dialog);animation:sheet-up .2s ease-out }
+.review-dialog-card>header { display:flex;align-items:start;justify-content:space-between;gap:12px }
+.review-dialog-card>header span { color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
+.review-dialog-card h2 { margin:3px 0 0;font-size:var(--kafgir-type-section-title) }
+.star-rating { display:grid;gap:8px;margin:0;border:0;padding:0 }
+.star-rating legend { font-weight:700 }
+.star-rating>div { display:flex;direction:ltr;justify-content:center;gap:7px }
+.star-rating button { display:grid;width:48px;height:48px;place-items:center;border:0;border-radius:50%;padding:0;color:var(--kafgir-color-border-strong);background:transparent }
+.star-rating button:hover,.star-rating button:focus-visible,.star-rating button.selected { color:var(--kafgir-color-accent);background:var(--kafgir-color-accent-soft) }
+.star-rating button.selected svg { fill:currentColor }
+.optional-label { color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption);font-weight:400 }
+.review-dialog textarea { resize:vertical }
+.review-dialog .field small { justify-self:end;color:var(--kafgir-color-text-muted) }
+
+@media (min-width:680px) {
+  .customer-progress:not(.compact) { grid-template-columns:repeat(5,1fr);gap:0;padding-block-start:2px;text-align:center }
+  .customer-progress:not(.compact)::before { inset-inline:7%;inset-block-start:13px;width:auto;height:2px }
+  .customer-progress:not(.compact) li { grid-template-columns:1fr;justify-items:center;gap:7px }
+  .customer-order-detail-grid { grid-template-columns:repeat(2,minmax(0,1fr)) }
+  .review-dialog { align-items:center;padding:24px }
+  .review-dialog-card { max-width:500px;border-radius:var(--kafgir-radius-xl);padding:22px;animation:rise-in .2s ease-out }
+}
+@media (max-width:680px) {
+  .customer-orders-panel { order:-1 }
+  .order-card-actions { display:grid;grid-template-columns:1fr }
+  .order-card-finance { align-items:start }
+  .detail-review-panel { display:grid }
+  .detail-review-panel button { width:100%;justify-content:center }
+}
+@media (prefers-reduced-motion:reduce) {
+  .customer-orders-skeleton span,.review-dialog-card { animation:none }
+}

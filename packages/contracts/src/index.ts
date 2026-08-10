@@ -1,5 +1,9 @@
 import { z } from 'zod'
+export * from './social.js'
+import { isoDate, timeOfDay } from './delivery.js'
+import { PaymentStatus } from './v15.js'
 export * from './v15.js'
+export * from './delivery.js'
 
 export enum PaymentMethod {
   Cash = 1,
@@ -237,6 +241,10 @@ export const createOrderSchema = z.object({
   paymentMethod: z.nativeEnum(PaymentMethod),
   deliveryMethod: z.nativeEnum(DeliveryMethod),
   customerNote: z.string().trim().max(1000).nullable().optional(),
+  // The client names only the window. The delivery date is derived server-side from the menu the
+  // items belong to, so a client cannot pair today's food with tomorrow's delivery. Optional so that
+  // Electron manual orders, which are taken by phone, can still be created without one.
+  deliveryTimeSlotId: z.number().int().positive().nullable().optional(),
   items: z.array(createOrderItemSchema).min(1),
 })
 
@@ -263,6 +271,7 @@ export const orderSchema = z.object({
   customerId: z.number().int(),
   customerFullName: z.string(),
   customerPhoneNumber: z.string(),
+  deliveryCity: z.string().optional(),
   addressLine: z.string().nullable().optional(),
   status: z.nativeEnum(OrderStatus),
   paymentMethod: z.nativeEnum(PaymentMethod),
@@ -276,8 +285,45 @@ export const orderSchema = z.object({
   confirmedAt: z.string().nullable().optional(),
   deliveredAt: z.string().nullable().optional(),
   cancelledAt: z.string().nullable().optional(),
+  // Snapshot, not a join. Orders placed before delivery windows existed keep these null and must be
+  // rendered as «زمان تحویل ثبت نشده» rather than given an invented time.
+  deliveryDate: isoDate.nullable().optional(),
+  deliveryTimeSlotTitle: z.string().nullable().optional(),
+  deliveryStartTime: timeOfDay.nullable().optional(),
+  deliveryEndTime: timeOfDay.nullable().optional(),
   items: z.array(orderItemSchema),
   statusHistories: z.array(orderStatusHistorySchema),
+})
+
+export const orderReviewWriteSchema = z.object({
+  rating: z.number().int().min(1, 'امتیاز باید بین ۱ تا ۵ باشد.').max(5, 'امتیاز باید بین ۱ تا ۵ باشد.'),
+  comment: z.string().trim().max(1000, 'نظر نمی‌تواند بیشتر از ۱۰۰۰ نویسه باشد.').nullable().optional(),
+})
+
+export const orderReviewSchema = orderReviewWriteSchema.extend({
+  id: z.number().int().positive(),
+  createdAt: z.string(),
+  updatedAt: z.string().nullable(),
+})
+
+export const customerPaymentDetailSchema = z.object({
+  paymentMethod: z.nativeEnum(PaymentMethod),
+  status: z.nativeEnum(PaymentStatus),
+  amount: z.number().nonnegative(),
+  providerName: z.string().nullable(),
+  trackingNumber: z.string().nullable(),
+  referenceNumber: z.string().nullable(),
+  paidAt: z.string().nullable(),
+  createdAt: z.string(),
+})
+
+export const customerOrderDetailSchema = orderSchema.omit({
+  customerId: true,
+  adminNote: true,
+}).extend({
+  deliveryCity: z.string(),
+  payments: z.array(customerPaymentDetailSchema),
+  review: orderReviewSchema.nullable(),
 })
 
 export const orderSummarySchema = z.object({
@@ -292,10 +338,22 @@ export const orderSummarySchema = z.object({
   createdAt: z.string(),
   totalQuantity: z.number().int(),
   foodSummary: z.string(),
+  deliveryDate: isoDate.nullable().optional(),
+  deliveryTimeSlotTitle: z.string().nullable().optional(),
+  deliveryStartTime: timeOfDay.nullable().optional(),
+  deliveryEndTime: timeOfDay.nullable().optional(),
+})
+
+export const customerOrderSummarySchema = orderSummarySchema.extend({
+  deliveryCity: z.string(),
+  addressLine: z.string(),
+  paymentStatus: z.nativeEnum(PaymentStatus).nullable(),
+  statusHistories: z.array(orderStatusHistorySchema),
+  review: orderReviewSchema.nullable(),
 })
 
 export const customerOrdersPageSchema = z.object({
-  items: z.array(orderSummarySchema),
+  items: z.array(customerOrderSummarySchema),
   page: z.number().int().positive(),
   pageSize: z.number().int().positive(),
   totalItems: z.number().int().nonnegative(),
@@ -567,6 +625,27 @@ export const dashboardSummarySchema = z.object({
   isTodayMenuOpen: z.boolean(),
 })
 
+export const analyticsHeartbeatSchema = z.object({
+  visitorId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+})
+
+export const analyticsHeartbeatResponseSchema = analyticsHeartbeatSchema.extend({
+  trackedAt: z.string(),
+})
+
+export const customerAnalyticsTodaySchema = z.object({
+  uniqueVisitorsToday: z.number().int().nonnegative(),
+  onlineNow: z.number().int().nonnegative(),
+  guestVisitorsToday: z.number().int().nonnegative(),
+  authenticatedUsersToday: z.number().int().nonnegative(),
+  newUsersToday: z.number().int().nonnegative(),
+  returningUsersToday: z.number().int().nonnegative(),
+  sessionsToday: z.number().int().nonnegative(),
+  conversionRate: z.number().min(0).max(100),
+  calculatedAt: z.string(),
+})
+
 export type DailyMenuDto = z.infer<typeof dailyMenuSchema>
 export type DailyMenuItemDto = z.infer<typeof dailyMenuItemSchema>
 export type PublicDailyMenuPageDto = z.infer<typeof publicDailyMenuPageSchema>
@@ -583,6 +662,11 @@ export type CustomerTelegramLoginRequest = z.infer<typeof customerTelegramLoginS
 export type CustomerProfileUpdateRequest = z.infer<typeof customerProfileUpdateSchema>
 export type CustomerAddressWriteRequest = z.infer<typeof customerAddressWriteSchema>
 export type CustomerOrdersPageDto = z.infer<typeof customerOrdersPageSchema>
+export type CustomerOrderDetailDto = z.infer<typeof customerOrderDetailSchema>
+export type CustomerOrderSummaryDto = z.infer<typeof customerOrderSummarySchema>
+export type CustomerPaymentDetailDto = z.infer<typeof customerPaymentDetailSchema>
+export type OrderReviewDto = z.infer<typeof orderReviewSchema>
+export type OrderReviewWriteRequest = z.infer<typeof orderReviewWriteSchema>
 export type CustomerProfileLookupRequest = z.infer<typeof customerProfileLookupSchema>
 export type CreateOrderRequest = z.infer<typeof createOrderSchema>
 export type OrderDto = z.infer<typeof orderSchema>
@@ -607,6 +691,9 @@ export type UpdateOrderStatusRequest = z.infer<typeof updateOrderStatusSchema>
 export type AdminLoginRequest = z.infer<typeof adminLoginSchema>
 export type AdminLoginResponse = z.infer<typeof adminLoginResponseSchema>
 export type AdminDashboardSummaryDto = z.infer<typeof dashboardSummarySchema>
+export type AnalyticsHeartbeatRequest = z.infer<typeof analyticsHeartbeatSchema>
+export type AnalyticsHeartbeatResponse = z.infer<typeof analyticsHeartbeatResponseSchema>
+export type CustomerAnalyticsTodayDto = z.infer<typeof customerAnalyticsTodaySchema>
 
 export interface OrderReportQuery {
   date: string

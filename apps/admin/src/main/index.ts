@@ -6,6 +6,7 @@ import {
   configureDatabase,
   configureManagedImageDeleter,
   testDatabaseConnection,
+  recoverInterruptedSocialPublications,
   type AdminPrincipal,
 } from '@kafgir/server-core'
 import type {
@@ -32,6 +33,7 @@ let principal: AdminPrincipal | null = null
 let configuredFingerprint: string | null = null
 let runtimeConfigurationPromise: Promise<void> | null = null
 let databaseClosedForQuit = false
+let socialAutomationTimer: ReturnType<typeof setInterval> | null = null
 
 function developmentUploadRoot() {
   return app.isPackaged
@@ -58,11 +60,28 @@ async function configureRuntime(value: SecureConnectionConfiguration) {
     await configureDatabase(value.databaseUrl, Number(process.env.ELECTRON_DATABASE_POOL_SIZE ?? 3))
     configureObjectStorage(value.storage, uploadRoot)
     configureManagedImageDeleter(value.storage || uploadRoot ? deleteManagedFoodImage : null)
+    await recoverInterruptedSocialPublications()
     configuredFingerprint = fingerprint
   })().finally(() => {
     runtimeConfigurationPromise = null
   })
   await runtimeConfigurationPromise
+}
+
+async function runSocialAutomation() {
+  if (!principal) return
+  try {
+    await dispatchAdminOperation('social.automation.evaluate', undefined, principal)
+  } catch (error) {
+    desktopLogger().warn({ event: 'social.automation.skipped', err: error }, 'ارزیابی خودکار شبکه‌های اجتماعی انجام نشد')
+  }
+}
+
+function startSocialAutomationTimer() {
+  if (socialAutomationTimer) clearInterval(socialAutomationTimer)
+  if (!principal?.roles.includes('Owner')) return
+  socialAutomationTimer = setInterval(() => void runSocialAutomation(), 60_000)
+  void runSocialAutomation()
 }
 
 async function ensureConfigured() {
@@ -116,6 +135,7 @@ function registerIpc() {
     assertTrustedSender(event)
     await ensureConfigured()
     principal = await authenticateAdmin(request)
+    startSocialAutomationTimer()
     return {
       fullName: principal.fullName,
       username: principal.username,
@@ -125,6 +145,8 @@ function registerIpc() {
   ipcMain.handle('auth:logout', (event) => {
     assertTrustedSender(event)
     principal = null
+    if (socialAutomationTimer) clearInterval(socialAutomationTimer)
+    socialAutomationTimer = null
     desktopLogger().info({ event: 'auth.logout' }, 'خروج از حساب مدیریت')
   })
   ipcMain.handle('admin:invoke', async (event, request: AdminOperationRequest) => {
@@ -240,6 +262,7 @@ app.on('before-quit', (event) => {
   if (databaseClosedForQuit) return
   event.preventDefault()
   principal = null
+  if (socialAutomationTimer) clearInterval(socialAutomationTimer)
   void closeDatabase().finally(() => {
     databaseClosedForQuit = true
     app.quit()

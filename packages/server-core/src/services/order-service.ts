@@ -14,6 +14,7 @@ import { persianBusinessYear } from '../time'
 import type { TelegramIdentity } from '../telegram/validation'
 import { isAllowedOrderTransition, normalizePhone, optionalText } from '../domain/order-rules'
 import { consumeOrderInventory, reverseOrderInventory } from './v15-service'
+import { reserveDeliverySlot } from './delivery-slot-service'
 import { logger } from '../logging/logger'
 import { formatTelegramOrderInvoice } from '../domain/order-invoice'
 
@@ -46,6 +47,10 @@ type OrderRecord = {
   confirmedAt: DbTimestamp | null
   deliveredAt: DbTimestamp | null
   cancelledAt: DbTimestamp | null
+  deliveryDate: string | null
+  deliveryTimeSlotTitle: string | null
+  deliveryStartTime: string | null
+  deliveryEndTime: string | null
 }
 
 type OrderItemRecord = {
@@ -185,6 +190,7 @@ export async function createOrder(
   allowMissingTelegramIdentity = false,
   authenticatedUserId?: number,
   sendTelegramInvoice = false,
+  analytics?: { visitorId: string; sessionId: string | null },
 ): Promise<OrderDto> {
   if (!allowMissingTelegramIdentity && !identity.userId && !authenticatedUserId) {
     throw new UnauthorizedError('برای ثبت سفارش وارد حساب خود شوید.')
@@ -299,6 +305,25 @@ export async function createOrder(
       dishes.set(menuItem.id, { menuItem, quantity })
     }
 
+    // Delivery date is not client input: it is the date of the menu the items came from. That keeps
+    // one date model (`daily_menus.menu_date`) and makes "today's menu delivered tomorrow"
+    // unrepresentable. Mixing menus in one basket was already assumed impossible by the rice lookup
+    // below; now it is enforced rather than assumed.
+    const menuIds = new Set([...dishes.values()].map(({ menuItem }) => menuItem.dailyMenuId))
+    if (menuIds.size > 1) {
+      throw new AppError('اقلام سبد به روزهای مختلفی تعلق دارند و در یک سفارش ثبت نمی‌شوند.')
+    }
+    const deliveryMenuId = [...menuIds][0]!
+    const menuDates = await tx<{ menuDate: string }[]>`
+      SELECT menu_date::text AS "menuDate" FROM daily_menus WHERE id = ${deliveryMenuId} LIMIT 1
+    `
+    const deliveryDate = menuDates[0]?.menuDate ?? null
+    let deliverySnapshot: Awaited<ReturnType<typeof reserveDeliverySlot>> | null = null
+    if (request.deliveryTimeSlotId != null) {
+      if (!deliveryDate) throw new AppError('تاریخ تحویل این سفارش مشخص نیست.')
+      deliverySnapshot = await reserveDeliverySlot(tx, request.deliveryTimeSlotId, deliveryDate, now)
+    }
+
     const orderLines = [...dishes.values()]
     if (persianRicePortions > 0) {
       const menuId = orderLines[0]!.menuItem.dailyMenuId
@@ -336,12 +361,22 @@ export async function createOrder(
         (order_number, customer_profile_id, customer_address_id, delivery_full_name,
          delivery_phone_number, delivery_city, delivery_address_line,
          status, payment_method, delivery_method, subtotal_amount, delivery_fee,
-         total_amount, customer_note, created_at)
+         total_amount, customer_note, delivery_date, delivery_time_slot_id,
+         delivery_time_slot_title, delivery_start_time, delivery_end_time, created_at,
+         analytics_visitor_id, analytics_session_id)
       VALUES
         (${orderNumber}, ${customer.profileId}, ${customerAddressId}, ${fullName},
          ${phoneNumber}, ${city}, ${addressLine}, ${OrderStatus.PendingConfirmation},
          ${request.paymentMethod}, ${request.deliveryMethod}, ${subtotal}, 0,
-         ${subtotal}, ${optionalText(request.customerNote)}, ${nowSql})
+         ${subtotal}, ${optionalText(request.customerNote)},
+         ${deliverySnapshot ? deliveryDate : null}::date, ${deliverySnapshot?.slotId ?? null},
+         ${deliverySnapshot?.title ?? null},
+         ${deliverySnapshot?.startTime ?? null}::time,
+         ${deliverySnapshot?.endTime ?? null}::time, ${nowSql},
+         ${analytics?.visitorId ?? null}::uuid,
+         (SELECT id FROM analytics_sessions
+          WHERE id = ${analytics?.sessionId ?? null}::uuid
+            AND visitor_id = ${analytics?.visitorId ?? null}::uuid LIMIT 1))
       RETURNING id
     `
     const orderId = orderRows[0]!.id
@@ -419,7 +454,11 @@ export async function getOrder(id: number): Promise<OrderDto> {
            total_amount::float8 AS "totalAmount", customer_note AS "customerNote",
            admin_note AS "adminNote", created_at AS "createdAt",
            confirmed_at AS "confirmedAt", delivered_at AS "deliveredAt",
-           cancelled_at AS "cancelledAt"
+           cancelled_at AS "cancelledAt",
+           delivery_date::text AS "deliveryDate",
+           delivery_time_slot_title AS "deliveryTimeSlotTitle",
+           to_char(delivery_start_time, 'HH24:MI') AS "deliveryStartTime",
+           to_char(delivery_end_time, 'HH24:MI') AS "deliveryEndTime"
     FROM orders WHERE id = ${id} LIMIT 1
   `
   const order = records[0]
@@ -468,11 +507,19 @@ export async function searchOrders(query: OrderReportQuery): Promise<OrderSummar
     createdAt: DbTimestamp
     totalQuantity: number
     foodSummary: string
+    deliveryDate: string | null
+    deliveryTimeSlotTitle: string | null
+    deliveryStartTime: string | null
+    deliveryEndTime: string | null
   }>>`
     SELECT o.id, o.order_number AS "orderNumber", o.delivery_full_name AS "customerFullName",
            o.delivery_phone_number AS "customerPhoneNumber", o.status,
            o.total_amount::float8 AS "totalAmount", o.payment_method AS "paymentMethod",
            o.delivery_method AS "deliveryMethod", o.created_at AS "createdAt",
+           o.delivery_date::text AS "deliveryDate",
+           o.delivery_time_slot_title AS "deliveryTimeSlotTitle",
+           to_char(o.delivery_start_time, 'HH24:MI') AS "deliveryStartTime",
+           to_char(o.delivery_end_time, 'HH24:MI') AS "deliveryEndTime",
            COALESCE(SUM(oi.quantity), 0)::int AS "totalQuantity",
            COALESCE(string_agg(oi.food_name || ' × ' || oi.quantity, '، ' ORDER BY oi.id), '') AS "foodSummary"
     FROM orders o
@@ -490,7 +537,9 @@ export async function searchOrders(query: OrderReportQuery): Promise<OrderSummar
         WHERE food_item.order_id = o.id AND food_item.food_name ILIKE '%' || ${foodName} || '%'
       ))
     GROUP BY o.id
-    ORDER BY o.created_at DESC
+    -- Dispatch order for the kitchen: earliest delivery window first, with orders that carry no
+    -- window (manual/legacy) last rather than sorted among today's runs.
+    ORDER BY o.delivery_date NULLS LAST, o.delivery_start_time NULLS LAST, o.created_at DESC
   `
   return rows.map((row) => ({ ...row, createdAt: isoTimestamp(row.createdAt) }))
 }

@@ -9,6 +9,11 @@ import {
   updateCustomerProfile,
 } from '@/server/services/customer-service'
 import { requireCustomer, requireSameOrigin } from '@/server/auth/customer-session'
+import {
+  customerRateLimitIdentity,
+  enforceCustomerMutationIdentity,
+  enforceCustomerMutationIp,
+} from '@/server/rate-limit/customer-mutations'
 
 export async function GET(request: Request) {
   try {
@@ -25,7 +30,9 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     requireSameOrigin(request)
+    await enforceCustomerMutationIp(request, 'customerAccount')
     const customer = await requireCustomer(request)
+    await enforceCustomerMutationIdentity('customerAccount', customerRateLimitIdentity(customer.userId))
     const body = await readJson(request, customerProfileUpdateSchema)
     await updateCustomerProfile(customer.userId, body.preferredName)
     return NextResponse.json(await getCustomerProfileByUserId(customer.userId))

@@ -2,7 +2,7 @@ import { DeliveryMethod, PaymentMethod, type OrderDto } from '../../types'
 import { BrandLogo } from '../../design-system/BrandLogo'
 import { Icon } from '../../design-system/Icon'
 import { StatusBadge } from '../../design-system/StatusBadge'
-import { formatMoney, formatNumber, formatPersianDateTime } from '../../utils/format'
+import { formatDeliveryWindow, formatMoney, formatNumber, formatPersianDateTime, formatPersianDay } from '../../utils/format'
 
 const deliveryLabels = {
   [DeliveryMethod.Pickup]: 'تحویل حضوری',
@@ -32,6 +32,11 @@ export function OrderInvoice({ order, allowPrint = true }: { order: OrderDto; al
       <div><span>نام مشتری</span><strong>{order.customerFullName}</strong></div>
       <div><span>شماره تماس</span><strong><bdi dir="ltr">{order.customerPhoneNumber}</bdi></strong></div>
       <div><span>روش دریافت</span><strong>{deliveryLabels[order.deliveryMethod]}</strong></div>
+      {/* Rendered from the order's own snapshot, so later edits to the window never rewrite history.
+          Orders placed before delivery windows existed say so instead of showing an invented time. */}
+      <div><span>زمان تحویل</span><strong>{order.deliveryDate && order.deliveryStartTime && order.deliveryEndTime
+        ? `${formatPersianDay(order.deliveryDate)}، ${formatDeliveryWindow(order.deliveryStartTime, order.deliveryEndTime)}`
+        : 'زمان تحویل ثبت نشده'}</strong></div>
       <div><span>روش پرداخت</span><strong>{paymentLabels[order.paymentMethod]}</strong></div>
       {order.addressLine && <div className="invoice-address"><span>آدرس</span><strong>{order.addressLine}</strong></div>}
     </div>

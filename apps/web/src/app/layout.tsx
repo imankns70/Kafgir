@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Script from 'next/script'
 import '../client/index.css'
 import '../client/App.css'
+import { CustomerAnalytics } from '../client/CustomerAnalytics'
 
 export const metadata: Metadata = {
   title: 'کفگیر | غذای خانگی',
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // which the server never rendered. Without this, React fails hydration on every page load.
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body>
+        <CustomerAnalytics />
         {children}
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
       </body>

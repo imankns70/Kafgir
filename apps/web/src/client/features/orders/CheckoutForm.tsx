@@ -9,6 +9,7 @@ import { createOrder } from '../../services/ordersApi'
 import { getTelegramInitData, getTelegramUser } from '../../services/telegram'
 import { cartItemIssue } from '../../services/cartReconciliation'
 import { Icon } from '../../design-system/Icon'
+import { DeliverySlotPicker } from './DeliverySlotPicker'
 import { formatNumber } from '../../utils/format'
 import {
   DeliveryMethod,
@@ -43,6 +44,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   const [savedAddresses, setSavedAddresses] = useState<CustomerAddressDto[]>([])
   const [selectedAddressId, setSelectedAddressId] = useState<string>(newAddressValue)
   const [error, setError] = useState<string | null>(null)
+  const [deliveryTimeSlotId, setDeliveryTimeSlotId] = useState<number | null>(null)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
@@ -176,6 +178,8 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     if (isCheckingCart) return setError('لطفاً تا پایان بررسی موجودی صبر کنید.')
     if (!isCartVerified) return setError('پیش از ثبت سفارش، موجودی سبد را دوباره بررسی کنید.')
     if (cartIssue) return setError(cartIssue)
+    // Server revalidates this atomically; the check here only saves the customer a round trip.
+    if (deliveryTimeSlotId == null) return setError('برای ادامه، یک بازه زمانی تحویل انتخاب کنید.')
     if (items.some((item) => item.quantity <= 0)) return setError('تعداد یکی از غذاها معتبر نیست.')
     if (authentication === 'checking') return setError('لطفاً تا پایان بررسی وضعیت ورود صبر کنید.')
     if (authentication !== 'authenticated') {
@@ -209,6 +213,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         : 'تحویل حضوری',
       customerNote: form.customerNote.trim() || null,
       deliveryMethod: form.deliveryMethod, paymentMethod: form.paymentMethod,
+      deliveryTimeSlotId,
       items: items.map((item) => ({ dailyMenuItemId: item.dailyMenuItemId, withPersianRice: Boolean(item.withPersianRice), quantity: item.quantity })),
     }
     setIsSubmitting(true)
@@ -311,8 +316,9 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       <span>{selectedSavedAddress.city}، {selectedSavedAddress.addressLine}</span>
     </div>}
     {form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && <label className="field">آدرس<textarea value={form.addressLine} onChange={(e) => setField('addressLine', e.target.value)} /></label>}
+    <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} />
     <label className="field">توضیح سفارش<textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
     {error && <div className="form-error" role="alert">{error}</div>}
-    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || showLogin || !isCartVerified || Boolean(cartIssue) || items.length === 0}>{isSubmitting ? 'در حال ثبت سفارش…' : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
+    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || showLogin || !isCartVerified || Boolean(cartIssue) || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting ? 'در حال ثبت سفارش…' : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
   </form>
 }

@@ -52,12 +52,14 @@
 ## Verification
 
 - TypeScript lint: passed.
-- Current workspace tests: Contracts 11 passed, Server Core 2 passed, Web 71 passed with 14
-  guarded PostgreSQL integration cases skipped without `TEST_DATABASE_URL`, and Electron Admin 8 passed.
+- Current workspace tests: Contracts 27 passed, Server Core 80 passed, Web 134 passed with 50 guarded
+  PostgreSQL cases skipped without `TEST_DATABASE_URL`, and Electron Admin 16 passed.
 - Guarded PostgreSQL integration tests: 9/9 passed against disposable database `kafgir_food_discovery_test`.
 - Local PostgreSQL migration and seed against `kafgir`: passed.
 - Next.js production build: passed.
 - Electron production build and Windows x64 NSIS packaging: passed.
+- Analytics aggregate smoke query against the migrated configured development database: passed with
+  all eight fields and the zero-visitor conversion fallback.
 - Direct server-core smoke test against configured PostgreSQL: connection, admin authentication, and dashboard query passed without Next.js running.
 - Canonical-logo asset generation and legacy-brand reference audit: passed.
 - Packaged Electron launch smoke test: passed.
@@ -284,7 +286,115 @@
   alongside a second «این غذا خودِ برنج ایرانی است» flag.
 - `npm run db:seed-rice-options --workspace @kafgir/web` now prepares only «برنج ایرانی», priced as
   the ۵۵٬۰۰۰ upgrade difference, and still leaves menu placement and dish flags to Admin.
-- Order-number generation bound its substring offset untyped, so PostgreSQL resolved the POSIX-regex
-  overload `substring(text FROM text)` and every order in a Persian year collapsed to one counter
-  value. The offset is now cast to `int`. Local data already showed the damage: `14051` then `14056`,
-  with the next order guaranteed to collide.
+- All four workspaces build on TypeScript `7.0.2`. `npm run lint` is `tsc --noEmit` per workspace.
+- Checking «با برنج ایرانی» no longer changes the price silently. It opens `RiceUpgradeDialog`, which
+  states the current dish price, the upgrade difference, the resulting per-portion price, remaining
+  Persian rice portions, and that basket lines already added are untouched. Confirm applies the
+  upgrade; cancel, Escape, and backdrop click leave the checkbox off. Unchecking still applies at
+  once. One component serves both breakpoints: a bottom sheet under 640px, a centred modal above it,
+  switched purely in CSS so the server and client renders cannot disagree.
+- The Web cart row gives item information its own full-width row at every breakpoint, the remove
+  action is a filled `primary-button`, and the chosen rice renders as a solid read-only pill rather
+  than an icon-prefixed line that looked like a third quantity control.
+- Customers choose a delivery window at checkout. Migration `0016_lively_delivery_windows.sql` adds
+  `delivery_time_slots` (title, `time` start/end, sort order, `order_cutoff_minutes_before_start`,
+  active flag), `delivery_time_slot_availabilities` (per-date override with optional
+  `capacity_orders`, unique on date+slot), and five nullable delivery columns on `orders`.
+- Effective availability is the master active flag, then the optional date override, then the slot
+  cutoff, then capacity — evaluated once in `packages/server-core/src/domain/delivery-slot-rules.ts`
+  and reused by the public query, order creation and the Admin day view.
+- Delivery-slot capacity counts orders in every status except Cancelled, so cancelling frees the seat
+  immediately. This is deliberately unlike food capacity, which is a production counter consumed at
+  confirmation and released only from Confirmed/Preparing/Ready.
+- Order creation revalidates the window inside the order transaction under
+  `pg_advisory_xact_lock(date, slot)`, because capacity counts rows that do not exist yet and row
+  locks cannot block a concurrent insert. Verified with 8 concurrent attempts against 3 seats.
+- The delivery date is derived from the daily menu the basket belongs to, never sent by the client;
+  baskets spanning two menus are now rejected rather than assumed impossible.
+- `GET /api/delivery-slots` returns available/unavailable plus a reason code per window, and no
+  remaining counts. Checkout shows unavailable windows disabled with their Persian reason and blocks
+  submission until one is chosen.
+- Orders keep a title/start/end snapshot, so editing a window later never rewrites historical order
+  details. Orders created before this feature keep null values and display «زمان تحویل ثبت نشده».
+- Electron Admin gained «بازه‌های ارسال» (master windows, overlap rejected) and «ظرفیت ارسال روزانه»
+  (per-date enable/disable and optional capacity) under سیستم. Order details, the invoice, and the
+  report grid show the delivery window, and the order report sorts by delivery date then start time.
+- `npm run db:seed` inserts ظهر ۱۲–۱۴، بعدازظهر ۱۴–۱۶ and عصر ۱۶–۱۸ only when no window exists, so
+  re-seeding never overwrites edited hours or restores a deleted window.
+- Guarded PostgreSQL integration suites must run with `--no-file-parallelism`. Each suite calls
+  `configureDatabase`/`closeDatabase` on one shared module-level client, so in parallel they close
+  each other's connection. This is pre-existing and unrelated to any single suite.
+- Electron Admin now includes a Persian RTL social-publishing module for Telegram, Bale and Eitaa:
+  dashboard, channels, composer with mandatory per-platform preview, editable templates, rules,
+  suggestions and filterable per-target history/retry.
+- Migration `0017_social_publishing.sql` adds channels, templates, posts, targets, attempts,
+  automation rules/targets, suggestions and global settings. It seeds five templates and four
+  disabled Suggestion-mode rules; no automatic rule is enabled by migration.
+- Social services live in `packages/server-core` and use PostgreSQL locks, target idempotency,
+  bounded retries and explicit Unknown recovery. Electron main owns providers and DPAPI credential
+  decryption; renderer/preload receive neither tokens nor SQL capability.
+- Exact food capacity remains internal. Limited-availability public text is semantic only, and both
+  template validation and draft generation reject capacity placeholders or exact counts.
+- Automatic evaluation runs every 60 seconds only while Electron is open and an Owner is logged in.
+  The services are framework-independent for a future worker, but this release adds no worker.
+- Customer profile now has a mobile-first `سفارش‌های من` experience backed by a customer-only summary
+  query and a separate detail query. Active statuses are PendingConfirmation, Confirmed, Preparing and
+  Ready; Delivered and Cancelled are final. Cards prioritize active orders and use only persisted order
+  totals, delivery snapshots, status history and latest payment status.
+- Order timelines derive the initial PendingConfirmation timestamp from `orders.created_at` and every
+  later completed timestamp only from `order_status_histories`; missing transitions are never assigned
+  synthetic times. Cancelled orders end in an explicit cancellation branch.
+- Migration `0018_warm_order_reviews.sql` adds one editable review per order. Only the authenticated
+  owner of a Delivered order may create/update its 1–5 rating and optional 1000-character comment.
+- Customer payment DTOs expose only method, status, amount, optional provider, safe tracking/reference
+  values and timestamps. Financial-account IDs, receipt URLs, descriptions, admin notes and provider
+  internals are not returned by customer order endpoints.
+- The client IP behind the reverse proxy is resolved from `X-Forwarded-For` by counting entries from
+  the right, skipping `TRUSTED_PROXY_HOPS` proxy-appended values. Local development sets `0`, which
+  ignores forwarded headers entirely because nothing proxies `next dev`. The production hop count is
+  deployment-specific and unverified: it must be counted from the real chain before rollout rather
+  than assumed, since too low a value lets a caller pick their own bucket. Unidentifiable
+  callers share one `unknown` bucket. This replaces reading the leftmost entry, which let any caller
+  choose their own OTP rate-limit bucket by sending one header.
+- Lightweight first-party customer analytics is active for Web/Mini App traffic. Anonymous visitors
+  use a random UUID without creating a user, sessions roll over after more than 30 idle minutes,
+  visible pages heartbeat every two minutes, and PostgreSQL writes are throttled to 60 seconds.
+- Migration `0019_lightweight_customer_analytics.sql` adds analytics sessions and optional visitor/
+  session attribution on orders. The configured local development database has been migrated.
+- Electron Dashboard keeps its operational cards and adds the separate 8-card «آمار کاربران امروز»
+  section through one direct typed IPC operation. It polls every 30 seconds only while visible,
+  retains prior values on failure, and exposes accessible Persian calculation tooltips.
+- Analytics uses the same `Asia/Tehran` business-day boundary as order reporting. Authentication
+  associates the current guest session without changing VisitorId; analytics failure cannot block
+  login or ordering. Full definitions are in `.ai/docs/customer-analytics.md`.
+- Rate-limit infrastructure under `apps/web/src/server/rate-limit` now protects customer order
+  creation, cart reconciliation, profile/address writes, and food like/favorite mutations. Every
+  protected mutation has an identity budget plus a trusted-client-IP safety budget. Authenticated
+  customer IDs are primary; signed Telegram identity is used for Telegram order creation, while
+  anonymous cart reconciliation uses the first-party VisitorId with IP fallback. Keys are HMACs, so
+  no raw customer ID, Telegram ID, VisitorId or IP reaches limiter memory.
+- The V1 `InMemoryRateLimitStore` remains per-process and explicitly non-distributed. This is correct
+  only for the current single-instance deployment; multi-instance deployment requires a shared
+  store before relying on these limits across replicas. Health and Admin routes remain unrestricted
+  by this customer Phase 4 work, and Electron IPC is unchanged.
+- `TRUSTED_PROXY_HOPS` is now required in production: unset raises a configuration error instead of
+  falling back to a guess. Development still defaults, and local `.env.local` sets `0`.
+- Customer OTP send quotas are enforced against `customer_otp_challenges` inside one transaction
+  behind `pg_advisory_xact_lock` keyed on the normalized phone: 60s cooldown, 3 per 10 minutes and
+  10 per 24 hours per phone, 10 per 10 minutes and 30 per hour per client IP. The inserted challenge
+  row is the reservation and commits before the SMS provider is called, so a refused request can
+  never send a message and concurrent requests can no longer all pass the pre-insert count.
+- A provider failure after reservation keeps the row, so a failing provider cannot be retried
+  without limit. It is logged as `customer.otp.delivery_failed`, distinct from a refusal, which keeps
+  delivery failure separable from a successful send without a schema change.
+- OTP verification adds per-phone (10 per 10 minutes) and per-IP (30 per 10 minutes) limits from the
+  process store, since a verify attempt has no durable row to count. Five wrong codes now consume the
+  challenge rather than leaving it parked at the cap, forcing a fresh send.
+- Rate-limit rejections now emit the single structured event `rate_limit.rejected` with only policy,
+  operation, Retry-After, distribution state and status. Allowed requests are silent; raw identities,
+  credentials and request bodies are excluded by construction.
+- The final implemented endpoint classification and Redis migration boundary are documented in
+  `.ai/docs/rate-limiting.md`. V1 generic counters are fixed-window, bounded/expiring, in-memory,
+  per-process, non-distributed and reset on restart, so production must remain single-instance until
+  an atomic shared `IRateLimitStore` implementation is installed. Admin, health and Electron remain
+  outside customer rate limiting.

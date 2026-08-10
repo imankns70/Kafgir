@@ -19,6 +19,23 @@ export function persianBusinessYear(now = new Date()): number {
   return year
 }
 
+/** Minutes past midnight in the business timezone. Delivery cutoffs compare against this, never
+ *  against the server machine's clock or the browser's. */
+export function businessMinutesOfDay(now = new Date()): number {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: businessTimeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now)
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value)
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value)
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
+    throw new Error('Could not determine business time of day.')
+  }
+  return hour * 60 + minute
+}
+
 export function isIsoDate(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
 }

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import type { ZodType } from 'zod'
 import { AppError } from './errors'
 import { errorFields, logger } from './logging/logger'
+import { RateLimitError } from './rate-limit/store'
+import { rateLimitStore } from './rate-limit'
+import { logRateLimitRejection } from './rate-limit/observability'
 
 export async function readJson<T>(request: Request, schema: ZodType<T>): Promise<T> {
   let value: unknown
@@ -19,6 +22,20 @@ export async function readJson<T>(request: Request, schema: ZodType<T>): Promise
 }
 
 export function routeError(error: unknown) {
+  if (error instanceof RateLimitError) {
+    // Same body as any other AppError; only the retry hint is added. No limit, remaining count or
+    // window is disclosed — those would let a caller pace themselves just under the threshold.
+    logRateLimitRejection({
+      policy: error.context?.policy ?? 'unknown',
+      operation: error.context?.operation ?? 'unknown',
+      retryAfterSeconds: error.retryAfterSeconds,
+      storeDistributed: error.context?.storeDistributed ?? rateLimitStore().isDistributed,
+    })
+    return NextResponse.json(
+      { error: error.message },
+      { status: 429, headers: { 'Retry-After': String(error.retryAfterSeconds) } },
+    )
+  }
   if (error instanceof AppError) {
     logger.warn({ event: 'http.request.rejected', status: error.status, ...errorFields(error) }, error.message)
     return NextResponse.json({ error: error.message }, { status: error.status })

@@ -8,6 +8,7 @@ import { FoodImage } from '../../design-system/FoodImage'
 import { Icon } from '../../design-system/Icon'
 import { BrandedState } from '../../design-system/BrandedState'
 import { PriceDisplay } from '../../design-system/PriceDisplay'
+import { RiceUpgradeDialog } from '../../design-system/RiceUpgradeDialog'
 import { addStoredCartItem, loadStoredCart, setStoredCartItemQuantity } from '../../services/cartStorage'
 import { getCustomerSession, loginCustomerWithTelegram } from '../../services/customerApi'
 import { favoriteFood, getFoodDetails, likeFood } from '../../services/foodDiscoveryApi'
@@ -32,6 +33,7 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
   const [cartQuantity, setCartQuantity] = useState(0)
   const [cartItems, setCartItems] = useState<CartItem[]>([])
   const [withPersianRice, setWithPersianRice] = useState(false)
+  const [confirmingRice, setConfirmingRice] = useState(false)
   const [cartCount, setCartCount] = useState(0)
   const [isCustomerAuthenticated, setIsCustomerAuthenticated] = useState(false)
 
@@ -119,9 +121,9 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
     }
   }
 
-  const addToCart = () => {
+  const addToCart = (upgraded = withPersianRice) => {
     if (!food?.menuItemId || !food.price || !food.isOrderable) return
-    const rice = withPersianRice && food.allowsPersianRice ? food.persianRice : null
+    const rice = upgraded && food.allowsPersianRice ? food.persianRice : null
     const remaining = Math.min(food.remainingCapacity, rice?.remainingPortions ?? food.remainingCapacity)
     const nextCart = addStoredCartItem({
       dailyMenuItemId: food.menuItemId,
@@ -174,7 +176,7 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
     />
     {offersRice && <label className="rice-upgrade-option">
       <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
-        onChange={(event) => setWithPersianRice(event.target.checked)} />
+        onChange={(event) => event.target.checked ? setConfirmingRice(true) : setWithPersianRice(false)} />
       <span>{riceAvailable || upgradedInCart
         ? `با برنج ایرانی (+${formatMoney(rice.price)})`
         : 'برنج ایرانی امروز تمام شده است'}</span>
@@ -302,5 +304,17 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
     </main>
 
     {renderPurchaseBar('food-purchase-bar food-purchase-bar-mobile')}
+    {/* The purchase bar is rendered twice (sticky mobile, inline desktop); the dialog belongs to the
+        page so only one copy ever exists. */}
+    {/* Both answers add the dish right away — the dialog is the add action, not just a toggle — so
+        the customer never has to check a box and then hunt for a separate add button. */}
+    {confirmingRice && rice && <RiceUpgradeDialog
+      foodName={food.title}
+      basePrice={food.price ?? 0}
+      ricePrice={rice.price}
+      riceTitle={rice.title}
+      onConfirm={() => { setWithPersianRice(true); addToCart(true); setConfirmingRice(false) }}
+      onCancel={() => { setWithPersianRice(false); addToCart(false); setConfirmingRice(false) }}
+    />}
   </div>
 }

@@ -2,6 +2,14 @@
 
 ## Complete
 
+- [x] Add migration `0017_social_publishing.sql`, shared contracts and server-core services for
+  channels, templates, drafts, posts, targets, attempts, rules, suggestions and settings.
+- [x] Add typed Electron IPC and Persian RTL pages for social dashboard, channels, composer,
+  templates, rules, suggestions and history without exposing SQL or credentials to renderer.
+- [x] Add Telegram, Bale and Eitaa adapters, target-level retries/idempotency, Unknown crash
+  recovery, automation throttles and strict public-capacity privacy validation.
+- [x] Apply migration 0017 locally and verify real database drafts, seeded templates/rules and the
+  default Suggestion configuration with `social:verify`.
 - [x] Create npm workspace and shared Zod contracts
 - [x] Move the Mini App to Next.js App Router
 - [x] Preserve customer and admin `/api/...` contracts
@@ -39,6 +47,12 @@
 
 ## Remaining operational work
 
+- [ ] Add real channel credentials, run each channel connection test and perform one manual test
+  publication per platform before enabling any rule.
+- [ ] Review rule hours, quiet hours, daily caps and destination channels, then enable rules one by
+  one. Keep Suggestion mode until actual platform deliveries have been reviewed.
+- [ ] Package Electron on the secured Windows account and verify DPAPI tokens remain readable after
+  app restart. Never copy ciphertext as a portable credential backup.
 - [x] Run guarded PostgreSQL integration tests against disposable `kafgir_food_discovery_test`
 - [ ] Review the default `rice` assignment for four pre-existing foods (`food-1` through `food-4`)
 - [ ] Rehearse the SQL Server import against staging PostgreSQL
@@ -92,7 +106,9 @@
 - [x] Add a token-safe rotating Pinggy helper and runbook for private Telegram Mini App testing.
 - [ ] Create the Telegram bot through BotFather, add its token to the ignored local environment,
   configure the current Pinggy menu URL, and pin the stable bot link in the Telegram channel.
-- [ ] Configure the production SMS.ir API key, approved template ID, OTP secret, and allowed public origin.
+- [ ] Set the SMS.ir key and template `495934` plus a fresh 32-character `CUSTOMER_OTP_SECRET` and the
+  public origin in the Liara production environment, and switch that environment to `SMS_PROVIDER=smsir`.
+  Local `.env.local` already holds the credentials but deliberately stays on the console adapter.
 - [ ] Create the production `kafgir_electron_admin` role, save its TLS URL through first-run setup, and rotate it after the acceptance test.
 - [ ] Create the public Liara food-image bucket, migrate legacy disk URLs with the dry-run utility, and verify public URLs before removing the legacy media route.
 - [ ] Remove compatibility `/api/admin/*` and admin-login Next.js routes after packaged Electron acceptance.
@@ -164,7 +180,73 @@
 - [x] Replace the Web modal picker with one inline «با برنج ایرانی» checkbox, and the Electron rice
   fieldset with two plain checkboxes.
 - [x] Seed only «برنج ایرانی» at the upgrade-difference price.
+- [x] Migrate all four workspaces to TypeScript `7.0.2`.
+- [x] Give the Web cart item information its own full-width row, make removal a filled button, and
+  present the chosen rice as a read-only pill instead of an icon-prefixed line.
+- [x] Confirm the Persian rice upgrade before it changes the price, with an itemised breakdown shown
+  as a mobile bottom sheet and a desktop modal from one CSS-switched component.
 - [ ] Operator, once the dev database is reachable: apply migrations `0014`/`0015`, run the rice seed,
   add «برنج ایرانی» to each day's menu with its upgrade price and capacity, and tick
   «امکان افزودن برنج ایرانی» on the dishes that offer it.
 - [ ] Decide whether «خورشت … بدون برنج» should keep the flag carried over from the mandatory model.
+- [x] Add delivery time-slot master data, per-date availability/capacity override, and migration
+  `0016_lively_delivery_windows.sql`.
+- [x] Derive the delivery date from the basket's daily menu, reject baskets spanning two menus, and
+  snapshot title/start/end onto the order.
+- [x] Revalidate the window atomically at order creation under an advisory lock keyed on date+slot,
+  with capacity counting every non-Cancelled order.
+- [x] Add `GET /api/delivery-slots` and the checkout «زمان تحویل» radio-card section with disabled
+  unavailable windows and their Persian reasons.
+- [x] Add Electron Admin «بازه‌های ارسال» and «ظرفیت ارسال روزانه», and show the delivery window in
+  order details, invoices, and the report grid sorted by delivery date and start time.
+- [x] Seed three starting windows only into an empty table.
+- [ ] Operator: run migration `0016` and `npm run db:seed` against the live database, then review the
+  seeded window hours and cutoffs against real kitchen lead times.
+- [ ] Decide whether the checkout day selector should offer tomorrow's menu; the picker and
+  `GET /api/delivery-slots?date=` already accept any date, but the basket is single-menu today.
+- [ ] Consider a delivery-window filter on the Electron orders screen if operators ask for it; the
+  report already sorts by delivery date and start time.
+- [x] Replace the customer order-history list with warm responsive cards, active-order priority, actual
+  status progress, immutable address/price snapshots, adaptive payment state and pagination.
+- [x] Add a dedicated customer order-detail view with item snapshots, delivery data, financial summary,
+  safe payment details and full actual-history timeline.
+- [x] Add accessible delivered-order rating/comment create and edit with server-side ownership,
+  eligibility, range/length validation and a unique review per order.
+- [x] Apply migration `0018_warm_order_reviews.sql` to the configured local development database.
+- [ ] Run `customer-auth.integration.test.ts` against a migrated disposable database after setting both
+  `TEST_DATABASE_URL` and `DATABASE_URL` to the same database whose name contains `test`.
+- [x] Rate limiting phase 1: resolve the trusted client IP from `TRUSTED_PROXY_HOPS` instead of the
+  leftmost `X-Forwarded-For` entry.
+- [x] Rate limiting phase 2: `IRateLimitStore` (async, replaceable) plus a concurrency-safe, bounded,
+  auto-expiring in-memory store with fail-closed eviction, and a `withRateLimit` route wrapper.
+  V1 is per-process and explicitly not distributed; Redis is deliberately deferred.
+- [x] Rate limiting phase 3: reorder OTP to limiter →
+  durable reservation → SMS so a blocked send never reaches the provider, keeping delivery failure
+  distinguishable from a successful send, with per-phone/per-IP verification protection. No generic
+  rate-limit table or migration.
+- [x] Rate limiting phase 4: moderate identity and trusted-IP limits on order creation, cart snapshot,
+  customer profile/address writes, and food like/favorite mutations; add same-origin protection to
+  like/favorite. Health, Admin routes and Electron IPC remain untouched by design.
+- [x] Rate limiting phase 5: safe `rate_limit.rejected` observability, final actual-endpoint
+  classification, exclusion audit, single-instance limitations and future Redis migration path.
+  Admin rate limiting remains intentionally out of scope.
+- [x] Add first-party anonymous VisitorId and 30-minute analytics sessions without creating guest users.
+- [x] Add visible-only two-minute Web heartbeat with a 60-second PostgreSQL write throttle and
+  guest-to-authenticated session association.
+- [x] Add optional order visitor/session attribution and the single Tehran-business-day aggregate for
+  the eight approved customer analytics metrics.
+- [x] Add the separate Electron «آمار کاربران امروز» dashboard section, accessible Persian tooltips,
+  non-overlapping visible-only 30-second polling, and temporary-failure stale-value behavior.
+- [x] Apply migration `0019_lightweight_customer_analytics.sql` to the configured development database.
+- [ ] Run `customer-analytics.integration.test.ts` against a disposable migrated PostgreSQL database
+  after setting `TEST_DATABASE_URL`; the local machine currently has no Docker executable.
+- [ ] Before production rollout: count the real proxy chain from a deployed request's
+  `X-Forwarded-For` and set `TRUSTED_PROXY_HOPS` accordingly. The committed value is an unverified
+  placeholder; too low lets a caller choose their own rate-limit bucket.
+- [x] Rate limiting phase 2: `IRateLimitStore`, `InMemoryRateLimitStore`, centralized typed policies,
+  `withRateLimit`, 429 with `Retry-After`, HMAC keys, and production `TRUSTED_PROXY_HOPS` validation.
+  Customer mutation policies are attached explicitly at their route boundaries in Phase 4.
+- [x] Rate limiting phase 3: customer OTP send quotas with advisory-locked durable reservation, and
+  per-phone/per-IP verify limits with challenge locking. Admin and Telegram login untouched.
+- [x] Run `otp-rate-limit.integration.test.ts` against a migrated disposable PostgreSQL database;
+  all 18 cases passed, including concurrent per-IP reservation and successful-code reuse rejection.

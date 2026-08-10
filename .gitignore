@@ -8,6 +8,10 @@ node_modules/
 .data/
 dist/
 dist-installer/
+# Ad-hoc electron-builder output dirs (e.g. dist-social-validation-3/win-unpacked)
+dist-social-validation*/
+win-unpacked/
+win-unpacked.tmp/
 out/
 .next/
 .turbo/

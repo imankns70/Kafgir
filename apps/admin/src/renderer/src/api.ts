@@ -1,5 +1,10 @@
 import type {
   AdminDashboardSummaryDto,
+  CustomerAnalyticsTodayDto,
+  AdminDeliveryTimeSlotDto,
+  AdminDeliveryDayDto,
+  DeliveryTimeSlotWriteRequest,
+  DeliveryDayOverrideRequest,
   CreateOrderRequest,
   DailyMenuDto,
   DailyMenuItemWriteRequest,
@@ -37,6 +42,26 @@ import type {
   RecipeDto,
   ShoppingListSummaryDto,
   CustomerPaymentDto,
+  SocialAutomationEvaluationDto,
+  SocialChannelDto,
+  SocialChannelWriteRequest,
+  SocialDashboardDto,
+  SocialDraftDto,
+  SocialDraftRequest,
+  SocialHistoryPageDto,
+  SocialHistoryQuery,
+  SocialPostDto,
+  SocialPostTargetDto,
+  SocialPostWriteRequest,
+  SocialPreviewDto,
+  SocialPublishResultDto,
+  SocialRuleDto,
+  SocialRuleWriteRequest,
+  SocialSettingsDto,
+  SocialSettingsWriteRequest,
+  SocialSuggestionDto,
+  SocialTemplateDto,
+  SocialTemplateWriteRequest,
 } from '@kafgir/contracts'
 import type { AdminOperation } from '../../shared/admin-operations'
 
@@ -69,6 +94,7 @@ const directOperation = (
     'GET /api/health': 'health',
     'GET /api/admin/dashboard/today': 'dashboard.today',
     'GET /api/admin/dashboard/v15': 'dashboard.v15',
+    'GET /api/admin/dashboard/analytics': 'dashboard.analytics',
     'GET /api/admin/food-categories': 'foodCategories.list',
     'POST /api/admin/food-categories': 'foodCategories.create',
     'GET /api/admin/food-tags': 'foodTags.list',
@@ -93,6 +119,9 @@ const directOperation = (
     'POST /api/admin/shopping-lists': 'shopping.create',
     'GET /api/admin/payments': 'payments.list',
     'POST /api/admin/payments': 'payments.create',
+    'GET /api/admin/delivery-slots': 'deliverySlots.list',
+    'POST /api/admin/delivery-slots': 'deliverySlots.create',
+    'POST /api/admin/delivery-days': 'deliveryDays.setOverride',
     'GET /api/admin/logs': 'logs.server',
   }
   const key = `${method.toUpperCase()} ${pathname}`
@@ -107,6 +136,17 @@ const directOperation = (
       return { operation, payload: { kind: value.kind, value: value.entry } }
     }
     return { operation, payload: body === undefined ? undefined : { value: body } }
+  }
+  if (pathname === '/api/admin/delivery-days' && method === 'GET') {
+    return { operation: 'deliveryDays.get', payload: { date: params.get('date') ?? '' } }
+  }
+  const deliverySlotMatch = /^\/api\/admin\/delivery-slots\/(\d+)(\/active)?$/.exec(pathname ?? '')
+  if (deliverySlotMatch) {
+    const id = Number(deliverySlotMatch[1])
+    if (deliverySlotMatch[2]) {
+      return { operation: 'deliverySlots.setActive', payload: { id, isActive: (body as { isActive: boolean }).isActive } }
+    }
+    return { operation: 'deliverySlots.update', payload: { id, value: body } }
   }
   if (pathname === '/api/admin/orders' && method === 'GET') {
     const numeric = (name: string) => params.has(name) ? Number(params.get(name)) : undefined
@@ -231,6 +271,18 @@ const request = async <T>(path: string, method = 'GET', body?: unknown) => {
   }
 }
 
+const socialInvoke = async <T>(operation: AdminOperation, payload?: unknown, mutation = false) => {
+  try {
+    const result = await window.kafgir.invoke<T>(operation, payload)
+    if (mutation) notifyMutation('success', 'عملیات با موفقیت انجام شد.')
+    return result
+  } catch (error) {
+    const message = cleanIpcError(error)
+    if (mutation) notifyMutation('error', message || 'عملیات انجام نشد.')
+    throw new Error(message)
+  }
+}
+
 export interface LogEntry {
   time?: number
   level?: number
@@ -255,6 +307,18 @@ export const adminApi = {
     window.kafgir.login({ username, password }),
   logout: () => window.kafgir.logout(),
   dashboard: () => request<AdminDashboardSummaryDto>('/api/admin/dashboard/today'),
+  customerAnalytics: () => request<CustomerAnalyticsTodayDto>('/api/admin/dashboard/analytics'),
+  deliverySlots: () => request<AdminDeliveryTimeSlotDto[]>('/api/admin/delivery-slots'),
+  createDeliverySlot: (value: DeliveryTimeSlotWriteRequest) =>
+    request<AdminDeliveryTimeSlotDto>('/api/admin/delivery-slots', 'POST', value),
+  updateDeliverySlot: (id: number, value: DeliveryTimeSlotWriteRequest) =>
+    request<AdminDeliveryTimeSlotDto>(`/api/admin/delivery-slots/${id}`, 'PUT', value),
+  setDeliverySlotActive: (id: number, isActive: boolean) =>
+    request<void>(`/api/admin/delivery-slots/${id}/active`, 'POST', { isActive }),
+  deliveryDay: (date: string) =>
+    request<AdminDeliveryDayDto>(`/api/admin/delivery-days?date=${encodeURIComponent(date)}`),
+  setDeliveryDayOverride: (value: DeliveryDayOverrideRequest) =>
+    request<void>('/api/admin/delivery-days', 'POST', value),
   foodCategories: () => request<FoodCategoryDto[]>('/api/admin/food-categories'),
   createFoodCategory: (category: FoodCategoryWriteRequest) =>
     request<FoodCategoryDto>('/api/admin/food-categories', 'POST', category),
@@ -362,4 +426,38 @@ export const adminApi = {
   }>(`/api/admin/reports/v15?from=${from}&to=${to}`),
   serverLogs: (limit = 500) => request<LogEntry[]>(`/api/admin/logs?limit=${limit}`),
   desktopLogs: (limit = 500) => window.kafgir.desktopLogs(limit) as Promise<LogEntry[]>,
+  socialDashboard: () => socialInvoke<SocialDashboardDto>('social.dashboard'),
+  socialChannels: () => socialInvoke<SocialChannelDto[]>('social.channels.list'),
+  saveSocialChannel: (id: number | null, value: SocialChannelWriteRequest) =>
+    socialInvoke<SocialChannelDto>('social.channels.save', { id, value }, true),
+  testSocialChannel: (id: number) => socialInvoke<{
+    supported: boolean; connected: boolean; detail: string
+  }>('social.channels.test', { id }, true),
+  socialTemplates: () => socialInvoke<SocialTemplateDto[]>('social.templates.list'),
+  saveSocialTemplate: (value: SocialTemplateWriteRequest) =>
+    socialInvoke<SocialTemplateDto>('social.templates.save', { value }, true),
+  generateSocialDraft: (value: SocialDraftRequest) =>
+    socialInvoke<SocialDraftDto>('social.draft.generate', { value }),
+  previewSocialPost: (value: SocialPostWriteRequest) =>
+    socialInvoke<SocialPreviewDto[]>('social.preview', { value }),
+  createSocialPost: (value: SocialPostWriteRequest) =>
+    socialInvoke<SocialPostDto>('social.posts.create', { value }, true),
+  publishSocialPost: (id: number) =>
+    socialInvoke<SocialPublishResultDto>('social.posts.publish', { id }, true),
+  socialSuggestions: (date?: string) =>
+    socialInvoke<SocialSuggestionDto[]>('social.suggestions.list', { date }),
+  dismissSocialSuggestion: (id: number) =>
+    socialInvoke<void>('social.suggestions.dismiss', { id }, true),
+  evaluateSocialAutomation: () =>
+    socialInvoke<SocialAutomationEvaluationDto>('social.automation.evaluate', undefined, true),
+  socialRules: () => socialInvoke<SocialRuleDto[]>('social.rules.list'),
+  saveSocialRule: (id: number | null, value: SocialRuleWriteRequest) =>
+    socialInvoke<SocialRuleDto>('social.rules.save', { id, value }, true),
+  socialSettings: () => socialInvoke<SocialSettingsDto>('social.settings.get'),
+  saveSocialSettings: (value: SocialSettingsWriteRequest) =>
+    socialInvoke<SocialSettingsDto>('social.settings.save', { value }, true),
+  socialHistory: (query: SocialHistoryQuery) =>
+    socialInvoke<SocialHistoryPageDto>('social.history', { query }),
+  retrySocialTarget: (id: number) =>
+    socialInvoke<SocialPostTargetDto>('social.targets.retry', { id }, true),
 }

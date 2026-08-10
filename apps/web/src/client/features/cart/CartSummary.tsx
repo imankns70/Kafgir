@@ -53,7 +53,7 @@ export function CartSummary({ items, onQuantityChange }: { items: CartItem[]; on
           <div className="cart-name">{item.foodName}</div>
           <div className="cart-unit-price"><PriceDisplay compact label="" price={item.unitPrice} originalPrice={item.originalUnitPrice} discountPercentage={item.discountPercentage} /><small className="muted">× {formatNumber(item.quantity)}</small></div>
           {item.persianRiceTitle && <div className="cart-rice-option">
-            <Icon name="add" size="xs" /> {item.persianRiceTitle} — {formatMoney(item.persianRicePrice ?? 0)} × {formatNumber(item.quantity)}
+            <span>{item.persianRiceTitle} — {formatMoney(item.persianRicePrice ?? 0)} × {formatNumber(item.quantity)}</span>
           </div>}
           {issue && <span className="cart-item-warning"><Icon name="info" size="xs" />{issue}</span>}
         </div>
@@ -64,15 +64,15 @@ export function CartSummary({ items, onQuantityChange }: { items: CartItem[]; on
             <button type="button" className="quantity-button" aria-label={`اضافه کردن تعداد ${item.foodName}`} disabled={item.quantity >= item.remainingPortions}
               onClick={() => onQuantityChange(item.dailyMenuItemId, item.quantity + 1, Boolean(item.withPersianRice))}><Icon name="add" size="sm" /></button>
           </div>}
-          <button type="button" className="cart-remove-button" aria-label={`حذف ${item.foodName} از سبد`} onClick={() => requestQuantityChange(item, 0)}><Icon name="delete" size="sm" /><span>حذف</span></button>
+          <button type="button" className="primary-button cart-remove-button" aria-label={`حذف ${item.foodName} از سبد`} onClick={() => requestQuantityChange(item, 0)}><Icon name="delete" size="sm" /><span>حذف</span></button>
         </div>
         <span className="cart-line-total">{formatMoney(lineTotal(item))}{issue && <small>در جمع قابل سفارش محاسبه نشده</small>}</span>
         {pendingEmptyItem?.dailyMenuItemId === item.dailyMenuItemId && pendingEmptyItem?.withPersianRice === item.withPersianRice && <div className="cart-empty-confirmation" role="alertdialog" aria-labelledby="empty-cart-title" aria-describedby="empty-cart-description">
-          <span className="cart-empty-confirmation-icon" aria-hidden="true"><Icon name="info" size="md" /></span>
-          <div>
+          <div className="cart-empty-confirmation-head">
+            <span className="cart-empty-confirmation-icon" aria-hidden="true"><Icon name="info" size="md" /></span>
             <strong id="empty-cart-title">سبدت خالی می‌شود</strong>
-            <p id="empty-cart-description">با حذف «{item.foodName}» دیگر چیزی در سبد نمی‌ماند. مطمئنی؟</p>
           </div>
+          <p id="empty-cart-description">با حذف «{item.foodName}» دیگر چیزی در سبد نمی‌ماند. مطمئنی؟</p>
           <div className="cart-empty-confirmation-actions">
             <button ref={keepButton} type="button" className="outline-button" onClick={() => setPendingEmptyItem(null)}>نه، نگهش دار</button>
             <button type="button" className="outline-button danger-outline" onClick={confirmEmptyCart}>بله، سبد را خالی کن</button>
