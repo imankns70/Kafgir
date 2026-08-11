@@ -7,11 +7,24 @@ import { hashPassword } from '../src/server/auth/password'
 const localEnvPath = resolve(process.cwd(), '.env.local')
 if (existsSync(localEnvPath)) loadEnvFile(localEnvPath)
 
-const localAdmin = {
-  username: 'admin',
-  password: 'Admin@123456',
-  fullName: 'مدیر کفگیر',
+function productionSeedSetting(name: string, localDefault: string) {
+  const value = process.env[name]?.trim()
+  if (value) return value
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(`${name} is required when seeding production.`)
+  }
+  return localDefault
+}
+
+const seedAdmin = {
+  username: productionSeedSetting('ADMIN_SEED_USERNAME', 'admin'),
+  password: productionSeedSetting('ADMIN_SEED_PASSWORD', 'Admin@123456'),
+  fullName: productionSeedSetting('ADMIN_SEED_FULL_NAME', 'مدیر کفگیر'),
 } as const
+
+if (seedAdmin.password.length < 12) {
+  throw new Error('ADMIN_SEED_PASSWORD must contain at least 12 characters.')
+}
 
 const seedCategories = [
   ['برنجی', 'rice', '🍚'],
@@ -177,12 +190,10 @@ async function main() {
        full_name, is_active, created_at, email_confirmed, phone_number_confirmed,
        two_factor_enabled, lockout_enabled, access_failed_count, allows_write_to_pm)
     VALUES
-      (${localAdmin.username}, ${localAdmin.username.toUpperCase()}, ${hashPassword(localAdmin.password)}, 'scrypt',
-       ${localAdmin.fullName}, true, ${now}, false, false, false, true, 0, false)
+      (${seedAdmin.username}, ${seedAdmin.username.toUpperCase()}, ${hashPassword(seedAdmin.password)}, 'scrypt',
+       ${seedAdmin.fullName}, true, ${now}, false, false, false, true, 0, false)
     ON CONFLICT (normalized_username) DO UPDATE
       SET full_name = EXCLUDED.full_name,
-          password_hash = EXCLUDED.password_hash,
-          password_hash_scheme = EXCLUDED.password_hash_scheme,
           is_active = true
     RETURNING id
   `

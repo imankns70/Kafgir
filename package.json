@@ -16,6 +16,8 @@
     "db:test:down": "docker compose -f infra/postgres.compose.yml down",
     "dev:web": "npm run dev --workspace @kafgir/web",
     "dev:admin": "npm run dev --workspace @kafgir/admin",
+    "build:web": "npm run build --workspace @kafgir/contracts && npm run build --workspace @kafgir/server-core && npm run build --workspace @kafgir/web && node apps/web/scripts/prepare-standalone.mjs",
+    "start:web": "node apps/web/.next/standalone/apps/web/server.js",
     "telegram:configure": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/configure-telegram-miniapp.ps1",
     "db:generate": "npm run db:generate --workspace @kafgir/web",
     "db:migrate": "npm run db:migrate --workspace @kafgir/web",

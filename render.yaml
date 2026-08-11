@@ -1,0 +1,57 @@
+services:
+  - type: web
+    name: kafgir-web
+    runtime: node
+    plan: free
+    region: frankfurt
+    autoDeployTrigger: commit
+    buildCommand: npm ci && npm run build:web && npm run db:migrate && npm run db:seed
+    startCommand: npm run start:web
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOSTNAME
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: kafgir-db
+          property: connectionString
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+      - key: JWT_SIGNING_KEY
+        generateValue: true
+      - key: JWT_ISSUER
+        value: Kafgir
+      - key: JWT_AUDIENCE
+        value: Kafgir.Admin
+      - key: JWT_EXPIRES_MINUTES
+        value: "720"
+      - key: CUSTOMER_OTP_SECRET
+        generateValue: true
+      - key: NOTIFICATION_PROCESSOR_SECRET
+        generateValue: true
+      - key: ADMIN_SEED_USERNAME
+        value: admin
+      - key: ADMIN_SEED_PASSWORD
+        sync: false
+      - key: ADMIN_SEED_FULL_NAME
+        value: مدیر کفگیر
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_REQUIRE_INIT_DATA
+        value: "true"
+      - key: TELEGRAM_INIT_DATA_MAX_AGE_MINUTES
+        value: "1440"
+      - key: TRUSTED_PROXY_HOPS
+        value: "1"
+      - key: LOG_LEVEL
+        value: info
+
+databases:
+  - name: kafgir-db
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: "18"
+    databaseName: kafgir
+    user: kafgir
