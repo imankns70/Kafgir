@@ -85,6 +85,21 @@ The utility preserves IDs, imports tables in dependency order, resets sequences,
 
 ## Production
 
+### Render free trial
+
+The root `render.yaml` creates the Frankfurt `kafgir-web` service and `kafgir-db` PostgreSQL
+database on Render's free plans. Render prompts for `ADMIN_SEED_PASSWORD` and
+`TELEGRAM_BOT_TOKEN` during the first Blueprint setup; neither value belongs in Git. The web build
+excludes Electron, then applies Drizzle migrations and the idempotent reference-data seed.
+
+The free web service has no persistent disk, so local food-image uploads are temporary. Keep image
+uploads out of this trial deployment until object storage is configured. The packaged Electron app
+uses the database's external TLS URL and should use the restricted database role from
+`infra/postgres/create-electron-admin-role.sql`, not the database owner URL.
+
+After the first deploy, verify `/api/health`, confirm the real proxy chain before retaining
+`TRUSTED_PROXY_HOPS=1`, and set the resulting HTTPS URL as the Telegram Mini App URL.
+
 The Next.js service uses Liara's private PostgreSQL address. Electron main uses a dedicated restricted PostgreSQL login over TLS; its renderer has no database capability. In production, food photos use a public Liara Object Storage bucket. The notification route is protected by `NOTIFICATION_PROCESSOR_SECRET` and should be invoked once per minute.
 
 Create the restricted login while connected as the database owner:

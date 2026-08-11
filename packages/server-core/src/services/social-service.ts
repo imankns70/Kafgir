@@ -163,7 +163,7 @@ async function publicOrderUrl() {
   const settings = await sqlClient<{ value: string }[]>`
     SELECT value FROM app_settings WHERE key = 'PublicOrderUrl' LIMIT 1
   `
-  return settings[0]?.value || process.env.KAFGIR_PUBLIC_URL || 'http://localhost:3000'
+  return settings[0]?.value || process.env.KAFGIR_PUBLIC_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3000'
 }
 
 async function activeTemplate(type: SocialPostTemplateType) {
