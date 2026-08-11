@@ -14,9 +14,7 @@ services:
       - key: HOSTNAME
         value: 0.0.0.0
       - key: DATABASE_URL
-        fromDatabase:
-          name: kafgir-db
-          property: connectionString
+        sync: false
       - key: DATABASE_POOL_SIZE
         value: "5"
       - key: JWT_SIGNING_KEY
@@ -47,11 +45,3 @@ services:
         value: "1"
       - key: LOG_LEVEL
         value: info
-
-databases:
-  - name: kafgir-db
-    plan: free
-    region: frankfurt
-    postgresMajorVersion: "18"
-    databaseName: kafgir
-    user: kafgir
