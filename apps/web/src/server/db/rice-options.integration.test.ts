@@ -25,6 +25,7 @@ let menuId = 0
 let dishMenuItemId = 0
 let plainMenuItemId = 0
 let riceMenuItemId = 0
+let standaloneRiceMenuItemId = 0
 let profileId = 0
 
 async function stockOf(ingredientId: number) {
@@ -94,6 +95,7 @@ integration.sequential('optional Persian rice upgrade', () => {
     const dishFoodId = await food(`غذای برنجی ${suffix}`, `dish-${suffix}`, true, false)
     const plainFoodId = await food(`غذای ساده ${suffix}`, `plain-${suffix}`, false, false)
     const riceFoodId = await food(`برنج ایرانی ${suffix}`, `iranian-${suffix}`, false, true)
+    const standaloneRiceFoodId = await food(`یک پرس برنج ایرانی ${suffix}`, `rice-side-${suffix}`, false, false)
 
     // Each food consumes its own ingredients through an ordinary recipe.
     const recipe = async (foodId: number, ingredientId: number, quantityInBaseUnit: string) => {
@@ -106,6 +108,7 @@ integration.sequential('optional Persian rice upgrade', () => {
     }
     await recipe(dishFoodId, saffronIngredientId, '2')
     await recipe(riceFoodId, riceIngredientId, '250')
+    await recipe(standaloneRiceFoodId, riceIngredientId, '180')
 
     menuId = (await sql<{ id: number }[]>`
       INSERT INTO daily_menus (menu_date,is_open,created_at)
@@ -119,6 +122,7 @@ integration.sequential('optional Persian rice upgrade', () => {
     dishMenuItemId = await menuItem(dishFoodId, 100, 10)
     plainMenuItemId = await menuItem(plainFoodId, 80, 5)
     riceMenuItemId = await menuItem(riceFoodId, 55, 2)
+    standaloneRiceMenuItemId = await menuItem(standaloneRiceFoodId, 150, 3)
 
     profileId = (await sql<{ id: number }[]>`
       INSERT INTO customer_profiles (user_id,preferred_name,default_phone_number,created_at)
@@ -151,9 +155,10 @@ integration.sequential('optional Persian rice upgrade', () => {
     await sql.end()
   })
 
-  it('hides the Persian rice food and publishes it as the menu upgrade', async () => {
+  it('hides the upgrade but publishes a full standalone Persian-rice portion', async () => {
     const menu = await getPublicMenuPageByDate(menuDate, { q: '', category: '', limit: 12 })
-    expect(menu?.items.map((item) => item.id).sort()).toEqual([dishMenuItemId, plainMenuItemId].sort())
+    expect(menu?.items.map((item) => item.id).sort())
+      .toEqual([dishMenuItemId, plainMenuItemId, standaloneRiceMenuItemId].sort())
     expect(menu?.persianRice?.menuItemId).toBe(riceMenuItemId)
     expect(menu?.persianRice?.price).toBe(55)
 
@@ -162,6 +167,19 @@ integration.sequential('optional Persian rice upgrade', () => {
     // The upgrade is optional, so the scarce rice never caps the dish.
     expect(dish?.remainingPortions).toBe(10)
     expect(menu?.items.find((item) => item.id === plainMenuItemId)?.allowsPersianRice).toBe(false)
+    expect(menu?.items.find((item) => item.id === standaloneRiceMenuItemId)?.price).toBe(150)
+  })
+
+  it('orders and consumes the standalone Persian-rice portion as an ordinary food', async () => {
+    const riceBefore = await stockOf(riceIngredientId)
+    const order = await createOrder(orderRequest(standaloneRiceMenuItemId, false, 1), anonymous, true, userId)
+    expect(order.items).toHaveLength(1)
+    expect(order.items[0]?.dailyMenuItemId).toBe(standaloneRiceMenuItemId)
+    expect(order.totalAmount).toBe(150)
+
+    await updateOrderStatus(order.id, { newStatus: OrderStatus.Confirmed }, userId)
+    expect(await soldPortionsOf(standaloneRiceMenuItemId)).toBe(1)
+    expect(await stockOf(riceIngredientId)).toBe(riceBefore - 180)
   })
 
   it('orders a rice-capable dish without the upgrade as a single line', async () => {

@@ -58,10 +58,9 @@ const publicFoodTagSchema = z.object({
 })
 
 /**
- * Every dish already includes foreign rice in its price. Persian rice is the one purchasable upgrade:
- * an ordinary food carrying `isPersianRice`, on the daily menu with its own price and capacity, hidden
- * from the customer grid and offered only on dishes whose `allowsPersianRice` is set. Its price is the
- * upgrade difference, not a full portion, because the dish price already covers rice.
+ * `isPersianRice` identifies only the hidden upgrade item. Its price is the upgrade difference, not
+ * a full portion. A standalone Persian-rice side is an ordinary customer-visible food with its own
+ * full price; both products may share the same recipe ingredient and stock.
  */
 export const persianRiceSchema = z.object({
   menuItemId: z.number().int().positive(),
@@ -470,12 +469,12 @@ export const foodWriteSchema = z.object({
       message: 'نشان اصلی باید یکی از برچسب‌های انتخاب‌شده باشد.',
     })
   }
-  // Persian rice is what other dishes upgrade to; it cannot offer the upgrade to itself.
+  // The hidden Persian-rice upgrade cannot offer itself as another upgrade.
   if (value.isPersianRice && value.allowsPersianRice) {
     context.addIssue({
       code: 'custom',
       path: ['allowsPersianRice'],
-      message: 'غذای «برنج ایرانی» خودش نمی‌تواند گزینه افزودن برنج ایرانی داشته باشد.',
+      message: 'آیتم «ارتقا به برنج ایرانی» نمی‌تواند خودش گزینه ارتقای برنج داشته باشد.',
     })
   }
 })

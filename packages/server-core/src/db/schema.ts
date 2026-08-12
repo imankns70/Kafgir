@@ -235,8 +235,7 @@ export const foods = pgTable('foods', {
   imageUrl: varchar('image_url', { length: 2000 }),
   // Every dish includes foreign rice in its price. This offers the paid Persian rice upgrade.
   allowsPersianRice: boolean('allows_persian_rice').notNull().default(false),
-  // Marks the one purchasable Persian rice food: hidden from the customer grid and offered only as
-  // the upgrade on dishes that allow it.
+  // Marks the one hidden upgrade item. A full standalone rice portion stays a normal visible food.
   isPersianRice: boolean('is_persian_rice').notNull().default(false),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: utcTimestamp('created_at').notNull(),

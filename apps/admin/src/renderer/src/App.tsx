@@ -818,7 +818,7 @@ function FoodsPage({ onCreate, onEdit, onPhotos, onTags }: {
       <tbody>{visible.map((food) => {
         const hasPhoto = food.images.length > 0 || Boolean(food.imageUrl)
         const riceRole = food.isPersianRice
-          ? 'خودِ برنج ایرانی'
+          ? 'ارتقای مخفی برنج ایرانی'
           : food.allowsPersianRice ? 'قابل ارتقا به برنج ایرانی' : '—'
         return <tr key={food.id}><td>{food.name}</td><td>{categories.find((category) => category.id === food.categoryId)?.title}</td><td>{food.description}</td><td><span className={`badge ${hasPhoto ? 'open' : 'closed'}`}>{hasPhoto ? 'دارد' : 'ندارد'}</span></td><td><span className={`badge ${food.isPersianRice || food.allowsPersianRice ? 'open' : 'closed'}`}>{riceRole}</span></td><td><StatusPill active={food.isActive} /></td><td className="actions"><button onClick={() => onEdit(food.id)}>ویرایش</button><button onClick={() => onTags(food.id)}>تگ‌ها</button><button onClick={() => onPhotos(food.id)}>عکس‌ها</button></td></tr>
       })}</tbody></table></div>
@@ -935,12 +935,12 @@ function FoodEditorPage({
         <label className="switch">
           <input type="checkbox" checked={form.isPersianRice} disabled={form.allowsPersianRice}
             onChange={(event) => setForm({ ...form, isPersianRice: event.target.checked })} />
-          این غذا خودِ «برنج ایرانی» است
+          این آیتم «ارتقا به برنج ایرانی» است
         </label>
         <small className="food-rice-help">
-          همه غذاها با برنج خارجی سرو می‌شوند و قیمتشان شامل آن است. با فعال‌کردن گزینه اول، مشتری
-          می‌تواند برنج ایرانی را با پرداخت مابه‌التفاوت جایگزین کند. غذای «برنج ایرانی» در فهرست
-          غذاهای مشتری دیده نمی‌شود و قیمت و ظرفیتش مثل هر غذای دیگر در منوی امروز تنظیم می‌شود.
+          گزینه دوم فقط برای آیتم مخفی ارتقا است و قیمتش باید مابه‌التفاوت برنج خارجی و ایرانی باشد.
+          برای فروش یک پرس کامل کنار خورشت یا خوراک، یک غذای عادی با عنوان «یک پرس برنج ایرانی» بسازید؛
+          گزینه دوم را برای آن فعال نکنید تا مانند سایر غذاها در فهرست مشتری نمایش داده شود.
         </small>
       </fieldset>
       <label>توضیح کوتاه<textarea maxLength={300} value={form.description ?? ''} onChange={(event) => setForm({ ...form, description: event.target.value || null })} /></label>
@@ -1218,7 +1218,7 @@ function DailyMenuPage() {
     <Message error={error} />
     <form className="panel form-grid menu-form" onSubmit={saveItem}>
       <label>غذا<select value={foodId} disabled={editing !== null} onChange={(event) => setFoodId(event.target.value)} required>
-        <option value="">انتخاب غذا</option>{foods.filter((food) => food.isActive).map((food) => <option value={food.id} key={food.id}>{food.name}{food.isPersianRice ? ' (برنج ایرانی)' : ''}</option>)}</select>
+        <option value="">انتخاب غذا</option>{foods.filter((food) => food.isActive).map((food) => <option value={food.id} key={food.id}>{food.name}{food.isPersianRice ? ' (ارتقای مخفی)' : ''}</option>)}</select>
         <small>{selectedFood?.isPersianRice ? 'قیمت این ردیف باید مابه‌التفاوت ارتقا به برنج ایرانی باشد، نه قیمت یک پرس کامل برنج.' : selectedFood?.allowsPersianRice ? 'مشتری می‌تواند به این غذا برنج ایرانی اضافه کند؛ «برنج ایرانی» را هم به منوی امروز اضافه کنید.' : ''}</small></label>
       <label>قیمت امروز<input dir="ltr" inputMode="numeric" value={formatMoneyInput(price)} onChange={(event) => setPrice(parseMoneyInput(event.target.value))} /><small className="price-help">{numberToPersianWords(price)}</small></label>
       <label>ظرفیت پرس<input type="number" min="0" value={capacity} onChange={(event) => setCapacity(Number(event.target.value))} /><small /></label>
@@ -1229,12 +1229,12 @@ function DailyMenuPage() {
           : <small>با فعال‌سازی، قیمت تخفیف همان لحظه در وب نمایش داده می‌شود.</small>}
       </div>
       {selectedFood?.allowsPersianRice && !persianRice && <p className="menu-rice-warning">
-        «برنج ایرانی» هنوز به منوی امروز اضافه نشده است؛ تا وقتی اضافه نشود گزینه ارتقا به مشتری نمایش داده نمی‌شود.
+        «ارتقا به برنج ایرانی» هنوز به منوی امروز اضافه نشده است؛ تا وقتی اضافه نشود گزینه ارتقا به مشتری نمایش داده نمی‌شود.
       </p>}
       <button className="primary">{editing ? 'ذخیره' : 'افزودن به منو'}</button>
     </form>
     <div className="panel table-wrap"><table><thead><tr><th>غذا</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
-      <tbody>{menu?.items.map((item) => <tr key={item.id}><td>{item.foodName}</td><td>{item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)}</td><td>{persianRice?.menuItemId === item.id ? 'برنج ایرانی' : item.allowsPersianRice ? 'قابل ارتقا' : '—'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{plainNumber(item.capacityPortions)}</td><td>{plainNumber(item.soldPortions)}</td><td>{plainNumber(item.remainingPortions)}</td><td className="actions"><button onClick={() => edit(item)}>ویرایش</button><button className="discount-action" onClick={() => edit(item, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button><button className="danger" onClick={() => void adminApi.removeMenuItem(item.id).then(setMenu)}>حذف</button></td></tr>)}</tbody></table></div>
+      <tbody>{menu?.items.map((item) => <tr key={item.id}><td>{item.foodName}</td><td>{item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{plainNumber(item.capacityPortions)}</td><td>{plainNumber(item.soldPortions)}</td><td>{plainNumber(item.remainingPortions)}</td><td className="actions"><button onClick={() => edit(item)}>ویرایش</button><button className="discount-action" onClick={() => edit(item, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button><button className="danger" onClick={() => void adminApi.removeMenuItem(item.id).then(setMenu)}>حذف</button></td></tr>)}</tbody></table></div>
   </PageFrame>
 }
 
