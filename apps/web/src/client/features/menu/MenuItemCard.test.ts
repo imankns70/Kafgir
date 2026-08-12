@@ -37,7 +37,7 @@ const rice: PersianRiceDto = {
 }
 
 describe('MenuItemCard', () => {
-  it('keeps the compact Persian rice choice on the fresh-cooking metadata row', () => {
+  it('keeps the Persian rice choice in its own purchase row with a separate upgrade price', () => {
     const html = renderToStaticMarkup(createElement(MenuItemCard, {
       item: food,
       persianRice: rice,
@@ -47,8 +47,13 @@ describe('MenuItemCard', () => {
     }))
 
     const metadata = html.match(/<div class="menu-card-meta"[^>]*>([\s\S]*?)<\/div>/u)?.[1]
+    const purchase = html.match(/<div class="menu-card-purchase"[^>]*>([\s\S]*)<\/div><\/div><\/article>/u)?.[1]
     expect(metadata).toContain('پخت تازه امروز')
-    expect(metadata).toContain('class="rice-upgrade-option"')
-    expect(metadata).toContain('با برنج ایرانی (+30,000 تومان)')
+    expect(metadata).not.toContain('rice-upgrade-option')
+    expect(purchase).toContain('rice-upgrade-option rice-upgrade-option-card')
+    expect(purchase).toContain('class="rice-upgrade-label">با برنج ایرانی')
+    expect(purchase).toContain('class="rice-upgrade-price">+30,000 تومان')
+    expect(purchase).toContain('class="menu-card-action"')
+    expect(purchase).toContain('260,000 تومان')
   })
 })
