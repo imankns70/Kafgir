@@ -763,7 +763,9 @@ select:disabled {
 .menu-card-action,
 .cart-row,
 .cart-total { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.menu-card-action { display:grid;grid-row:4;grid-template-columns:minmax(118px,1fr) max-content;align-items:end;align-self:end;direction:ltr;gap:10px }
+.menu-card-purchase { grid-row:4;display:grid;align-self:end;gap:10px;min-width:0; }
+.menu-card-action { display:grid;grid-template-columns:max-content minmax(150px,1fr);align-items:end;direction:rtl;gap:10px;min-width:0; }
+.menu-card-action .add-button { width:100%; }
 .menu-card-price { display: grid; align-content: end; direction: rtl; gap: 1px; min-width: 0; }
 .menu-card-price > span { color: var(--kafgir-color-text-secondary); font-size: var(--kafgir-type-caption); }
 .price { color: var(--kafgir-color-primary); font-size: var(--kafgir-type-price); font-weight: 700; line-height: 1.35; white-space: nowrap; }
@@ -1476,19 +1478,26 @@ select:disabled {
 .rice-upgrade-option:has(input:disabled) { opacity: .6; cursor: not-allowed; background: transparent; }
 .rice-upgrade-option:has(input:disabled) input { cursor: not-allowed; }
 .rice-upgrade-option:has(input:focus-visible) { outline: 2px solid var(--kafgir-color-secondary); outline-offset: 2px; }
-.menu-card-meta .rice-upgrade-option {
-  flex: 0 1 auto;
+.rice-upgrade-option-card {
+  width: 100%;
   min-width: 0;
-  align-self: center;
-  gap: .35rem;
-  padding: .25rem .5rem;
+  min-height: 44px;
+  align-self: stretch;
+  gap: .5rem;
+  border-radius: var(--kafgir-radius-md);
+  padding: .55rem .7rem;
   border-color: color-mix(in srgb, var(--kafgir-color-secondary) 34%, var(--kafgir-color-border));
-  font-size: .7rem;
+  background: color-mix(in srgb, var(--kafgir-color-secondary-soft) 76%, var(--kafgir-color-surface));
+  font-size: .76rem;
   line-height: 1.45;
-  white-space: nowrap;
 }
-.menu-card-meta .rice-upgrade-option input { flex: 0 0 auto; width: .9rem; height: .9rem; }
-.menu-card-meta .rice-upgrade-option span { overflow: hidden; text-overflow: ellipsis; }
+.rice-upgrade-option-card input { flex: 0 0 auto; width: 1rem; height: 1rem; }
+.rice-upgrade-label { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.rice-upgrade-price { flex:0 0 auto;margin-inline-start:auto;padding-inline-start:.6rem;border-inline-start:1px solid color-mix(in srgb,var(--kafgir-color-secondary) 26%,transparent);direction:rtl;white-space:nowrap; }
+@media (max-width:340px) {
+  .menu-card-action { grid-template-columns:1fr;align-items:stretch; }
+  .menu-card-action .price-display { justify-self:end; }
+}
 .rice-upgrade-hint { display: inline-flex; align-items: center; gap: .3rem; color: var(--kafgir-color-secondary); font-size: .75rem; font-weight: 700; text-decoration: none; }
 .cart-variant-hint { display: block; color: var(--kafgir-color-text-muted); font-size: .72rem; line-height: 1.7; }
 /* A bare "+" icon here read as a third control next to the quantity +/- buttons. This is read-only
