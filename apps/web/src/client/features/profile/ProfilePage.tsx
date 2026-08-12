@@ -96,7 +96,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
     try {
       await requestCustomerOtp(phone)
       setLoginStep('code')
-      setResendSeconds(60)
+      setResendSeconds(120)
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'ارسال کد تایید ممکن نشد.')
     } finally {

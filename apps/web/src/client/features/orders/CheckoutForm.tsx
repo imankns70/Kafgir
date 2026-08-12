@@ -137,7 +137,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       await requestCustomerOtp(loginPhone)
       setField('phoneNumber', loginPhone.trim())
       setLoginStep('code')
-      setResendSeconds(60)
+      setResendSeconds(120)
     } catch (submitError) {
       setOtpError(submitError instanceof Error ? submitError.message : 'ارسال کد تایید ممکن نشد.')
     } finally {
