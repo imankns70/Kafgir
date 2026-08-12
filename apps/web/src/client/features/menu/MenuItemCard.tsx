@@ -53,14 +53,14 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
 
       <div className="menu-card-meta" aria-label="اطلاعات غذا">
         <span><Icon name="freshIngredients" size="xs" /> پخت تازه امروز</span>
+        {offersRice && <label className="rice-upgrade-option">
+          <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
+            onChange={(event) => event.target.checked ? setConfirmingRice(true) : setWithPersianRice(false)} />
+          <span>{riceAvailable || upgradedInCart
+            ? `با برنج ایرانی (+${formatMoney(persianRice.price)})`
+            : 'برنج ایرانی امروز تمام شده است'}</span>
+        </label>}
       </div>
-      {offersRice && <label className="rice-upgrade-option">
-        <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
-          onChange={(event) => event.target.checked ? setConfirmingRice(true) : setWithPersianRice(false)} />
-        <span>{riceAvailable || upgradedInCart
-          ? `با برنج ایرانی (+${formatMoney(persianRice.price)})`
-          : 'برنج ایرانی امروز تمام شده است'}</span>
-      </label>}
       {/* Both answers add the dish right away — the dialog is the add action, not just a toggle — so
           the customer never has to check a box and then hunt for a separate add button. */}
       {confirmingRice && persianRice && <RiceUpgradeDialog
