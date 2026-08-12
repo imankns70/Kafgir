@@ -77,16 +77,23 @@ async function main() {
         const ingredientId = ingredientRows[0]!.id
 
         // Hidden upgrade: its menu price is only the difference between foreign and Persian rice.
-        const foodRows = await tx<{ id: number }[]>`
+        const existingUpgradeFood = await tx<{ id: number }[]>`
+          SELECT id FROM foods
+          WHERE slug=${option.slug} OR is_persian_rice=TRUE
+            OR lower(btrim(name))=lower(btrim(${option.name}))
+          ORDER BY CASE WHEN is_persian_rice=TRUE THEN 0 WHEN slug=${option.slug} THEN 1 ELSE 2 END, id
+          LIMIT 1`
+        const foodRows = existingUpgradeFood[0] ? await tx<{ id: number }[]>`
+          UPDATE foods SET name=${option.name},slug=${option.slug},description=${option.description},
+            category_id=${foodCategoryId},default_price=${option.price},allows_persian_rice=FALSE,
+            is_persian_rice=TRUE,is_active=TRUE,updated_at=NOW()
+          WHERE id=${existingUpgradeFood[0].id}
+          RETURNING id` : await tx<{ id: number }[]>`
           INSERT INTO foods
             (name,slug,description,category_id,default_price,allows_persian_rice,is_persian_rice,
              is_active,created_at,updated_at)
           VALUES (${option.name},${option.slug},${option.description},${foodCategoryId},${option.price},
             FALSE,TRUE,TRUE,NOW(),NOW())
-          ON CONFLICT (slug) DO UPDATE SET
-            name=EXCLUDED.name, description=EXCLUDED.description, category_id=EXCLUDED.category_id,
-            default_price=EXCLUDED.default_price, allows_persian_rice=FALSE,
-            is_persian_rice=TRUE, is_active=TRUE, updated_at=NOW()
           RETURNING id`
         const foodId = foodRows[0]!.id
 
