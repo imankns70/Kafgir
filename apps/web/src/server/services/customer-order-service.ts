@@ -143,10 +143,14 @@ export async function getCustomerOrderDetail(userId: number, orderId: number): P
   if (!order) throw new NotFoundError('سفارش پیدا نشد.')
   const [items, histories, payments, reviews] = await Promise.all([
     sqlClient<CustomerOrderDetailDto['items']>`
-      SELECT id, daily_menu_item_id AS "dailyMenuItemId", food_name AS "foodName",
-             original_unit_price::float8 AS "originalUnitPrice", unit_price::float8 AS "unitPrice",
-             quantity, total_price::float8 AS "totalPrice"
-      FROM order_items WHERE order_id = ${orderId} ORDER BY id`,
+      SELECT oi.id, oi.daily_menu_item_id AS "dailyMenuItemId", oi.food_name AS "foodName",
+             f.allows_persian_rice AS "allowsPersianRice", f.is_persian_rice AS "isPersianRice",
+             oi.original_unit_price::float8 AS "originalUnitPrice", oi.unit_price::float8 AS "unitPrice",
+             oi.quantity, oi.total_price::float8 AS "totalPrice"
+      FROM order_items oi
+      JOIN daily_menu_items d ON d.id = oi.daily_menu_item_id
+      JOIN foods f ON f.id = d.food_id
+      WHERE oi.order_id = ${orderId} ORDER BY oi.id`,
     sqlClient<Array<Omit<CustomerOrderDetailDto['statusHistories'][number], 'changedAt'> & { changedAt: DbDate }>>`
       SELECT from_status AS "fromStatus", to_status AS "toStatus", note, changed_at AS "changedAt"
       FROM order_status_histories WHERE order_id = ${orderId} ORDER BY changed_at, id`,

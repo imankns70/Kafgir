@@ -11,7 +11,7 @@ describe('Telegram order invoice', () => {
       customerPhoneNumber: '09120000000',
       addressLine: 'اندیمشک، خیابان نمونه',
       deliveryMethod: DeliveryMethod.Delivery,
-      paymentMethod: PaymentMethod.CardToCard,
+      paymentMethod: PaymentMethod.Cash,
       subtotalAmount: 774000,
       deliveryFee: 0,
       totalAmount: 774000,

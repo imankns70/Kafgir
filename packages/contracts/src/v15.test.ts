@@ -13,7 +13,6 @@ import {
 describe('Kafgir v1.5 contracts', () => {
   it('keeps finance payment values aligned with order payment values', () => {
     expect(CustomerPaymentMethod.Cash).toBe(1)
-    expect(CustomerPaymentMethod.CardToCard).toBe(2)
     expect(CustomerPaymentMethod.OnlineGateway).toBe(3)
     expect(CustomerPaymentMethod.Pos).toBe(4)
   })
@@ -49,7 +48,7 @@ describe('Kafgir v1.5 contracts', () => {
 
   it('does not treat receipt upload as paid', () => {
     const payment = paymentWriteSchema.parse({
-      orderId: 1, paymentMethod: CustomerPaymentMethod.CardToCard,
+      orderId: 1, paymentMethod: CustomerPaymentMethod.OnlineGateway,
       financialAccountId: 1, amount: 1000, receiptImageUrl: '/receipt.webp',
     })
     expect(payment).not.toHaveProperty('status')

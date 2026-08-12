@@ -79,7 +79,7 @@ integration('customer authentication, order ownership and reviews', () => {
          'اندیمشک', 'نشانی تحویل‌شده', ${OrderStatus.Delivered}, ${PaymentMethod.Online}, 1,
          480000, 5000, 485000, NOW() - INTERVAL '3 day', NOW() - INTERVAL '2 day', NULL),
         (${`C-${suffix}`}, ${firstProfileId}, 'Customer A', '09120000001',
-         'اندیمشک', 'نشانی لغوشده', ${OrderStatus.Cancelled}, ${PaymentMethod.CardToCard}, 1,
+         'اندیمشک', 'نشانی لغوشده', ${OrderStatus.Cancelled}, ${PaymentMethod.Cash}, 1,
          200, 0, 200, NOW() - INTERVAL '5 day', NULL, NOW() - INTERVAL '4 day')
       RETURNING id, status
     `

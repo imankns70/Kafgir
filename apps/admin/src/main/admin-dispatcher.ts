@@ -114,6 +114,7 @@ import {
   saveSocialSettings,
   saveSocialTemplate,
   testSocialChannelConnection,
+  findCustomerByPhone,
 } from '@kafgir/server-core'
 import { readServerLogs } from '@kafgir/server-core/logging/read-logs'
 import type { AdminOperation } from '../shared/admin-operations'
@@ -186,6 +187,7 @@ export async function dispatchAdminOperation(
     case 'deliveryDays.get': return getDeliveryDay(textField(body, 'date'))
     case 'deliveryDays.setOverride':
       return setDeliveryDayOverride(deliveryDayOverrideWriteSchema.parse(body.value))
+    case 'customers.lookup': return findCustomerByPhone(textField(body, 'phoneNumber'))
     case 'orders.search': return searchOrders((body.query ?? {}) as OrderReportQuery)
     case 'orders.get': return getOrder(numberField(body, 'id'))
     case 'orders.create':

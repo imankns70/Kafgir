@@ -1,6 +1,7 @@
 import type {
   AdminDashboardSummaryDto,
   CustomerAnalyticsTodayDto,
+  CustomerProfileDto,
   AdminDeliveryTimeSlotDto,
   AdminDeliveryDayDto,
   DeliveryTimeSlotWriteRequest,
@@ -166,6 +167,9 @@ const directOperation = (
       },
     }
   }
+  if (pathname === '/api/admin/customers/lookup' && method === 'GET') {
+    return { operation: 'customers.lookup', payload: { phoneNumber: params.get('phone') ?? '' } }
+  }
   if (pathname === '/api/admin/orders' && method === 'POST') {
     return { operation: 'orders.create', payload: { value: body } }
   }
@@ -308,6 +312,8 @@ export const adminApi = {
   logout: () => window.kafgir.logout(),
   dashboard: () => request<AdminDashboardSummaryDto>('/api/admin/dashboard/today'),
   customerAnalytics: () => request<CustomerAnalyticsTodayDto>('/api/admin/dashboard/analytics'),
+  customerByPhone: (phoneNumber: string) =>
+    request<CustomerProfileDto | null>(`/api/admin/customers/lookup?phone=${encodeURIComponent(phoneNumber)}`),
   deliverySlots: () => request<AdminDeliveryTimeSlotDto[]>('/api/admin/delivery-slots'),
   createDeliverySlot: (value: DeliveryTimeSlotWriteRequest) =>
     request<AdminDeliveryTimeSlotDto>('/api/admin/delivery-slots', 'POST', value),

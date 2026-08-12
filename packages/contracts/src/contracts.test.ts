@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildInvoiceOrderLines,
   createOrderSchema,
   analyticsHeartbeatSchema,
   customerAnalyticsTodaySchema,
@@ -20,7 +21,9 @@ describe('shared contracts', () => {
     expect(OrderStatus.PendingConfirmation).toBe(1)
     expect(OrderStatus.Cancelled).toBe(6)
     expect(DeliveryMethod.Delivery).toBe(2)
-    expect(PaymentMethod.CardToCard).toBe(2)
+    expect(PaymentMethod.Cash).toBe(1)
+    expect(PaymentMethod.Online).toBe(3)
+    expect(PaymentMethod.Pos).toBe(4)
   })
 
   it('rejects an order without items', () => {
@@ -28,11 +31,33 @@ describe('shared contracts', () => {
       fullName: 'کاربر',
       phoneNumber: '09120000000',
       city: 'اندیمشک',
-      paymentMethod: PaymentMethod.CardToCard,
+      paymentMethod: PaymentMethod.Cash,
       deliveryMethod: DeliveryMethod.Pickup,
       items: [],
     })
     expect(result.success).toBe(false)
+  })
+
+  it('folds the technical Persian-rice row into one customer-facing invoice line', () => {
+    const lines = buildInvoiceOrderLines([
+      {
+        id: 1, dailyMenuItemId: 10, foodName: 'زرشک‌پلو با مرغ (ران)',
+        allowsPersianRice: true, isPersianRice: false,
+        unitPrice: 351000, quantity: 1, totalPrice: 351000,
+      },
+      {
+        id: 2, dailyMenuItemId: 11, foodName: 'برنج ایرانی',
+        allowsPersianRice: false, isPersianRice: true,
+        unitPrice: 30000, quantity: 1, totalPrice: 30000,
+      },
+    ])
+
+    expect(lines).toEqual([expect.objectContaining({
+      foodName: 'زرشک‌پلو با مرغ (ران) (با برنج ایرانی)',
+      unitPrice: 381000,
+      quantity: 1,
+      totalPrice: 381000,
+    })])
   })
 
   it('validates category slugs', () => {

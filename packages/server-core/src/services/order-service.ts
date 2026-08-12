@@ -57,6 +57,8 @@ type OrderItemRecord = {
   id: number
   dailyMenuItemId: number
   foodName: string
+  allowsPersianRice: boolean
+  isPersianRice: boolean
   originalUnitPrice: number | null
   unitPrice: number
   quantity: number
@@ -101,7 +103,10 @@ async function resolveCustomer(
         SELECT u.id, p.id AS "profileId"
         FROM users u
         LEFT JOIN customer_profiles p ON p.user_id = u.id
+        LEFT JOIN customer_login_phones lp ON lp.user_id = u.id
         WHERE u.phone_number = ${phoneNumber} OR u.username = ${username}
+           OR lp.normalized_phone_number = ${phoneNumber}
+           OR p.default_phone_number = ${phoneNumber}
         ORDER BY u.id
         LIMIT 1
       `
@@ -464,10 +469,14 @@ export async function getOrder(id: number): Promise<OrderDto> {
   const order = records[0]
   if (!order) throw new NotFoundError()
   const items = await sqlClient<OrderItemRecord[]>`
-    SELECT id, daily_menu_item_id AS "dailyMenuItemId", food_name AS "foodName",
-           original_unit_price::float8 AS "originalUnitPrice",
-           unit_price::float8 AS "unitPrice", quantity, total_price::float8 AS "totalPrice"
-    FROM order_items WHERE order_id = ${id} ORDER BY id
+    SELECT oi.id, oi.daily_menu_item_id AS "dailyMenuItemId", oi.food_name AS "foodName",
+           f.allows_persian_rice AS "allowsPersianRice", f.is_persian_rice AS "isPersianRice",
+           oi.original_unit_price::float8 AS "originalUnitPrice",
+           oi.unit_price::float8 AS "unitPrice", oi.quantity, oi.total_price::float8 AS "totalPrice"
+    FROM order_items oi
+    JOIN daily_menu_items d ON d.id = oi.daily_menu_item_id
+    JOIN foods f ON f.id = d.food_id
+    WHERE oi.order_id = ${id} ORDER BY oi.id
   `
   const histories = await sqlClient<HistoryRecord[]>`
     SELECT from_status AS "fromStatus", to_status AS "toStatus", note, changed_at AS "changedAt"

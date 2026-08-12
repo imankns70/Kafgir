@@ -32,7 +32,7 @@ const orderRequest = (deliveryTimeSlotId: number | null, quantity = 1) => ({
   city: 'اندیمشک',
   addressLine: 'آدرس تست',
   saveAddress: false,
-  paymentMethod: PaymentMethod.CardToCard,
+  paymentMethod: PaymentMethod.Cash,
   deliveryMethod: DeliveryMethod.Delivery,
   customerNote: null,
   deliveryTimeSlotId,

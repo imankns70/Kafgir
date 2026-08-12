@@ -24,6 +24,7 @@ export const adminOperations = [
   'menus.addItem',
   'menus.updateItem',
   'menus.removeItem',
+  'customers.lookup',
   'orders.search',
   'orders.get',
   'orders.create',

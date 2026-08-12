@@ -47,7 +47,7 @@ const orderRequest = (dailyMenuItemId: number, withPersianRice: boolean, quantit
   city: 'اندیمشک',
   addressLine: 'آدرس تست',
   saveAddress: false,
-  paymentMethod: PaymentMethod.CardToCard,
+  paymentMethod: PaymentMethod.Cash,
   deliveryMethod: DeliveryMethod.Pickup,
   customerNote: null,
   items: [{ dailyMenuItemId, withPersianRice, quantity }],
@@ -244,5 +244,14 @@ integration.sequential('optional Persian rice upgrade', () => {
     await updateOrderStatus(order.id, { newStatus: OrderStatus.Cancelled }, userId)
     expect(await soldPortionsOf(riceMenuItemId)).toBe(2)
     expect(await stockOf(riceIngredientId)).toBe(riceBefore)
+  })
+
+  it('confirms a sold order even when opening ingredient stock was not entered', async () => {
+    await sql`DELETE FROM inventory_transactions WHERE ingredient_id=${saffronIngredientId}`
+    const order = await createOrder(orderRequest(dishMenuItemId, false, 1), anonymous, true, userId)
+
+    await updateOrderStatus(order.id, { newStatus: OrderStatus.Confirmed }, userId)
+
+    expect(await stockOf(saffronIngredientId)).toBe(-2)
   })
 })

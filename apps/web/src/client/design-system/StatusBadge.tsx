@@ -2,8 +2,8 @@ import { OrderStatus } from '../types'
 import { Icon, type IconName } from './Icon'
 
 const presentation: Record<OrderStatus, { label: string; tone: string; icon: IconName }> = {
-  [OrderStatus.PendingConfirmation]: { label: 'در انتظار تایید', tone: 'warning', icon: 'clock' },
-  [OrderStatus.Confirmed]: { label: 'تایید شده', tone: 'primary', icon: 'confirm' },
+  [OrderStatus.PendingConfirmation]: { label: 'در انتظار تأیید', tone: 'warning', icon: 'clock' },
+  [OrderStatus.Confirmed]: { label: 'تأیید شده', tone: 'primary', icon: 'confirm' },
   [OrderStatus.Preparing]: { label: 'در حال آماده‌سازی', tone: 'accent', icon: 'kitchen' },
   [OrderStatus.Ready]: { label: 'آماده تحویل', tone: 'info', icon: 'packaging' },
   [OrderStatus.Delivered]: { label: 'تحویل شده', tone: 'success', icon: 'delivery' },
