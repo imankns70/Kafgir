@@ -53,13 +53,6 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
 
       <div className="menu-card-meta" aria-label="اطلاعات غذا">
         <span><Icon name="freshIngredients" size="xs" /> پخت تازه امروز</span>
-        {offersRice && <label className="rice-upgrade-option">
-          <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
-            onChange={(event) => event.target.checked ? setConfirmingRice(true) : setWithPersianRice(false)} />
-          <span>{riceAvailable || upgradedInCart
-            ? `با برنج ایرانی (+${formatMoney(persianRice.price)})`
-            : 'برنج ایرانی امروز تمام شده است'}</span>
-        </label>}
       </div>
       {/* Both answers add the dish right away — the dialog is the add action, not just a toggle — so
           the customer never has to check a box and then hunt for a separate add button. */}
@@ -71,47 +64,57 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
         onConfirm={() => { setWithPersianRice(true); onAdd(item, true); setConfirmingRice(false) }}
         onCancel={() => { setWithPersianRice(false); onAdd(item, false); setConfirmingRice(false) }}
       />}
-      {otherLine && <small className="cart-variant-hint">
-        {formatNumber(otherLine.quantity)} پرس {otherLine.withPersianRice ? 'با برنج ایرانی' : 'بدون برنج ایرانی'} هم در سبد شماست
-      </small>}
+      <div className="menu-card-purchase">
+        {offersRice && <label className="rice-upgrade-option rice-upgrade-option-card">
+          <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
+            onChange={(event) => event.target.checked ? setConfirmingRice(true) : setWithPersianRice(false)} />
+          <span className="rice-upgrade-label">{riceAvailable || upgradedInCart
+            ? 'با برنج ایرانی'
+            : 'برنج ایرانی امروز تمام شده است'}</span>
+          {(riceAvailable || upgradedInCart) && <span className="rice-upgrade-price">+{formatMoney(persianRice.price)}</span>}
+        </label>}
+        {otherLine && <small className="cart-variant-hint">
+          {formatNumber(otherLine.quantity)} پرس {otherLine.withPersianRice ? 'با برنج ایرانی' : 'بدون برنج ایرانی'} هم در سبد شماست
+        </small>}
 
-      <div className="menu-card-action">
-        <div>
-          <PriceDisplay
-            price={item.price + (withPersianRice && persianRice ? persianRice.price : 0)}
-            originalPrice={item.originalPrice}
-            discountPercentage={item.discountPercentage}
-            showDiscountPill={false}
-          />
+        <div className="menu-card-action">
+          <div>
+            <PriceDisplay
+              price={item.price + (withPersianRice && persianRice ? persianRice.price : 0)}
+              originalPrice={item.originalPrice}
+              discountPercentage={item.discountPercentage}
+              showDiscountPill={false}
+            />
+          </div>
+          {isInCart
+            ? <div className="add-button quantity-add-control" aria-label={`${item.foodName} در سبد خرید`}>
+                <button
+                  type="button"
+                  className="quantity-add-button"
+                  onClick={() => onQuantityChange(item.id, quantity - 1, withPersianRice)}
+                  aria-label={`کم کردن ${item.foodName}`}
+                >
+                  <Icon name="minus" size="sm" />
+                </button>
+                <span className="quantity-add-status">
+                  <span>{formatNumber(quantity)}</span>
+                  <small>در سبد خرید</small>
+                </span>
+                <button
+                  type="button"
+                  className="quantity-add-button"
+                  onClick={() => onAdd(item, withPersianRice)}
+                  disabled={!canIncrease}
+                  aria-label={`اضافه کردن ${item.foodName}`}
+                >
+                  <Icon name="add" size="sm" />
+                </button>
+              </div>
+            : <button className="primary-button add-button" onClick={() => onAdd(item, withPersianRice)}>
+                <Icon name="cart" size="sm" />
+                <span>{withPersianRice ? 'افزودن با برنج ایرانی' : 'افزودن به سبد خرید'}</span>
+              </button>}
         </div>
-        {isInCart
-          ? <div className="add-button quantity-add-control" aria-label={`${item.foodName} در سبد خرید`}>
-              <button
-                type="button"
-                className="quantity-add-button"
-                onClick={() => onQuantityChange(item.id, quantity - 1, withPersianRice)}
-                aria-label={`کم کردن ${item.foodName}`}
-              >
-                <Icon name="minus" size="sm" />
-              </button>
-              <span className="quantity-add-status">
-                <span>{formatNumber(quantity)}</span>
-                <small>در سبد خرید</small>
-              </span>
-              <button
-                type="button"
-                className="quantity-add-button"
-                onClick={() => onAdd(item, withPersianRice)}
-                disabled={!canIncrease}
-                aria-label={`اضافه کردن ${item.foodName}`}
-              >
-                <Icon name="add" size="sm" />
-              </button>
-            </div>
-          : <button className="primary-button add-button" onClick={() => onAdd(item, withPersianRice)}>
-              <Icon name="cart" size="sm" />
-              <span>{withPersianRice ? 'افزودن با برنج ایرانی' : 'افزودن به سبد خرید'}</span>
-            </button>}
       </div>
     </div>
   </article>
