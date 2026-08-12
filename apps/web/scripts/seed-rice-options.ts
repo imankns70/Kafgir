@@ -6,16 +6,14 @@ import postgres from 'postgres'
 const envPath = resolve(process.cwd(), '.env.local')
 if (existsSync(envPath)) loadEnvFile(envPath)
 if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is required.')
-if (process.env.NODE_ENV === 'production' && process.env.ALLOW_OPERATIONAL_DEMO_SEED !== 'true') {
-  throw new Error('Rice option demo seed is disabled in production.')
-}
 const sql = postgres(process.env.DATABASE_URL, { max: 1, prepare: false })
 
 /**
  * Foreign rice is what every dish already comes with, priced into the dish. Persian rice is the one
- * paid upgrade, modelled as a standalone food carrying `is_persian_rice`. This seed prepares its
- * ingredient, the food and its recipe. It deliberately does NOT put it on any daily menu and does not
- * flag any dish: price, capacity and which dishes offer the upgrade stay the owner's decisions.
+ * paid upgrade, modelled as a hidden food carrying `is_persian_rice`. A second, ordinary food is a
+ * full standalone portion for stews, sandwiches and other dishes that need rice on the side. Both
+ * recipes consume the same tracked ingredient, but each gets its own daily-menu price and capacity.
+ * This seed deliberately does NOT put either product on a daily menu and does not flag any dish.
  */
 const persianRice = {
   code: 'KFG-RICE-01',
@@ -23,7 +21,17 @@ const persianRice = {
   // The dish price already includes foreign rice, so this is the upgrade difference only.
   price: 55_000,
   description: 'ارتقای برنج غذا از خارجی به ایرانی',
-  gramsPerPortion: '250', minimum: 20_000, preferred: 70_000, unitCost: 185,
+  gramsPerPortion: '250', minimum: 20_000, preferred: 70_000,
+} as const
+
+const standalonePersianRice = {
+  name: 'یک پرس برنج ایرانی', slug: 'persian-rice-side',
+  price: 150_000,
+  description: 'یک پرس کامل برنج ایرانی برای سفارش کنار خورشت، خوراک یا غذای نونی',
+  fullDescription: 'برنج ایرانی دم‌کشیده در ظرف جدا؛ قابل سفارش به‌عنوان غذای جانبی مستقل.',
+  ingredients: 'برنج ایرانی، روغن و نمک',
+  portionDescription: 'یک پرس کامل برنج پخته در ظرف جداگانه',
+  gramsPerPortion: '180',
 } as const
 
 async function main() {
@@ -31,8 +39,7 @@ async function main() {
     await sql.begin(async (tx) => {
       const category = await tx<{ id: number }[]>`SELECT id FROM ingredient_categories WHERE name='برنج و غلات' LIMIT 1`
       const unit = await tx<{ id: number }[]>`SELECT id FROM units WHERE name='گرم' OR symbol='g' ORDER BY id LIMIT 1`
-      const user = await tx<{ id: number }[]>`SELECT id FROM users WHERE is_active=TRUE ORDER BY id LIMIT 1`
-      if (!category[0] || !unit[0] || !user[0]) throw new Error('Seed operational demo data first (category, gram unit and admin user are required).')
+      if (!category[0] || !unit[0]) throw new Error('Rice ingredient category and gram unit are required.')
 
       const foodCategory = await tx<{ id: number }[]>`
         INSERT INTO food_categories (title,slug,icon,display_order,is_active,created_at,updated_at)
@@ -69,18 +76,7 @@ async function main() {
           RETURNING id`
         const ingredientId = ingredientRows[0]!.id
 
-        const stock = await tx<{ value: number }[]>`
-          SELECT COALESCE(SUM(quantity_in_base_unit),0)::float8 value
-          FROM inventory_transactions WHERE ingredient_id=${ingredientId}`
-        if ((stock[0]?.value ?? 0) <= 0) {
-          await tx`INSERT INTO inventory_transactions
-            (ingredient_id,transaction_type,quantity_in_base_unit,unit_cost,total_cost,reference_type,
-             transaction_group,transaction_date,notes,created_by_user_id,created_at)
-            VALUES (${ingredientId},6,50000,${option.unitCost},${50000 * option.unitCost},'rice-option-demo',
-              'rice-option-demo',NOW(),'موجودی نمونه برای آموزش انتخاب برنج',${user[0].id},NOW())`
-        }
-
-        // The Persian rice food: hidden from the customer grid, offered only as the upgrade.
+        // Hidden upgrade: its menu price is only the difference between foreign and Persian rice.
         const foodRows = await tx<{ id: number }[]>`
           INSERT INTO foods
             (name,slug,description,category_id,default_price,allows_persian_rice,is_persian_rice,
@@ -106,13 +102,50 @@ async function main() {
             INSERT INTO recipe_items (recipe_id,ingredient_id,quantity_in_base_unit,waste_percent,notes)
             VALUES (${recipeRows[0]!.id},${ingredientId},${option.gramsPerPortion}::numeric,0,NULL)`
         }
+
+        // Standalone side dish: an ordinary customer-visible food with a full-portion price. It uses
+        // the same rice ingredient as the hidden upgrade, so confirmed orders share real stock.
+        const side = standalonePersianRice
+        const existingSideFood = await tx<{ id: number }[]>`
+          SELECT id FROM foods
+          WHERE slug=${side.slug} OR lower(btrim(name))=lower(btrim(${side.name}))
+          ORDER BY CASE WHEN slug=${side.slug} THEN 0 ELSE 1 END, id
+          LIMIT 1`
+        const sideFoodRows = existingSideFood[0] ? await tx<{ id: number }[]>`
+          UPDATE foods SET name=${side.name},slug=${side.slug},description=${side.description},
+            full_description=${side.fullDescription},ingredients=${side.ingredients},
+            portion_description=${side.portionDescription},category_id=${foodCategoryId},
+            allows_persian_rice=FALSE,is_persian_rice=FALSE,is_active=TRUE,updated_at=NOW()
+          WHERE id=${existingSideFood[0].id}
+          RETURNING id` : await tx<{ id: number }[]>`
+          INSERT INTO foods
+            (name,slug,description,full_description,ingredients,portion_description,category_id,
+             default_price,allows_persian_rice,is_persian_rice,is_active,created_at,updated_at)
+          VALUES (${side.name},${side.slug},${side.description},${side.fullDescription},
+            ${side.ingredients},${side.portionDescription},${foodCategoryId},${side.price},
+            FALSE,FALSE,TRUE,NOW(),NOW())
+          RETURNING id`
+        const sideFoodId = sideFoodRows[0]!.id
+        const existingSideRecipe = await tx<{ id: number }[]>`
+          SELECT id FROM recipes WHERE food_id=${sideFoodId} AND is_active=TRUE LIMIT 1`
+        if (!existingSideRecipe[0]) {
+          const recipeRows = await tx<{ id: number }[]>`
+            INSERT INTO recipes (food_id,yield_quantity,preparation_loss_percent,overhead_per_portion,
+              notes,is_active,created_at,updated_at)
+            VALUES (${sideFoodId},1,0,0,'مصرف یک پرس مستقل برنج از موجودی مشترک.',TRUE,NOW(),NOW())
+            RETURNING id`
+          await tx`
+            INSERT INTO recipe_items (recipe_id,ingredient_id,quantity_in_base_unit,waste_percent,notes)
+            VALUES (${recipeRows[0]!.id},${ingredientId},${side.gramsPerPortion}::numeric,0,NULL)`
+        }
       }
     })
     console.log([
-      'The «برنج ایرانی» upgrade food is ready with its ingredient and recipe.',
-      "Next, from Admin: add it to today's menu with its price and capacity, then tick",
+      'Two Persian-rice products are ready and share the same inventory ingredient:',
+      '1) «برنج ایرانی» is the hidden upgrade; its daily price is the upgrade difference.',
+      '2) «یک پرس برنج ایرانی» is customer-visible; its daily price is the full portion price.',
+      "Next, from Admin: add either or both to today's menu with separate prices and capacities, then tick",
       '«امکان افزودن برنج ایرانی به این غذا» on every dish that should offer the upgrade.',
-      'Its menu price is the upgrade DIFFERENCE — dish prices already include foreign rice.',
     ].join('\n'))
   } finally {
     await sql.end()
