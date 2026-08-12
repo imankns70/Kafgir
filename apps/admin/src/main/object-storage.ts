@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { v2 as cloudinary, type UploadApiResponse } from 'cloudinary'
 import sharp from 'sharp'
 import type { SecureConnectionConfiguration } from '../shared/admin-operations'
 
@@ -9,41 +9,69 @@ const maximumBytes = 5 * 1024 * 1024
 const validExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp'])
 const validMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
-type StorageConfiguration = NonNullable<SecureConnectionConfiguration['storage']>
+type CloudinaryConfiguration = NonNullable<SecureConnectionConfiguration['cloudinary']>
 
-let configuration: StorageConfiguration | null = null
-let client: S3Client | null = null
+let configuration: CloudinaryConfiguration | null = null
 let localUploadRoot: string | null = null
 
 export function hasConfiguredFoodImageStorage() {
-  return Boolean((configuration && client) || localUploadRoot)
+  return Boolean(configuration || localUploadRoot)
 }
 
-export function configureObjectStorage(
-  value: StorageConfiguration | null | undefined,
+export function configureFoodImageStorage(
+  value: CloudinaryConfiguration | null | undefined,
   developmentUploadRoot?: string | null,
 ) {
   configuration = value ?? null
   localUploadRoot = configuration ? null : developmentUploadRoot ? resolve(developmentUploadRoot) : null
-  client = configuration
-    ? new S3Client({
-      region: 'default',
-      endpoint: configuration.endpoint,
-      credentials: {
-        accessKeyId: configuration.accessKeyId,
-        secretAccessKey: configuration.secretAccessKey,
-      },
-      forcePathStyle: true,
+  if (configuration) {
+    cloudinary.config({
+      cloud_name: configuration.cloudName,
+      api_key: configuration.apiKey,
+      api_secret: configuration.apiSecret,
+      secure: true,
     })
-    : null
+  }
 }
 
 function requiredStorage() {
-  if (configuration && client) return { kind: 'object' as const, configuration, client }
+  if (configuration) return { kind: 'cloudinary' as const, configuration }
   if (localUploadRoot) return { kind: 'local' as const, root: localUploadRoot }
   {
     throw new Error('فضای ذخیره‌سازی تصاویر پیکربندی نشده است.')
   }
+}
+
+function uploadToCloudinary(output: Buffer, publicId: string) {
+  return new Promise<UploadApiResponse>((resolveUpload, rejectUpload) => {
+    const stream = cloudinary.uploader.upload_stream({
+      public_id: publicId,
+      resource_type: 'image',
+      format: 'webp',
+      overwrite: false,
+      tags: ['kafgir-food'],
+    }, (error, result) => {
+      if (error) rejectUpload(new Error(`آپلود تصویر در Cloudinary ناموفق بود: ${error.message}`))
+      else if (!result?.secure_url) rejectUpload(new Error('Cloudinary آدرس امن تصویر را برنگرداند.'))
+      else resolveUpload(result)
+    })
+    stream.end(output)
+  })
+}
+
+function cloudinaryPublicId(imageUrl: string, cloudName: string) {
+  let url: URL
+  try {
+    url = new URL(imageUrl)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'https:' || url.hostname !== 'res.cloudinary.com') return null
+  const prefix = `/${cloudName}/image/upload/`
+  if (!url.pathname.startsWith(prefix)) return null
+  const path = decodeURIComponent(url.pathname.slice(prefix.length)).replace(/^v\d+\//u, '')
+  const publicId = path.replace(/\.webp$/iu, '')
+  return /^kafgir\/foods\/[0-9a-f-]{36}$/iu.test(publicId) ? publicId : null
 }
 
 function sourceBytes(value: ArrayBuffer) {
@@ -90,25 +118,18 @@ export async function uploadFoodImage(request: {
   }
   const storage = requiredStorage()
   const fileName = `${randomUUID()}.webp`
-  const key = `foods/${fileName}`
-  if (storage.kind === 'object') {
-    await storage.client.send(new PutObjectCommand({
-      Bucket: storage.configuration.bucket,
-      Key: key,
-      Body: output,
-      ContentType: 'image/webp',
-      CacheControl: 'public, max-age=31536000, immutable',
-    }))
+  const publicId = `kafgir/foods/${fileName.replace(/\.webp$/u, '')}`
+  let imageUrl: string
+  if (storage.kind === 'cloudinary') {
+    const uploaded = await uploadToCloudinary(output, publicId)
+    imageUrl = uploaded.secure_url
   } else {
     const directory = resolve(storage.root, 'foods')
     await mkdir(directory, { recursive: true })
     await writeFile(resolve(directory, fileName), output, { flag: 'wx' })
+    imageUrl = `/api/media/foods/${fileName}`
   }
-  return {
-    imageUrl: storage.kind === 'object'
-      ? `${storage.configuration.publicBaseUrl.replace(/\/$/u, '')}/${key}`
-      : `/api/media/foods/${fileName}`,
-  }
+  return { imageUrl }
 }
 
 export async function deleteManagedFoodImage(imageUrl: string) {
@@ -124,14 +145,12 @@ export async function deleteManagedFoodImage(imageUrl: string) {
       throw error
     }
   }
-  if (storage.kind !== 'object') return false
-  const base = `${storage.configuration.publicBaseUrl.replace(/\/$/u, '')}/`
-  if (!imageUrl.startsWith(`${base}foods/`)) return false
-  const key = decodeURIComponent(imageUrl.slice(base.length))
-  if (!/^foods\/[0-9a-f-]{36}\.webp$/iu.test(key)) return false
-  await storage.client.send(new DeleteObjectCommand({
-    Bucket: storage.configuration.bucket,
-    Key: key,
-  }))
-  return true
+  if (storage.kind !== 'cloudinary') return false
+  const publicId = cloudinaryPublicId(imageUrl, storage.configuration.cloudName)
+  if (!publicId) return false
+  const result = await cloudinary.uploader.destroy(publicId, {
+    resource_type: 'image',
+    invalidate: true,
+  }) as { result?: string }
+  return result.result === 'ok'
 }

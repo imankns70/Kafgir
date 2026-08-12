@@ -44,7 +44,7 @@ import {
 
 const localAdmin: Record<'username' | 'password', string> = {
   username: 'admin',
-  password: 'Admin@123456',
+  password: '',
 }
 
 const today = () => new Intl.DateTimeFormat('en-CA', {
@@ -268,15 +268,6 @@ function Login({ onLogin }: { onLogin: (name: string) => void }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [online, setOnline] = useState<boolean | null>(null)
-  const [configurationSource, setConfigurationSource] =
-    useState<'environment' | 'encrypted' | 'missing'>('missing')
-  const [showConnection, setShowConnection] = useState(false)
-  const [databaseUrl, setDatabaseUrl] = useState('')
-  const [storageEndpoint, setStorageEndpoint] = useState('')
-  const [storageBucket, setStorageBucket] = useState('')
-  const [storageAccessKey, setStorageAccessKey] = useState('')
-  const [storageSecretKey, setStorageSecretKey] = useState('')
-  const [storagePublicBase, setStoragePublicBase] = useState('')
   const checkHealth = useCallback(async () => {
     setOnline(null)
     try {
@@ -287,47 +278,8 @@ function Login({ onLogin }: { onLogin: (name: string) => void }) {
     }
   }, [])
   useEffect(() => {
-    void adminApi.configurationStatus().then((status) => {
-      setConfigurationSource(status.source)
-      setShowConnection(!status.configured)
-      if (status.configured) void checkHealth()
-      else setOnline(false)
-    })
+    void checkHealth()
   }, [checkHealth])
-  const saveConnection = async () => {
-    setBusy(true)
-    setError(null)
-    try {
-      const storageValues = [
-        storageEndpoint,
-        storageBucket,
-        storageAccessKey,
-        storageSecretKey,
-        storagePublicBase,
-      ]
-      const hasStorage = storageValues.every((value) => value.trim())
-      if (storageValues.some((value) => value.trim()) && !hasStorage) {
-        throw new Error('برای فضای تصاویر، تکمیل همه فیلدها الزامی است.')
-      }
-      const status = await adminApi.saveConfiguration({
-        databaseUrl: databaseUrl.trim(),
-        storage: hasStorage ? {
-          endpoint: storageEndpoint.trim(),
-          bucket: storageBucket.trim(),
-          accessKeyId: storageAccessKey.trim(),
-          secretAccessKey: storageSecretKey,
-          publicBaseUrl: storagePublicBase.trim(),
-        } : null,
-      })
-      setConfigurationSource(status.source)
-      setShowConnection(false)
-      await checkHealth()
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason))
-    } finally {
-      setBusy(false)
-    }
-  }
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setBusy(true)
@@ -348,42 +300,6 @@ function Login({ onLogin }: { onLogin: (name: string) => void }) {
       {online === false && <Message error="ارتباط با سرور برقرار نشد.">
         <button type="button" onClick={() => void checkHealth()}>تلاش دوباره</button>
       </Message>}
-      {configurationSource !== 'environment' && <button
-        type="button"
-        className="ghost"
-        onClick={() => setShowConnection((value) => !value)}
-      >
-        {showConnection ? 'بستن تنظیمات اتصال' : 'تنظیم اتصال مستقیم'}
-      </button>}
-      {showConnection && <fieldset className="connection-settings">
-        <legend>اتصال امن مستقیم</legend>
-        <label>آدرس PostgreSQL
-          <input
-            dir="ltr"
-            type="password"
-            value={databaseUrl}
-            onChange={(event) => setDatabaseUrl(event.target.value)}
-            placeholder="postgresql://...?sslmode=require"
-          />
-        </label>
-        <details>
-          <summary>فضای تصاویر لیارا (فقط تولید)</summary>
-          <label>Endpoint<input dir="ltr" value={storageEndpoint}
-            onChange={(event) => setStorageEndpoint(event.target.value)} /></label>
-          <label>Bucket<input dir="ltr" value={storageBucket}
-            onChange={(event) => setStorageBucket(event.target.value)} /></label>
-          <label>Access key<input dir="ltr" value={storageAccessKey}
-            onChange={(event) => setStorageAccessKey(event.target.value)} /></label>
-          <label>Secret key<input dir="ltr" type="password" value={storageSecretKey}
-            onChange={(event) => setStorageSecretKey(event.target.value)} /></label>
-          <label>آدرس عمومی تصاویر<input dir="ltr" value={storagePublicBase}
-            onChange={(event) => setStoragePublicBase(event.target.value)} /></label>
-        </details>
-        <button type="button" className="secondary" disabled={busy || !databaseUrl.trim()}
-          onClick={() => void saveConnection()}>
-          آزمایش و ذخیره اتصال
-        </button>
-      </fieldset>}
       <label>نام کاربری<input value={username} onChange={(event) => setUsername(event.target.value)} autoFocus /></label>
       <label>رمز عبور<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
       <Message error={error} />
@@ -1705,4 +1621,3 @@ export function App() {
     <main>{pages[page]}</main>
   </div>
 }
-

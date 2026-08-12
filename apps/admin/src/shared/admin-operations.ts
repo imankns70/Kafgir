@@ -95,12 +95,10 @@ export interface AdminOperationRequest {
 
 export interface SecureConnectionConfiguration {
   databaseUrl: string
-  storage?: {
-    endpoint: string
-    bucket: string
-    accessKeyId: string
-    secretAccessKey: string
-    publicBaseUrl: string
+  cloudinary?: {
+    cloudName: string
+    apiKey: string
+    apiSecret: string
   } | null
 }
 
