@@ -19,7 +19,7 @@ let profileId = 0
 
 const order = (items: Array<{ dailyMenuItemId: number; withPersianRice: boolean; quantity: number }>) => ({
   fullName: 'مشتری', phoneNumber: '09000000000', city: 'اندیمشک', addressLine: 'آدرس',
-  saveAddress: false, paymentMethod: PaymentMethod.CardToCard,
+  saveAddress: false, paymentMethod: PaymentMethod.Cash,
   deliveryMethod: DeliveryMethod.Pickup, customerNote: null, items,
 })
 

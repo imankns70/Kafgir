@@ -17,7 +17,7 @@ export enum InventoryTransactionType {
 export enum ShoppingListStatus { Draft = 1, InProgress = 2, Completed = 3, Cancelled = 4 }
 export enum FinancialAccountType { Cash = 1, Bank = 2, GatewaySettlement = 3, PettyCash = 4, Other = 5 }
 // Keep these values identical to the order PaymentMethod enum in index.ts.
-export enum CustomerPaymentMethod { Cash = 1, CardToCard = 2, OnlineGateway = 3, Pos = 4 }
+export enum CustomerPaymentMethod { Cash = 1, OnlineGateway = 3, Pos = 4 }
 export enum PurchasePaymentMethod { Cash = 1, Bank = 2, Card = 3, Other = 4 }
 export enum PaymentStatus {
   Pending = 1, AwaitingVerification = 2, Paid = 3, Failed = 4,

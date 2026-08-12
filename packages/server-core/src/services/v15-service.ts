@@ -473,9 +473,9 @@ export async function consumeOrderInventory(tx: Tx, orderId: number, userId: num
     for (const item of recipeItems) {
       const ingredient = lockedIngredients.get(item.ingredientId)!
       if (!ingredient.isInventoryTracked) continue
-      if (Number(await currentStock(tx, item.ingredientId)) < Number(item.needed)) {
-        throw new AppError('موجودی مواد اولیه برای تأیید سفارش کافی نیست.')
-      }
+      // Daily-menu capacity is the sales guard. Inventory is an operational/accounting ledger and
+      // must not block an already-sold order when opening stock was not entered. Recording the
+      // movement can intentionally expose a negative balance so the missing stock remains visible.
       await insertMovement(tx, { ingredientId: item.ingredientId,
         type: InventoryTransactionType.ProductionConsumption, quantity: `-${item.needed}`, userId,
         referenceType: 'order-consumption', referenceId: consumption[0]!.id, group })
@@ -591,8 +591,7 @@ export async function createPayment(input: PaymentWriteRequest, userId: number) 
     if (allocated[0]!.amount + input.amount > order[0].totalAmount) {
       throw new AppError('مجموع پرداخت‌ها از مبلغ سفارش بیشتر می‌شود.')
     }
-    const status = input.paymentMethod === CustomerPaymentMethod.CardToCard
-      ? PaymentStatus.AwaitingVerification : PaymentStatus.Pending
+    const status = PaymentStatus.Pending
     const rows = await tx<{ id: number }[]>`INSERT INTO payments
       (order_id,payment_method,financial_account_id,pos_terminal_id,amount,status,tracking_number,
        reference_number,receipt_image_url,description,created_at,updated_at)

@@ -18,7 +18,7 @@ describe('customer order authentication', () => {
         city: 'اندیمشک',
         addressLine: 'یک آدرس معتبر برای آزمایش',
         saveAddress: true,
-        paymentMethod: 2,
+        paymentMethod: 1,
         deliveryMethod: 1,
         customerNote: null,
         items: [{ dailyMenuItemId: 1, quantity: 1 }],

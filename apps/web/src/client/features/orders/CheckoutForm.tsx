@@ -22,7 +22,7 @@ import {
 } from '../../types'
 
 type FormState = { fullName: string; phoneNumber: string; addressLine: string; customerNote: string; deliveryMethod: DeliveryMethod; paymentMethod: PaymentMethod }
-const initialForm: FormState = { fullName: '', phoneNumber: '', addressLine: '', customerNote: '', deliveryMethod: DeliveryMethod.Delivery, paymentMethod: PaymentMethod.CardToCard }
+const initialForm: FormState = { fullName: '', phoneNumber: '', addressLine: '', customerNote: '', deliveryMethod: DeliveryMethod.Delivery, paymentMethod: PaymentMethod.Cash }
 const newAddressValue = 'new'
 type AuthenticationState = 'checking' | 'guest' | 'authenticated'
 type LoginStep = 'phone' | 'code'
@@ -297,12 +297,10 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         <option value={DeliveryMethod.Delivery}>ارسال</option><option value={DeliveryMethod.Pickup}>تحویل حضوری</option>
       </select></label>
       <label className="field">روش پرداخت<select value={form.paymentMethod} onChange={(e) => setField('paymentMethod', Number(e.target.value) as PaymentMethod)}>
-        <option value={PaymentMethod.CardToCard}>کارت‌به‌کارت</option><option value={PaymentMethod.Cash}>نقدی</option>
-        <option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.Online}>پرداخت آنلاین</option>
+        <option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.Online}>پرداخت آنلاین</option>
       </select></label>
     </div>
     <div className="form-hint">
-      {form.paymentMethod === PaymentMethod.CardToCard && 'پس از واریز، پرداخت شما در انتظار تأیید مدیریت خواهد بود.'}
       {form.paymentMethod === PaymentMethod.Cash && 'وجه نقد هنگام تحویل یا دریافت حضوری پرداخت می‌شود.'}
       {form.paymentMethod === PaymentMethod.Pos && 'پرداخت با دستگاه پوز هنگام تحویل یا دریافت حضوری انجام می‌شود.'}
       {form.paymentMethod === PaymentMethod.Online && 'پس از ثبت سفارش به مرحله پرداخت آنلاین هدایت می‌شوید.'}

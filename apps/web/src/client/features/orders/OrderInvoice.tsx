@@ -1,3 +1,4 @@
+import { buildInvoiceOrderLines } from '@kafgir/contracts'
 import { DeliveryMethod, PaymentMethod, type OrderDto } from '../../types'
 import { BrandLogo } from '../../design-system/BrandLogo'
 import { Icon } from '../../design-system/Icon'
@@ -11,12 +12,12 @@ const deliveryLabels = {
 
 const paymentLabels = {
   [PaymentMethod.Cash]: 'نقدی',
-  [PaymentMethod.CardToCard]: 'کارت به کارت',
   [PaymentMethod.Online]: 'پرداخت آنلاین',
   [PaymentMethod.Pos]: 'کارت‌خوان',
 }
 
 export function OrderInvoice({ order, allowPrint = true }: { order: OrderDto; allowPrint?: boolean }) {
+  const invoiceItems = buildInvoiceOrderLines(order.items)
   return <section className="customer-invoice" aria-labelledby={`invoice-title-${order.id}`}>
     <header className="invoice-heading">
       <BrandLogo variant="compact" />
@@ -44,7 +45,7 @@ export function OrderInvoice({ order, allowPrint = true }: { order: OrderDto; al
     <div className="invoice-lines-wrap">
       <table className="invoice-lines">
         <thead><tr><th>ردیف</th><th>شرح</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr></thead>
-        <tbody>{order.items.map((item, index) => <tr key={item.id}>
+        <tbody>{invoiceItems.map((item, index) => <tr key={item.key}>
           <td>{formatNumber(index + 1)}</td>
           <td>{item.foodName}</td>
           <td>{formatNumber(item.quantity)}</td>

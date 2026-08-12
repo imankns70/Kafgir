@@ -33,7 +33,7 @@ describe('order analytics isolation', () => {
         city: 'اندیمشک',
         addressLine: 'یک آدرس معتبر برای آزمایش',
         saveAddress: false,
-        paymentMethod: 2,
+        paymentMethod: 1,
         deliveryMethod: 1,
         customerNote: null,
         items: [{ dailyMenuItemId: 1, quantity: 1 }],

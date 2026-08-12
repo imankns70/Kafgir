@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import {
+  buildInvoiceOrderLines,
   DeliveryMethod,
   OrderStatus,
   PaymentMethod,
+  DeliverySlotUnavailableReason,
+  type AdminDeliveryDayDto,
   type AdminDashboardSummaryDto,
+  type CustomerProfileDto,
   type CustomerAnalyticsTodayDto,
   type CreateOrderRequest,
   type DailyMenuDto,
@@ -53,6 +57,20 @@ const today = () => new Intl.DateTimeFormat('en-CA', {
   month: '2-digit',
   day: '2-digit',
 }).format(new Date())
+
+const deliverySlotReasonLabel: Record<DeliverySlotUnavailableReason, string> = {
+  [DeliverySlotUnavailableReason.Inactive]: 'غیرفعال',
+  [DeliverySlotUnavailableReason.DisabledForDate]: 'برای امروز غیرفعال',
+  [DeliverySlotUnavailableReason.CutoffPassed]: 'مهلت ثبت گذشته',
+  [DeliverySlotUnavailableReason.CapacityFull]: 'ظرفیت تکمیل',
+}
+
+const mobileDigits = (value: string) => value
+  .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+  .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+  .replace(/\D/g, '')
+  .replace(/^0098/, '0')
+  .replace(/^98/, '0')
 
 const plainNumber = (value: number) => value.toString()
 const groupedNumber = (value: number) => formatNumber(value)
@@ -119,7 +137,6 @@ const statusLabel: Record<OrderStatus, string> = {
 
 const paymentMethodLabel: Record<PaymentMethod, string> = {
   [PaymentMethod.Cash]: 'نقدی',
-  [PaymentMethod.CardToCard]: 'کارت‌به‌کارت',
   [PaymentMethod.Online]: 'آنلاین',
   [PaymentMethod.Pos]: 'دستگاه پوز',
 }
@@ -191,6 +208,7 @@ function Message({ error, children }: { error?: string | null; children?: ReactN
 }
 
 function AdminOrderInvoice({ order }: { order: OrderDto }) {
+  const invoiceItems = buildInvoiceOrderLines(order.items)
   return <article className="admin-invoice" aria-labelledby={`admin-invoice-title-${order.id}`}>
     <header className="admin-invoice-header">
       <Logo />
@@ -214,7 +232,7 @@ function AdminOrderInvoice({ order }: { order: OrderDto }) {
     <div className="admin-invoice-table-wrap">
       <table className="admin-invoice-table">
         <thead><tr><th>ردیف</th><th>شرح</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr></thead>
-        <tbody>{order.items.map((item, index) => <tr key={item.id}>
+        <tbody>{invoiceItems.map((item, index) => <tr key={item.key}>
           <td>{plainNumber(index + 1)}</td>
           <td>{item.foodName}</td>
           <td>{plainNumber(item.quantity)}</td>
@@ -1240,11 +1258,16 @@ function DailyMenuPage() {
 
 function ManualOrderPage() {
   const [menu, setMenu] = useState<DailyMenuDto | null>(null)
+  const [deliveryDay, setDeliveryDay] = useState<AdminDeliveryDayDto | null>(null)
   const [cart, setCart] = useState<Array<{ id: number; withPersianRice: boolean; persianRicePrice: number; name: string; price: number; quantity: number; remaining: number }>>([])
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
+  const [customer, setCustomer] = useState<CustomerProfileDto | null>(null)
+  const [customerLookup, setCustomerLookup] = useState<'idle' | 'loading' | 'found' | 'not-found'>('idle')
+  const [selectedAddressId, setSelectedAddressId] = useState('new')
   const [delivery, setDelivery] = useState(DeliveryMethod.Pickup)
-  const [payment, setPayment] = useState(PaymentMethod.CardToCard)
+  const [deliveryTimeSlotId, setDeliveryTimeSlotId] = useState('')
+  const [payment, setPayment] = useState(PaymentMethod.Cash)
   const [address, setAddress] = useState('')
   const [customerNote, setCustomerNote] = useState('')
   const [selectedItemId, setSelectedItemId] = useState('')
@@ -1253,22 +1276,62 @@ function ManualOrderPage() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   useEffect(() => {
-    void adminApi.menu(today())
-      .then((dailyMenu) => {
+    const date = today()
+    void Promise.all([adminApi.menu(date), adminApi.deliveryDay(date)])
+      .then(([dailyMenu, day]) => {
         setMenu(dailyMenu)
+        setDeliveryDay(day)
         setError(null)
       })
       .catch((reason) => {
         setMenu(null)
+        setDeliveryDay(null)
         setError(reason instanceof Error ? reason.message : String(reason))
       })
   }, [])
+  useEffect(() => {
+    const normalizedPhone = mobileDigits(phone)
+    if (!/^09\d{9}$/.test(normalizedPhone)) {
+      setCustomerLookup('idle')
+      return
+    }
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      setCustomerLookup('loading')
+      void adminApi.customerByPhone(normalizedPhone).then((profile) => {
+        if (cancelled) return
+        if (!profile) {
+          setCustomer(null)
+          setSelectedAddressId('new')
+          setCustomerLookup('not-found')
+          return
+        }
+        const defaultAddress = profile.addresses.find((item) => item.isDefault) ?? profile.addresses[0]
+        setCustomer(profile)
+        setFullName(profile.preferredName)
+        setPhone(profile.defaultPhoneNumber)
+        setSelectedAddressId(defaultAddress ? String(defaultAddress.id) : 'new')
+        setAddress(defaultAddress?.addressLine ?? '')
+        setCustomerLookup('found')
+      }).catch((reason) => {
+        if (cancelled) return
+        setCustomerLookup('idle')
+        setError(reason instanceof Error ? reason.message : String(reason))
+      })
+    }, 350)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [phone])
   // Persian rice is hidden from the dish list; it is added as an upgrade on a dish that allows it.
   const persianRice = menu?.persianRice ?? null
   const riceAvailable = Boolean(persianRice?.isAvailable && persianRice.remainingPortions > 0)
   const menuItems = menu?.items.filter((item) => item.isAvailable && item.remainingPortions > 0
     && item.id !== persianRice?.menuItemId) ?? []
   const selectedItem = menuItems.find((item) => item.id === Number(selectedItemId))
+  const selectedAddress = customer?.addresses.find((item) => item.id === Number(selectedAddressId))
+  const availableDeliverySlots = deliveryDay?.slots.filter((slot) => slot.unavailableReason === null) ?? []
   const cartTotal = cart.reduce((sum, item) => sum + (item.price + item.persianRicePrice) * item.quantity, 0)
   const addSelected = () => {
     if (!selectedItem) return
@@ -1304,8 +1367,12 @@ function ManualOrderPage() {
     setCart([])
     setFullName('')
     setPhone('')
+    setCustomer(null)
+    setCustomerLookup('idle')
+    setSelectedAddressId('new')
     setDelivery(DeliveryMethod.Pickup)
-    setPayment(PaymentMethod.CardToCard)
+    setDeliveryTimeSlotId('')
+    setPayment(PaymentMethod.Cash)
     setAddress('')
     setCustomerNote('')
     setSelectedItemId('')
@@ -1316,11 +1383,17 @@ function ManualOrderPage() {
   }
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (delivery === DeliveryMethod.Delivery && !deliveryTimeSlotId) {
+      setError('برای سفارش ارسالی، بازه ارسال را انتخاب کنید.')
+      return
+    }
     const request: CreateOrderRequest = {
-      fullName, phoneNumber: phone, city: 'اندیمشک',
+      fullName, phoneNumber: phone, city: selectedAddress?.city ?? 'اندیمشک',
+      customerAddressId: delivery === DeliveryMethod.Delivery && selectedAddress ? selectedAddress.id : null,
       addressLine: delivery === DeliveryMethod.Delivery ? address : 'تحویل حضوری',
       customerNote: customerNote || null,
       saveAddress: false, paymentMethod: payment, deliveryMethod: delivery,
+      deliveryTimeSlotId: delivery === DeliveryMethod.Delivery ? Number(deliveryTimeSlotId) : null,
       items: cart.map((item) => ({ dailyMenuItemId: item.id, withPersianRice: item.withPersianRice, quantity: item.quantity })),
     }
     try {
@@ -1338,15 +1411,45 @@ function ManualOrderPage() {
     <form className="manual-order-layout" onSubmit={submit}>
       <section className="panel manual-customer-panel">
         <h2>اطلاعات مشتری</h2>
+        <label>شماره موبایل<input dir="ltr" inputMode="tel" value={phone} onChange={(event) => {
+          setPhone(event.target.value)
+          if (customer) {
+            setCustomer(null)
+            setFullName('')
+            setAddress('')
+            setSelectedAddressId('new')
+          }
+        }} required placeholder="0912 123 4567" /></label>
+        {customerLookup === 'loading' && <p className="customer-lookup-state">در حال بررسی شماره موبایل…</p>}
+        {customerLookup === 'found' && <p className="customer-lookup-state found">مشتری قبلی پیدا شد؛ اطلاعات و آدرس‌ها بازیابی شدند.</p>}
+        {customerLookup === 'not-found' && <p className="customer-lookup-state new">مشتری جدید است؛ اطلاعات را وارد کنید.</p>}
         <label>نام مشتری<input value={fullName} onChange={(event) => setFullName(event.target.value)} required /></label>
-        <label>شماره تماس<input dir="ltr" value={phone} onChange={(event) => setPhone(event.target.value)} required /></label>
-        <label>روش دریافت<select value={delivery} onChange={(event) => setDelivery(Number(event.target.value) as DeliveryMethod)}>
+        <label>روش دریافت<select value={delivery} onChange={(event) => {
+          const method = Number(event.target.value) as DeliveryMethod
+          setDelivery(method)
+          setDeliveryTimeSlotId(method === DeliveryMethod.Delivery ? String(availableDeliverySlots[0]?.slotId ?? '') : '')
+        }}>
           <option value={DeliveryMethod.Pickup}>تحویل حضوری</option><option value={DeliveryMethod.Delivery}>ارسال</option>
         </select></label>
+        {delivery === DeliveryMethod.Delivery && customer && customer.addresses.length > 0 && <label>آدرس‌های مشتری<select value={selectedAddressId} onChange={(event) => {
+          const value = event.target.value
+          setSelectedAddressId(value)
+          const saved = customer.addresses.find((item) => item.id === Number(value))
+          setAddress(saved?.addressLine ?? '')
+        }}>
+          {customer.addresses.map((item) => <option key={item.id} value={item.id}>{item.title}{item.isDefault ? ' (پیش‌فرض)' : ''} — {item.addressLine}</option>)}
+          <option value="new">آدرس جدید</option>
+        </select></label>}
+        {delivery === DeliveryMethod.Delivery && <label>آدرس<textarea value={address} disabled={Boolean(selectedAddress)} onChange={(event) => setAddress(event.target.value)} required placeholder="نشانی کامل محل تحویل" /></label>}
+        {delivery === DeliveryMethod.Delivery && <label>بازه ارسال<select value={deliveryTimeSlotId} onChange={(event) => setDeliveryTimeSlotId(event.target.value)} required>
+          <option value="">انتخاب بازه ارسال</option>
+          {deliveryDay?.slots.map((slot) => <option key={slot.slotId} value={slot.slotId} disabled={slot.unavailableReason !== null}>
+            {slot.title} — {slot.startTime} تا {slot.endTime}{slot.unavailableReason === null ? '' : ` (${deliverySlotReasonLabel[slot.unavailableReason]})`}
+          </option>)}
+        </select></label>}
         <label>روش پرداخت<select value={payment} onChange={(event) => setPayment(Number(event.target.value) as PaymentMethod)}>
-          <option value={PaymentMethod.CardToCard}>کارت به کارت</option><option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.Online}>آنلاین</option>
+          <option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.Online}>آنلاین</option>
         </select></label>
-        <label>آدرس<textarea value={address} disabled={delivery === DeliveryMethod.Pickup} onChange={(event) => setAddress(event.target.value)} required={delivery === DeliveryMethod.Delivery} placeholder={delivery === DeliveryMethod.Pickup ? 'برای تحویل حضوری لازم نیست' : ''} /></label>
         <label>یادداشت مشتری<textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} /></label>
         <div className="manual-submit-row">
           <button type="button" className="secondary" onClick={clearOrder}>سفارش جدید</button>
@@ -1381,7 +1484,7 @@ function ManualOrderPage() {
           <div className="manual-section-title"><h2>آیتم‌های سفارش</h2><span>{plainNumber(cart.length)} ردیف</span></div>
           <div className="table-wrap manual-cart-table"><table><thead><tr><th>غذا</th><th>قیمت</th><th>تعداد</th><th>جمع</th><th>عملیات</th></tr></thead>
             <tbody>{cart.length > 0 ? cart.map((line) => <tr key={`${line.id}:${line.withPersianRice}`}>
-              <td>{line.name}{line.withPersianRice && <small className="rice-line-label">با برنج ایرانی ({money(line.persianRicePrice)}) — ردیف جداگانه در فاکتور</small>}</td><td>{money(line.price + line.persianRicePrice)}</td><td>{plainNumber(line.quantity)}</td><td>{money((line.price + line.persianRicePrice) * line.quantity)}</td>
+              <td>{line.name}{line.withPersianRice && <small className="rice-line-label">با برنج ایرانی ({money(line.persianRicePrice)}) — در فاکتور با غذا نمایش داده می‌شود</small>}</td><td>{money(line.price + line.persianRicePrice)}</td><td>{plainNumber(line.quantity)}</td><td>{money((line.price + line.persianRicePrice) * line.quantity)}</td>
               <td className="actions"><button type="button" onClick={() => changeLineQuantity(line.id, line.withPersianRice, -1)}>-</button><button type="button" onClick={() => changeLineQuantity(line.id, line.withPersianRice, 1)}>+</button><button type="button" className="danger" onClick={() => setCart((rows) => rows.filter((item) => item.id !== line.id || item.withPersianRice !== line.withPersianRice))}>حذف</button></td>
             </tr>) : <tr><td colSpan={5}>هنوز آیتمی به سفارش اضافه نشده است.</td></tr>}</tbody></table></div>
           <div className="table-summary"><span>{plainNumber(cart.length)} مورد</span><span>صفحه 1 از 1</span></div>
@@ -1446,7 +1549,7 @@ function ReportPage() {
       <label>نام مشتری<input value={query.customerName ?? ''} onChange={(event) => setQuery({ ...query, customerName: event.target.value })} /></label>
       <label>شماره تماس<input dir="ltr" value={query.phoneNumber ?? ''} onChange={(event) => setQuery({ ...query, phoneNumber: event.target.value })} /></label>
       <label>نوع دریافت<select value={query.deliveryMethod ?? ''} onChange={(event) => setQuery({ ...query, deliveryMethod: event.target.value ? Number(event.target.value) as DeliveryMethod : undefined })}><option value="">همه روش‌ها</option><option value={DeliveryMethod.Pickup}>حضوری</option><option value={DeliveryMethod.Delivery}>ارسال</option></select></label>
-      <label>نوع فروش<select value={query.paymentMethod ?? ''} onChange={(event) => setQuery({ ...query, paymentMethod: event.target.value ? Number(event.target.value) as PaymentMethod : undefined })}><option value="">همه روش‌ها</option><option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.CardToCard}>کارت‌به‌کارت</option><option value={PaymentMethod.Online}>آنلاین</option></select></label>
+      <label>نوع فروش<select value={query.paymentMethod ?? ''} onChange={(event) => setQuery({ ...query, paymentMethod: event.target.value ? Number(event.target.value) as PaymentMethod : undefined })}><option value="">همه روش‌ها</option><option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.Online}>آنلاین</option></select></label>
       <label>غذا<select value={query.foodName ?? ''} onChange={(event) => setQuery({ ...query, foodName: event.target.value || undefined })}><option value="">همه غذاها</option>{foods.map((food) => <option value={food.name} key={food.id}>{food.name}</option>)}</select></label>
       <div className="filter-actions">
         <button className="primary" disabled={busy}>{busy ? 'در حال دریافت…' : 'جستجو'}</button>

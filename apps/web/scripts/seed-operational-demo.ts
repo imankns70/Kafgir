@@ -242,14 +242,6 @@ async function main() {
   `
   if (order[0]) {
     const selectedOrder = order[0]
-    const rejected = await sql`SELECT 1 FROM payments WHERE tracking_number='DEMO-REJECTED-001'`
-    if (!rejected[0]) {
-      const id = await core.createPayment({ orderId: selectedOrder.id, paymentMethod: CustomerPaymentMethod.CardToCard,
-        financialAccountId: bankId, posTerminalId: null, amount: Math.min(100_000, selectedOrder.total),
-        trackingNumber: 'DEMO-REJECTED-001', referenceNumber: null, receiptImageUrl: null,
-        description: 'نمونه پرداخت کارت‌به‌کارت با رسید نامعتبر' }, userId)
-      await core.changePaymentStatus(id, { status: PaymentStatus.Rejected, description: 'شماره پیگیری با گردش حساب تطبیق نداشت.' }, userId)
-    }
     const allocated = await sql<{ amount: number }[]>`SELECT COALESCE(SUM(amount),0)::float8 amount FROM payments
       WHERE order_id=${selectedOrder.id} AND status IN (1,2,3)`
     let available = Math.max(0, selectedOrder.total - required(allocated[0], 'allocated payments').amount)
@@ -261,12 +253,6 @@ async function main() {
         referenceNumber: 'DEMO-REF-POS', receiptImageUrl: null, description: 'پرداخت حضوری با کارت‌خوان صندوق' }, userId)
       await core.changePaymentStatus(id, { status: PaymentStatus.Paid, description: 'تراکنش پوز با موفقیت تأیید شد.' }, userId)
       available -= amount
-    }
-    const cardExists = await sql`SELECT 1 FROM payments WHERE tracking_number='DEMO-CARD-001'`
-    if (!cardExists[0] && available > 0) {
-      await core.createPayment({ orderId: selectedOrder.id, paymentMethod: CustomerPaymentMethod.CardToCard,
-        financialAccountId: bankId, posTerminalId: null, amount: available, trackingNumber: 'DEMO-CARD-001',
-        referenceNumber: null, receiptImageUrl: null, description: 'نمونه منتظر تطبیق رسید کارت‌به‌کارت' }, userId)
     }
   }
 

@@ -7,7 +7,6 @@ export * from './delivery.js'
 
 export enum PaymentMethod {
   Cash = 1,
-  CardToCard = 2,
   Online = 3,
   Pos = 4,
 }
@@ -251,6 +250,8 @@ export const orderItemSchema = z.object({
   id: z.number().int(),
   dailyMenuItemId: z.number().int(),
   foodName: z.string(),
+  allowsPersianRice: z.boolean().optional(),
+  isPersianRice: z.boolean().optional(),
   originalUnitPrice: z.number().nonnegative().nullable().optional(),
   unitPrice: z.number(),
   quantity: z.number().int(),
@@ -293,6 +294,68 @@ export const orderSchema = z.object({
   items: z.array(orderItemSchema),
   statusHistories: z.array(orderStatusHistorySchema),
 })
+
+type InvoiceSourceItem = z.infer<typeof orderItemSchema>
+
+export type InvoiceOrderLine = {
+  key: string
+  foodName: string
+  unitPrice: number
+  quantity: number
+  totalPrice: number
+}
+
+/**
+ * Persian-rice upgrades stay as independent order items for capacity and inventory accounting,
+ * but customers bought one combined dish. Fold those technical rows into customer-facing invoice
+ * lines without changing the stored order or its total.
+ */
+export function buildInvoiceOrderLines(items: InvoiceSourceItem[]): InvoiceOrderLine[] {
+  const riceQueue = items
+    .filter((item) => item.isPersianRice)
+    .map((item) => ({ ...item, remaining: item.quantity }))
+  const lines: InvoiceOrderLine[] = []
+
+  for (const item of items.filter((candidate) => !candidate.isPersianRice)) {
+    let remaining = item.quantity
+    if (item.allowsPersianRice) {
+      for (const rice of riceQueue) {
+        if (remaining === 0) break
+        if (rice.remaining === 0) continue
+        const quantity = Math.min(remaining, rice.remaining)
+        lines.push({
+          key: `${item.id}:rice:${rice.id}:${quantity}`,
+          foodName: `${item.foodName} (با برنج ایرانی)`,
+          unitPrice: item.unitPrice + rice.unitPrice,
+          quantity,
+          totalPrice: (item.unitPrice + rice.unitPrice) * quantity,
+        })
+        remaining -= quantity
+        rice.remaining -= quantity
+      }
+    }
+    if (remaining > 0) {
+      lines.push({
+        key: `${item.id}:plain:${remaining}`,
+        foodName: item.foodName,
+        unitPrice: item.unitPrice,
+        quantity: remaining,
+        totalPrice: item.unitPrice * remaining,
+      })
+    }
+  }
+
+  for (const rice of riceQueue.filter((item) => item.remaining > 0)) {
+    lines.push({
+      key: `${rice.id}:unmatched:${rice.remaining}`,
+      foodName: rice.foodName,
+      unitPrice: rice.unitPrice,
+      quantity: rice.remaining,
+      totalPrice: rice.unitPrice * rice.remaining,
+    })
+  }
+  return lines
+}
 
 export const orderReviewWriteSchema = z.object({
   rating: z.number().int().min(1, 'امتیاز باید بین ۱ تا ۵ باشد.').max(5, 'امتیاز باید بین ۱ تا ۵ باشد.'),

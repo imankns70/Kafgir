@@ -29,7 +29,6 @@ const dateTime = (value: Date) => new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu
 
 const paymentLabels: Record<PaymentMethod, string> = {
   [PaymentMethod.Cash]: 'نقدی',
-  [PaymentMethod.CardToCard]: 'کارت به کارت',
   [PaymentMethod.Online]: 'پرداخت آنلاین',
   [PaymentMethod.Pos]: 'کارت‌خوان',
 }

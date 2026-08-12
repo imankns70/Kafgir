@@ -32,7 +32,6 @@ const statusLabel: Record<OrderStatus, string> = {
 
 const paymentMethodLabel: Record<PaymentMethod, string> = {
   [PaymentMethod.Cash]: 'نقدی',
-  [PaymentMethod.CardToCard]: 'کارت به کارت',
   [PaymentMethod.Online]: 'پرداخت آنلاین',
   [PaymentMethod.Pos]: 'کارت‌خوان',
 }

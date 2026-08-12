@@ -126,6 +126,9 @@ tr.selected-row:hover{background:#fff0c8}
 .manual-customer-panel input,.manual-customer-panel select,.manual-customer-panel textarea,.manual-add-panel input,.manual-add-panel select{min-height:42px;border:1px solid var(--border);border-radius:10px;padding:8px 11px;background:#fff}
 .manual-customer-panel textarea{min-height:86px;resize:vertical}
 .manual-customer-panel textarea:disabled{color:var(--muted);background:#fff8ed}
+.customer-lookup-state{margin:-4px 0 0;border-radius:9px;padding:8px 10px;color:var(--muted);background:#fff8ed;font-size:12px}
+.customer-lookup-state.found{color:#3f5d2f;background:#edf3e6}
+.customer-lookup-state.new{color:#8b5e00;background:#fff0c8}
 .manual-submit-row{display:flex;justify-content:flex-start;gap:8px;padding-top:6px}
 .manual-submit-row button{min-width:116px}
 .manual-add-panel{display:grid;gap:12px}
