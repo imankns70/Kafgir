@@ -1159,10 +1159,11 @@ select:disabled {
 .related-foods .food-placeholder-art { width:56px;height:44px }
 .related-foods a span { color:var(--kafgir-color-primary);font-size:var(--kafgir-type-caption) }
 .related-foods .discount-pill { color:var(--kafgir-color-error);background:var(--kafgir-color-error-soft) }
-.food-purchase-bar { display:grid;grid-template-columns:minmax(120px,1fr) max-content;align-items:center;gap:14px;margin:10px;padding:10px 12px;border:1px solid var(--kafgir-color-border);border-radius:var(--kafgir-radius-lg);background:var(--kafgir-color-surface-elevated);box-shadow:none }
+.food-purchase-bar { display:grid;grid-template-columns:1fr;gap:10px;margin:10px;padding:10px 12px;border:1px solid var(--kafgir-color-border);border-radius:var(--kafgir-radius-lg);background:var(--kafgir-color-surface-elevated);box-shadow:none }
 .food-purchase-bar-mobile { display:none }
-.food-purchase-bar .add-button { min-width:190px }
-.food-purchase-bar .quantity-add-control { width:210px }
+.food-purchase-action { display:grid;grid-template-columns:max-content minmax(190px,1fr);align-items:end;direction:rtl;gap:10px;min-width:0 }
+.food-purchase-bar .add-button { width:100%;min-width:0 }
+.food-purchase-bar .quantity-add-control { width:100% }
 
 .profile-login-page { max-width:560px;margin-inline:auto }
 .profile-login-card { margin-block-start:28px }
@@ -1410,6 +1411,7 @@ select:disabled {
 
   .mobile-bottom-nav button.active { color: var(--kafgir-color-primary); background: var(--kafgir-color-primary-soft); }
   .food-detail-page { display:block;padding-block-end:118px }
+  .food-detail-shell:has(.food-purchase-bar-mobile .rice-upgrade-option-card) .food-detail-page { padding-block-end:172px }
   .food-detail-gallery { position:static;margin-block-end:12px }
   .food-gallery-arrow { width:36px;height:36px }
   .food-gallery-arrow.previous { inset-inline-start:8px }
@@ -1422,12 +1424,13 @@ select:disabled {
   .icon-action { width:38px;height:38px }
   .related-foods>div { grid-template-columns:1fr }
   .food-purchase-bar-desktop { display:none }
-  .food-purchase-bar-mobile { position:fixed;z-index:var(--kafgir-z-navigation);inset-inline:50%;inset-block-end:max(10px,env(safe-area-inset-bottom));transform:translateX(50%);display:grid;grid-template-columns:minmax(86px,1fr) minmax(156px,max-content);gap:8px;width:min(calc(100% - 24px),760px);margin:0;padding:9px 10px;border-radius:var(--kafgir-radius-xl);background:var(--kafgir-color-surface-glass);box-shadow:var(--kafgir-shadow-navigation);backdrop-filter:blur(14px) }
+  .food-purchase-bar-mobile { position:fixed;z-index:var(--kafgir-z-navigation);inset-inline:50%;inset-block-end:max(10px,env(safe-area-inset-bottom));transform:translateX(50%);display:grid;grid-template-columns:1fr;gap:8px;width:min(calc(100% - 24px),760px);margin:0;padding:9px 10px;border-radius:var(--kafgir-radius-xl);background:var(--kafgir-color-surface-glass);box-shadow:var(--kafgir-shadow-navigation);backdrop-filter:blur(14px) }
   .food-purchase-bar .menu-card-price>span { display:none }
   .food-purchase-bar .price { font-size:.9rem }
   .food-purchase-bar .primary-button { min-height:42px;padding:8px 10px;font-size:.76rem }
-  .food-purchase-bar .add-button { min-width:156px }
-  .food-purchase-bar .quantity-add-control { width:176px;grid-template-columns:32px minmax(54px,1fr) 32px }
+  .food-purchase-action { grid-template-columns:max-content minmax(156px,1fr) }
+  .food-purchase-bar .add-button { min-width:0 }
+  .food-purchase-bar .quantity-add-control { width:100%;grid-template-columns:32px minmax(54px,1fr) 32px }
   .food-purchase-bar .quantity-controls { gap:4px }
   .food-purchase-bar .quantity-button { min-width:34px;min-height:34px }
   .profile-layout { display:block }
@@ -1497,6 +1500,10 @@ select:disabled {
 @media (max-width:340px) {
   .menu-card-action { grid-template-columns:1fr;align-items:stretch; }
   .menu-card-action .price-display { justify-self:end; }
+  .food-purchase-action { grid-template-columns:1fr;align-items:stretch; }
+  .food-purchase-action .price-display { justify-self:end; }
+  .food-detail-page { padding-block-end:166px; }
+  .food-detail-shell:has(.food-purchase-bar-mobile .rice-upgrade-option-card) .food-detail-page { padding-block-end:220px; }
 }
 .rice-upgrade-hint { display: inline-flex; align-items: center; gap: .3rem; color: var(--kafgir-color-secondary); font-size: .75rem; font-weight: 700; text-decoration: none; }
 .cart-variant-hint { display: block; color: var(--kafgir-color-text-muted); font-size: .72rem; line-height: 1.7; }
