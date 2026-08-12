@@ -55,7 +55,7 @@ npm run telegram:configure -- -MiniAppUrl https://your-current-host.pinggy.link
 See [.ai/docs/telegram-mini-app.md](.ai/docs/telegram-mini-app.md) for the BotFather, channel, and
 security checklist. Never expose Electron, PostgreSQL, or pgAdmin through the tunnel.
 
-For development, Electron reads `DATABASE_URL` directly, uses a three-connection pool by default, and stores uploaded food photos in `.data/uploads/foods` through the same `/api/media/foods/...` URLs served by Next.js. Packaged builds test and encrypt PostgreSQL and Liara Object Storage configuration through Windows DPAPI.
+For development, Electron reads `DATABASE_URL` from `apps/admin/.env.local`, uses a three-connection pool by default, and stores uploaded food photos in `.data/uploads/foods` through the same `/api/media/foods/...` URLs served by Next.js. With Cloudinary credentials configured, its main process uploads signed images directly and the renderer receives only the public URL.
 
 ## PostgreSQL integration test
 
@@ -100,7 +100,7 @@ uses the database's external TLS URL and should use the restricted database role
 After the first deploy, verify `/api/health`, confirm the real proxy chain before retaining
 `TRUSTED_PROXY_HOPS=1`, and set the resulting HTTPS URL as the Telegram Mini App URL.
 
-The Next.js service uses Liara's private PostgreSQL address. Electron main uses a dedicated restricted PostgreSQL login over TLS; its renderer has no database capability. In production, food photos use a public Liara Object Storage bucket. The notification route is protected by `NOTIFICATION_PROCESSOR_SECRET` and should be invoked once per minute.
+The Next.js service uses the configured PostgreSQL address. Electron main uses a dedicated restricted PostgreSQL login over TLS; its renderer has no database capability. In production, food photos use Cloudinary. The notification route is protected by `NOTIFICATION_PROCESSOR_SECRET` and should be invoked once per minute.
 
 Create the restricted login while connected as the database owner:
 
@@ -108,9 +108,10 @@ Create the restricted login while connected as the database owner:
 psql "$env:DATABASE_URL" -f infra/postgres/create-electron-admin-role.sql
 ```
 
-Configure a public Liara S3-compatible bucket for production only. Local development does not need
-Liara Object Storage; omit the Liara fields and uploads will be written under `.data/uploads/foods`.
-Packaged Electron collects the production bucket settings through its encrypted connection form.
+Create `apps/admin/.env.local` from `apps/admin/.env.example`. Local development can omit the three
+Cloudinary values and uploads will be written under `.data/uploads/foods`. When all three Cloudinary
+values are present, Electron main uploads the normalized WebP directly to `kafgir/foods`; the API
+secret is never exposed to the renderer.
 
 Migrate legacy disk images with a dry run first:
 
