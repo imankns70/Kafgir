@@ -169,48 +169,51 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
   const upgradedQuantity = lines.find((item) => Boolean(item.withPersianRice) === withPersianRice)?.quantity ?? 0
   const otherLine = lines.find((item) => Boolean(item.withPersianRice) !== withPersianRice)
   const renderPurchaseBar = (className: string) => <div className={className}>
-    <PriceDisplay
-      price={(food.price ?? 0) + (withPersianRice && rice ? rice.price : 0)}
-      originalPrice={food.originalPrice}
-      discountPercentage={food.discountPercentage}
-    />
-    {offersRice && <label className="rice-upgrade-option">
+    {offersRice && <label className="rice-upgrade-option rice-upgrade-option-card">
       <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
         onChange={(event) => event.target.checked ? setConfirmingRice(true) : setWithPersianRice(false)} />
-      <span>{riceAvailable || upgradedInCart
-        ? `با برنج ایرانی (+${formatMoney(rice.price)})`
+      <span className="rice-upgrade-label">{riceAvailable || upgradedInCart
+        ? 'با برنج ایرانی'
         : 'برنج ایرانی امروز تمام شده است'}</span>
+      {(riceAvailable || upgradedInCart) && <span className="rice-upgrade-price">+{formatMoney(rice.price)}</span>}
     </label>}
     {otherLine && <small className="cart-variant-hint">
       {formatNumber(otherLine.quantity)} پرس {otherLine.withPersianRice ? 'با برنج ایرانی' : 'بدون برنج ایرانی'} هم در سبد شماست
     </small>}
-    {upgradedQuantity > 0
-      ? <div className="add-button quantity-add-control" aria-label={`${food.title} در سبد خرید`}>
-          <button
-            type="button"
-            className="quantity-add-button"
-            onClick={() => changeCartQuantity(upgradedQuantity - 1, withPersianRice)}
-            aria-label={`کم کردن ${food.title}`}
-          >
-            <Icon name="minus" size="sm" />
-          </button>
-          <span className="quantity-add-status">
-            <span>{formatNumber(upgradedQuantity)}</span>
-            <small>در سبد خرید</small>
-          </span>
-          <button
-            type="button"
-            className="quantity-add-button"
-            onClick={() => addToCart()}
-            disabled={upgradedQuantity >= food.remainingCapacity}
-            aria-label={`اضافه کردن ${food.title}`}
-          >
-            <Icon name="add" size="sm" />
-          </button>
-        </div>
-      : <button className="primary-button add-button" disabled={!food.isOrderable} onClick={() => addToCart()}>
-          <Icon name="cart" size="sm" /><span>افزودن به سبد خرید</span>
-        </button>}
+    <div className="food-purchase-action">
+      <PriceDisplay
+        price={(food.price ?? 0) + (withPersianRice && rice ? rice.price : 0)}
+        originalPrice={food.originalPrice}
+        discountPercentage={food.discountPercentage}
+      />
+      {upgradedQuantity > 0
+        ? <div className="add-button quantity-add-control" aria-label={`${food.title} در سبد خرید`}>
+            <button
+              type="button"
+              className="quantity-add-button"
+              onClick={() => changeCartQuantity(upgradedQuantity - 1, withPersianRice)}
+              aria-label={`کم کردن ${food.title}`}
+            >
+              <Icon name="minus" size="sm" />
+            </button>
+            <span className="quantity-add-status">
+              <span>{formatNumber(upgradedQuantity)}</span>
+              <small>در سبد خرید</small>
+            </span>
+            <button
+              type="button"
+              className="quantity-add-button"
+              onClick={() => addToCart()}
+              disabled={upgradedQuantity >= food.remainingCapacity}
+              aria-label={`اضافه کردن ${food.title}`}
+            >
+              <Icon name="add" size="sm" />
+            </button>
+          </div>
+        : <button className="primary-button add-button" disabled={!food.isOrderable} onClick={() => addToCart()}>
+            <Icon name="cart" size="sm" /><span>افزودن به سبد خرید</span>
+          </button>}
+    </div>
   </div>
 
   return <div className="app-shell food-detail-shell">
