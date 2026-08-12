@@ -750,7 +750,8 @@ select:disabled {
   grid-row: 3;
   display: flex;
   align-items: center;
-  gap: 0;
+  justify-content: space-between;
+  gap: 8px;
   min-width: 0;
   padding-block: 7px;
   border-block: 1px solid var(--kafgir-color-border);
@@ -1475,6 +1476,19 @@ select:disabled {
 .rice-upgrade-option:has(input:disabled) { opacity: .6; cursor: not-allowed; background: transparent; }
 .rice-upgrade-option:has(input:disabled) input { cursor: not-allowed; }
 .rice-upgrade-option:has(input:focus-visible) { outline: 2px solid var(--kafgir-color-secondary); outline-offset: 2px; }
+.menu-card-meta .rice-upgrade-option {
+  flex: 0 1 auto;
+  min-width: 0;
+  align-self: center;
+  gap: .35rem;
+  padding: .25rem .5rem;
+  border-color: color-mix(in srgb, var(--kafgir-color-secondary) 34%, var(--kafgir-color-border));
+  font-size: .7rem;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+.menu-card-meta .rice-upgrade-option input { flex: 0 0 auto; width: .9rem; height: .9rem; }
+.menu-card-meta .rice-upgrade-option span { overflow: hidden; text-overflow: ellipsis; }
 .rice-upgrade-hint { display: inline-flex; align-items: center; gap: .3rem; color: var(--kafgir-color-secondary); font-size: .75rem; font-weight: 700; text-decoration: none; }
 .cart-variant-hint { display: block; color: var(--kafgir-color-text-muted); font-size: .72rem; line-height: 1.7; }
 /* A bare "+" icon here read as a third control next to the quantity +/- buttons. This is read-only
