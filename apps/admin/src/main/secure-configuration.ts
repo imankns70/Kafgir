@@ -12,8 +12,8 @@ const configurationFile = () => join(app.getPath('userData'), 'secure-connection
 function developmentEnvironment(): Record<string, string> {
   if (app.isPackaged) return {}
   const candidates = [
-    resolve(process.cwd(), '../web/.env.local'),
-    resolve(process.cwd(), 'apps/web/.env.local'),
+    resolve(process.cwd(), '.env.local'),
+    resolve(process.cwd(), 'apps/admin/.env.local'),
   ]
   for (const fileName of candidates) {
     try {
@@ -34,19 +34,21 @@ function environmentConfiguration(): SecureConnectionConfiguration | null {
   const setting = (name: string) => (process.env[name] ?? development[name])?.trim()
   const databaseUrl = setting('DATABASE_URL')
   if (!databaseUrl) return null
-  const endpoint = setting('LIARA_ENDPOINT')
-  const bucket = setting('LIARA_BUCKET_NAME')
-  const accessKeyId = setting('LIARA_ACCESS_KEY')
-  const secretAccessKey = setting('LIARA_SECRET_KEY')
-  const publicBaseUrl = setting('FOOD_MEDIA_PUBLIC_BASE')
+  const cloudName = setting('CLOUDINARY_CLOUD_NAME')
+  const apiKey = setting('CLOUDINARY_API_KEY')
+  const apiSecret = setting('CLOUDINARY_API_SECRET')
+  const cloudinaryValues = [cloudName, apiKey, apiSecret]
+  if (cloudinaryValues.some(Boolean) && !cloudinaryValues.every(Boolean)) {
+    throw new Error('هر سه تنظیم Cloudinary باید تکمیل شوند.')
+  }
   const value: SecureConnectionConfiguration = {
     databaseUrl,
-    storage: endpoint && bucket && accessKeyId && secretAccessKey && publicBaseUrl
-      ? { endpoint, bucket, accessKeyId, secretAccessKey, publicBaseUrl }
+    cloudinary: cloudName && apiKey && apiSecret
+      ? { cloudName, apiKey, apiSecret }
       : null,
   }
   validateProductionDatabaseUrl(value.databaseUrl)
-  validateStorage(value.storage)
+  validateCloudinary(value.cloudinary)
   return value
 }
 
@@ -60,16 +62,10 @@ function validateProductionDatabaseUrl(value: string) {
   }
 }
 
-function validateStorage(value: SecureConnectionConfiguration['storage']) {
+function validateCloudinary(value: SecureConnectionConfiguration['cloudinary']) {
   if (!value) return
-  for (const candidate of [value.endpoint, value.publicBaseUrl]) {
-    const url = new URL(candidate)
-    if (url.protocol !== 'https:') {
-      throw new Error('آدرس‌های فضای تصاویر باید HTTPS باشند.')
-    }
-  }
-  if (!value.bucket.trim() || !value.accessKeyId.trim() || !value.secretAccessKey.trim()) {
-    throw new Error('پیکربندی فضای تصاویر کامل نیست.')
+  if (!value.cloudName.trim() || !value.apiKey.trim() || !value.apiSecret.trim()) {
+    throw new Error('پیکربندی Cloudinary کامل نیست.')
   }
 }
 
@@ -93,7 +89,7 @@ export async function saveSecureConfiguration(value: SecureConnectionConfigurati
     throw new Error('پیکربندی از متغیرهای محیطی خوانده می‌شود و در برنامه قابل تغییر نیست.')
   }
   validateProductionDatabaseUrl(value.databaseUrl)
-  validateStorage(value.storage)
+  validateCloudinary(value.cloudinary)
   if (!safeStorage.isEncryptionAvailable()) {
     throw new Error('رمزنگاری امن ویندوز در دسترس نیست؛ اطلاعات ذخیره نشد.')
   }
@@ -119,13 +115,13 @@ export async function connectionConfigurationStatus(): Promise<ConnectionConfigu
     return {
       configured: true,
       source: 'environment',
-      storageConfigured: Boolean(environment.storage) || !app.isPackaged,
+      storageConfigured: Boolean(environment.cloudinary) || !app.isPackaged,
     }
   }
   const encrypted = await readSecureConfiguration()
   return {
     configured: Boolean(encrypted?.databaseUrl),
     source: encrypted ? 'encrypted' : 'missing',
-    storageConfigured: Boolean(encrypted?.storage) || (Boolean(encrypted?.databaseUrl) && !app.isPackaged),
+    storageConfigured: Boolean(encrypted?.cloudinary) || (Boolean(encrypted?.databaseUrl) && !app.isPackaged),
   }
 }
