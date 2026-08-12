@@ -16,7 +16,7 @@ import type {
 import { dispatchAdminOperation } from './admin-dispatcher'
 import { desktopLogger, readDesktopLogs } from './logger'
 import {
-  configureObjectStorage,
+  configureFoodImageStorage,
   deleteManagedFoodImage,
   hasConfiguredFoodImageStorage,
   uploadFoodImage,
@@ -42,15 +42,15 @@ function developmentUploadRoot() {
 }
 
 function ensureFoodImageStorage(value: SecureConnectionConfiguration) {
-  if (value.storage || hasConfiguredFoodImageStorage()) return
+  if (value.cloudinary || hasConfiguredFoodImageStorage()) return
   const root = developmentUploadRoot()
-  configureObjectStorage(null, root)
+  configureFoodImageStorage(null, root)
   configureManagedImageDeleter(root ? deleteManagedFoodImage : null)
 }
 
 async function configureRuntime(value: SecureConnectionConfiguration) {
   const uploadRoot = developmentUploadRoot()
-  const fingerprint = `${value.databaseUrl}\n${value.storage?.endpoint ?? ''}\n${value.storage?.bucket ?? ''}\n${uploadRoot ?? 'packaged'}`
+  const fingerprint = `${value.databaseUrl}\n${value.cloudinary?.cloudName ?? ''}\n${value.cloudinary?.apiKey ?? ''}\n${uploadRoot ?? 'packaged'}`
   if (configuredFingerprint === fingerprint) return
   if (runtimeConfigurationPromise) {
     await runtimeConfigurationPromise
@@ -58,8 +58,8 @@ async function configureRuntime(value: SecureConnectionConfiguration) {
   }
   runtimeConfigurationPromise = (async () => {
     await configureDatabase(value.databaseUrl, Number(process.env.ELECTRON_DATABASE_POOL_SIZE ?? 3))
-    configureObjectStorage(value.storage, uploadRoot)
-    configureManagedImageDeleter(value.storage || uploadRoot ? deleteManagedFoodImage : null)
+    configureFoodImageStorage(value.cloudinary, uploadRoot)
+    configureManagedImageDeleter(value.cloudinary || uploadRoot ? deleteManagedFoodImage : null)
     await recoverInterruptedSocialPublications()
     configuredFingerprint = fingerprint
   })().finally(() => {
@@ -122,7 +122,7 @@ function registerIpc() {
     principal = null
     configuredFingerprint = null
     runtimeConfigurationPromise = null
-    configureObjectStorage(null, null)
+    configureFoodImageStorage(null, null)
     configureManagedImageDeleter(null)
     await closeDatabase()
     await clearSecureConfiguration()
