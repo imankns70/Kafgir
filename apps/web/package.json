@@ -15,7 +15,7 @@
     "db:seed-demo": "tsx scripts/seed-operational-demo.ts",
     "db:seed-rice-options": "tsx scripts/seed-rice-options.ts",
     "migrate:sqlserver": "tsx scripts/migrate-sqlserver.ts",
-    "migrate:food-images": "tsx scripts/migrate-food-images-to-object-storage.ts",
+    "migrate:food-images": "tsx scripts/migrate-food-images-to-cloudinary.ts",
     "social:verify": "tsx scripts/verify-social-publishing.mts"
   },
   "dependencies": {
@@ -32,7 +32,7 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.922.0",
+    "cloudinary": "^2.10.0",
     "@types/mssql": "9.1.8",
     "@types/node": "24.13.2",
     "@types/react": "19.2.17",
