@@ -1,5 +1,18 @@
 # Tasks
 
+## Completed — 2026-08-14 mobile order/cart layout polish
+
+- [x] Keep the delivery address title and text visually adjacent to its location icon.
+- [x] Move each cart food's detail action to the visual upper-left of the item heading.
+- [x] Add a markup regression assertion and validate the Web workspace.
+
+## Completed — 2026-08-14 GitHub CI and Netlify boundary
+
+- [x] Run lint, unit tests, and production builds for pull requests and pushes to `main`.
+- [x] Use Node.js 24, `npm ci`, read-only repository permissions, and concurrency cancellation.
+- [x] Build generated shared-contract declarations before lint on a clean CI runner.
+- [x] Keep production deployment exclusively on Netlify's existing Git integration.
+
 ## Completed — 2026-08-13 account/cart/loading polish
 
 - [x] Rename authenticated customer navigation and heading to `حساب من`.

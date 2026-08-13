@@ -50,7 +50,12 @@ export function CartSummary({ items, onQuantityChange }: { items: CartItem[]; on
       const canAdjust = (item.availability ?? 'available') === 'available' && item.remainingPortions > 0
       return <div className={`cart-row ${issue ? 'cart-row-invalid' : ''}`} key={`${item.dailyMenuItemId}:${Boolean(item.withPersianRice)}`}>
         <div className="cart-item-info">
-          <div className="cart-name">{item.foodName}</div>
+          <div className="cart-item-heading">
+            <div className="cart-name">{item.foodName}</div>
+            {item.slug && <a className="outline-button cart-detail-button" href={`/foods/${encodeURIComponent(item.slug)}?menuItemId=${item.dailyMenuItemId}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
+              <Icon name="info" size="sm" /><span>جزئیات</span>
+            </a>}
+          </div>
           <div className="cart-unit-price"><PriceDisplay compact label="" price={item.unitPrice} originalPrice={item.originalUnitPrice} discountPercentage={item.discountPercentage} /><small className="muted">× {formatNumber(item.quantity)}</small></div>
           {item.persianRiceTitle && <div className="cart-rice-option">
             <span>{item.persianRiceTitle} — {formatMoney(item.persianRicePrice ?? 0)} × {formatNumber(item.quantity)}</span>
@@ -64,9 +69,6 @@ export function CartSummary({ items, onQuantityChange }: { items: CartItem[]; on
             <button type="button" className="quantity-button" aria-label={`اضافه کردن تعداد ${item.foodName}`} disabled={item.quantity >= item.remainingPortions}
               onClick={() => onQuantityChange(item.dailyMenuItemId, item.quantity + 1, Boolean(item.withPersianRice))}><Icon name="add" size="sm" /></button>
           </div>}
-          {item.slug && <a className="outline-button cart-detail-button" href={`/foods/${encodeURIComponent(item.slug)}?menuItemId=${item.dailyMenuItemId}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
-            <Icon name="info" size="sm" /><span>جزئیات</span>
-          </a>}
           <button type="button" className="primary-button cart-remove-button" aria-label={`حذف ${item.foodName} از سبد`} onClick={() => requestQuantityChange(item, 0)}><Icon name="delete" size="sm" /><span>حذف</span></button>
         </div>
         <span className="cart-line-total">{formatMoney(lineTotal(item))}{issue && <small>در جمع قابل سفارش محاسبه نشده</small>}</span>

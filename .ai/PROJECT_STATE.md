@@ -1,5 +1,24 @@
 # Project state
 
+## 2026-08-14 — Mobile order-address and cart-detail layout
+
+- Customer order cards keep the delivery-location icon and its title/address in one compact flex row,
+  so the text no longer stretches away from the icon on narrow RTL screens.
+- Each cart food's `جزئیات` action is in the item heading at the visual upper-left; quantity and remove
+  controls remain grouped beneath the food information.
+- No database migration is required.
+
+## 2026-08-14 — GitHub quality gate and Netlify deployment boundary
+
+- GitHub Actions now runs workspace lint, unit tests, and production builds for pull requests and
+  pushes to `main` on Node.js 24 with npm's lockfile-backed clean install.
+- A fresh runner builds `@kafgir/contracts` before lint because its workspace package exports generated
+  `dist` declarations; unlike a developer checkout, `npm ci` has no pre-existing contract output.
+- The workflow has read-only repository permissions, cancels superseded runs on the same ref, and
+  does not hold Netlify credentials or deploy the site.
+- Netlify remains the sole deployment owner through its existing Git integration with `main`, which
+  avoids duplicate production deploys and extra long-lived deployment secrets.
+
 ## 2026-08-13 — Account, contact, cart-detail, and branded busy states
 
 - Authenticated customer navigation and page heading use `حساب من` instead of the ambiguous
