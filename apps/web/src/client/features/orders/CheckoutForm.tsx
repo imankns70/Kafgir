@@ -9,6 +9,7 @@ import { createOrder } from '../../services/ordersApi'
 import { getTelegramInitData, getTelegramUser } from '../../services/telegram'
 import { cartItemIssue } from '../../services/cartReconciliation'
 import { Icon } from '../../design-system/Icon'
+import { ButtonLoading } from '../../design-system/ButtonLoading'
 import { DeliverySlotPicker } from './DeliverySlotPicker'
 import { formatNumber } from '../../utils/format'
 import {
@@ -317,6 +318,8 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} />
     <label className="field">توضیح سفارش<textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
     {error && <div className="form-error" role="alert">{error}</div>}
-    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || showLogin || !isCartVerified || Boolean(cartIssue) || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting ? 'در حال ثبت سفارش…' : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
+    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || showLogin || !isCartVerified || Boolean(cartIssue) || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting
+      ? <ButtonLoading label={form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} />
+      : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
   </form>
 }

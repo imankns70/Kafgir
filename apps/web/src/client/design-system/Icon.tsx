@@ -6,7 +6,7 @@ export type IconName =
   | 'freshIngredients' | 'healthyFood' | 'packaging' | 'delivery' | 'discount' | 'rating'
   | 'customerSatisfaction' | 'support' | 'hygiene' | 'add' | 'edit' | 'delete' | 'save'
   | 'confirm' | 'cancel' | 'back' | 'forward' | 'filter' | 'sort' | 'more' | 'settings'
-  | 'logout' | 'refresh' | 'minus' | 'info'
+  | 'logout' | 'refresh' | 'minus' | 'info' | 'phone'
 
 const paths: Record<IconName, string> = {
   home: 'M3 11 12 3l9 8M5 10v11h14V10M9 21v-7h6v7',
@@ -32,6 +32,7 @@ const paths: Record<IconName, string> = {
   rating: 'm12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.5-2.9-5.5 2.9 1.1-6.2L3 9.6l6.2-.9L12 3Z',
   customerSatisfaction: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM8 10h.01M16 10h.01M8 15c2.5 2 5.5 2 8 0',
   support: 'M4 13v-2a8 8 0 0 1 16 0v2M4 13v5h4v-6H4m16 1v5h-4v-6h4m0 6c0 2-2 3-5 3',
+  phone: 'M7.2 3.8 9.7 8 7.9 9.8c1.1 2.3 3 4.2 5.3 5.3l1.8-1.8 4.2 2.5-.8 4.1c-.2.8-.9 1.4-1.8 1.4C9 20.8 3.2 15 2.7 7.4c-.1-.9.5-1.6 1.4-1.8l3.1-.8Z',
   hygiene: 'm12 3 7 3v5c0 5-3 9-7 11-4-2-7-6-7-11V6l7-3Zm-3 9 2 2 4-5',
   add: 'M12 5v14M5 12h14',
   edit: 'm4 20 4-1L19 8l-3-3L5 16l-1 4Zm10-13 3 3',

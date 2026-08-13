@@ -116,6 +116,12 @@
 .profile-button:hover,
 .profile-button.active { color:var(--kafgir-color-primary);border-color:var(--kafgir-color-primary);background:var(--kafgir-color-primary-soft) }
 
+.button-loading { display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:0 }
+.button-loading-mark { position:relative;display:inline-grid;width:22px;height:22px;flex:none;place-items:center;border:1px solid currentColor;border-radius:50%;opacity:.92 }
+.button-loading-mark::before { content:"";position:absolute;width:3px;height:8px;border:1px solid currentColor;border-radius:1px 1px 3px 3px;transform:translateY(-3px) }
+.button-loading-mark i { display:block;width:2px;height:10px;border-radius:2px;background:currentColor;transform-origin:50% 0;transform:translateY(4px);animation:kafgir-button-stir .8s ease-in-out infinite alternate }
+@keyframes kafgir-button-stir { from { transform:translate(-2px,4px) rotate(-20deg) } to { transform:translate(2px,4px) rotate(20deg) } }
+
 .eyebrow {
   display: inline-flex;
   align-items: center;
@@ -974,6 +980,7 @@ select:disabled {
 .cart-unit-price > small { order:3 }
 .cart-item-warning { display: inline-flex; align-items: center; gap: 5px; color: var(--kafgir-color-error); font-size: var(--kafgir-type-caption); font-weight: 700; }
 .cart-item-actions { display: flex; align-items: center; gap: 8px; }
+.cart-detail-button { min-height:38px;gap:5px;padding:6px 10px;text-decoration:none }
 /* Carries `primary-button` in the markup, so it is the same filled control as «ورود و ثبت سفارش».
    Only the icon/label gap is tightened for this short button. */
 .cart-remove-button { gap: 5px; }
@@ -1380,7 +1387,9 @@ select:disabled {
   .food-placeholder-art { width: 104px; height: 68px; }
   .page-actions { align-items: center; }
   .page-actions .outline-button { min-height: 40px; padding: 7px 10px; font-size: .78rem; }
-  .cart-item-actions { flex-wrap: wrap; }
+  .cart-item-actions { display:grid;grid-template-columns:1fr 1fr;width:100% }
+  .cart-item-actions .quantity-controls { grid-column:1 / -1;justify-content:center }
+  .cart-detail-button,.cart-remove-button { justify-content:center }
   .cart-sync-panel { grid-template-columns: auto minmax(0, 1fr); }
   .cart-sync-panel > button { grid-column: 1 / -1; width: 100%; }
   /* The container already stacks; on phones give each button its own full-width row too, so the

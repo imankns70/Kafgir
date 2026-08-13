@@ -1,5 +1,13 @@
 # Tasks
 
+## Completed — 2026-08-13 account/cart/loading polish
+
+- [x] Rename authenticated customer navigation and heading to `حساب من`.
+- [x] Replace the contact headset with a phone-receiver icon in desktop and mobile navigation.
+- [x] Add a food-detail action to every reconciled cart line and persist its canonical slug.
+- [x] Add isolated branded loading feedback to address create/update/delete and checkout submission.
+- [x] Prevent duplicate Electron manual-order submission and show matching progress feedback.
+
 ## Completed — 2026-08-13 mobile invoice logo
 
 - [x] Replace the overflowing compact invoice lockup with the square Kafgir symbol.

@@ -1,5 +1,19 @@
 # Project state
 
+## 2026-08-13 — Account, contact, cart-detail, and branded busy states
+
+- Authenticated customer navigation and page heading use `حساب من` instead of the ambiguous
+  `کفگیر من` / `پروفایل من` labels.
+- Contact navigation uses a conventional phone-receiver icon instead of the headset/support icon.
+- Cart lines persist and reconcile the public food slug, exposing a `جزئیات` action that opens the
+  current food-detail route even after Admin recreates today's menu row.
+- Address create/update/delete operations have isolated busy state so unrelated profile actions do
+  not disable them. The active button displays a small animated Kafgir-spatula mark and specific
+  progress text.
+- Checkout distinguishes saving a new delivery address from ordinary order submission. Electron
+  manual ordering uses the same branded progress treatment and prevents duplicate submission.
+- No database migration is required.
+
 ## 2026-08-13 — Mobile invoice brand layout
 
 - Customer invoices use the square Kafgir symbol instead of the compact icon-plus-wordmark lockup.

@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { BrandedState } from '../../design-system/BrandedState'
+import { ButtonLoading } from '../../design-system/ButtonLoading'
 import { Icon } from '../../design-system/Icon'
 import {
   createCustomerAddress,
@@ -54,6 +55,8 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   const [loginStep, setLoginStep] = useState<LoginStep>('phone')
   const [resendSeconds, setResendSeconds] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isAddressSubmitting, setIsAddressSubmitting] = useState(false)
+  const [deletingAddressId, setDeletingAddressId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState('')
   const [address, setAddress] = useState<CustomerAddressWriteRequest>(emptyAddress)
   const [editingAddressId, setEditingAddressId] = useState<number | null>(null)
@@ -92,7 +95,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   const sendOtp = async (event?: FormEvent) => {
     event?.preventDefault()
     setError(null)
-    setIsSubmitting(true)
+    setIsAddressSubmitting(true)
     try {
       await requestCustomerOtp(phone)
       setLoginStep('code')
@@ -100,7 +103,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'ارسال کد تایید ممکن نشد.')
     } finally {
-      setIsSubmitting(false)
+      setIsAddressSubmitting(false)
     }
   }
 
@@ -163,8 +166,10 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   const removeAddress = async (id: number) => {
     if (!window.confirm('این آدرس حذف شود؟')) return
     setError(null)
+    setDeletingAddressId(id)
     try { setProfile(await deleteCustomerAddress(id)) }
     catch (removeError) { setError(removeError instanceof Error ? removeError.message : 'حذف آدرس ممکن نشد.') }
+    finally { setDeletingAddressId(null) }
   }
 
   const openOrder = async (id: number) => {
@@ -246,7 +251,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   return (
     <main className="customer-profile-page">
       <div className="page-actions">
-        <div><p className="eyebrow"><Icon name="profile" size="sm" /> حساب مشتری</p><h1 className="section-title">پروفایل من</h1></div>
+        <div><p className="eyebrow"><Icon name="profile" size="sm" /> حساب مشتری</p><h1 className="section-title">حساب من</h1></div>
         <button className="checkout-back-link" onClick={onBack}>منوی امروز <Icon name="back" size="sm" /></button>
       </div>
       {error && <div className="form-error" role="alert">{error}</div>}
@@ -281,7 +286,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
               {profile.addresses.map((item) => <article className="customer-address-card" key={item.id}>
                 <div><strong>{item.title}</strong>{item.isDefault && <span>پیش‌فرض</span>}</div>
                 <p>{item.city}، {item.addressLine}</p>
-                <div><button className="outline-button" onClick={() => startAddressEdit(item)}><Icon name="edit" size="xs" /> ویرایش</button><button className="outline-button danger-outline" onClick={() => void removeAddress(item.id)}><Icon name="delete" size="xs" /> حذف</button></div>
+                <div><button className="outline-button" disabled={isAddressSubmitting || deletingAddressId !== null} onClick={() => startAddressEdit(item)}><Icon name="edit" size="xs" /> ویرایش</button><button className="outline-button danger-outline" disabled={isAddressSubmitting || deletingAddressId !== null} onClick={() => void removeAddress(item.id)}>{deletingAddressId === item.id ? <ButtonLoading label="در حال حذف…" /> : <><Icon name="delete" size="xs" /> حذف</>}</button></div>
               </article>)}
             </div>
           </section>
@@ -294,7 +299,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
             </div>
             <label className="field">نشانی<textarea value={address.addressLine} onChange={(event) => setAddress({ ...address, addressLine: event.target.value })} /></label>
             <label className="check-field"><input type="checkbox" checked={address.isDefault} onChange={(event) => setAddress({ ...address, isDefault: event.target.checked })} /> آدرس پیش‌فرض</label>
-            <div className="form-actions"><button className="primary-button" disabled={isSubmitting}>ذخیره آدرس</button>{editingAddressId && <button type="button" className="outline-button" onClick={() => startAddressEdit()}>انصراف</button>}</div>
+            <div className="form-actions"><button className="primary-button" disabled={isAddressSubmitting || deletingAddressId !== null}>{isAddressSubmitting ? <ButtonLoading label={editingAddressId ? 'در حال به‌روزرسانی آدرس…' : 'در حال ثبت آدرس…'} /> : editingAddressId ? 'به‌روزرسانی آدرس' : 'ثبت آدرس'}</button>{editingAddressId && <button type="button" className="outline-button" disabled={isAddressSubmitting} onClick={() => startAddressEdit()}>انصراف</button>}</div>
           </form>
           <button className="outline-button danger-outline profile-logout" onClick={() => void logout()}><Icon name="logout" size="sm" /> خروج از حساب</button>
         </div>

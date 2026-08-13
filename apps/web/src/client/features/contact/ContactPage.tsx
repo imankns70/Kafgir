@@ -16,7 +16,7 @@ export function ContactPage({ onBack }: Props) {
     <main className="contact-page">
       <div className="page-actions">
         <div>
-          <p className="eyebrow"><Icon name="support" size="sm" /> تماس با ما</p>
+          <p className="eyebrow"><Icon name="phone" size="sm" /> تماس با ما</p>
           <h1 className="section-title">ارتباط با کفگیر</h1>
         </div>
         <button className="checkout-back-link" onClick={onBack}>
@@ -29,7 +29,7 @@ export function ContactPage({ onBack }: Props) {
         <div className="contact-list">
           {contacts.map((item) => (
             <a className="contact-link" href={`tel:${item.phone}`} key={item.phone}>
-              <span><Icon name="support" size="md" /> {item.label}</span>
+              <span><Icon name="phone" size="md" /> {item.label}</span>
               <bdi dir="ltr">{item.phone}</bdi>
             </a>
           ))}

@@ -64,6 +64,9 @@ export function CartSummary({ items, onQuantityChange }: { items: CartItem[]; on
             <button type="button" className="quantity-button" aria-label={`اضافه کردن تعداد ${item.foodName}`} disabled={item.quantity >= item.remainingPortions}
               onClick={() => onQuantityChange(item.dailyMenuItemId, item.quantity + 1, Boolean(item.withPersianRice))}><Icon name="add" size="sm" /></button>
           </div>}
+          {item.slug && <a className="outline-button cart-detail-button" href={`/foods/${encodeURIComponent(item.slug)}?menuItemId=${item.dailyMenuItemId}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
+            <Icon name="info" size="sm" /><span>جزئیات</span>
+          </a>}
           <button type="button" className="primary-button cart-remove-button" aria-label={`حذف ${item.foodName} از سبد`} onClick={() => requestQuantityChange(item, 0)}><Icon name="delete" size="sm" /><span>حذف</span></button>
         </div>
         <span className="cart-line-total">{formatMoney(lineTotal(item))}{issue && <small>در جمع قابل سفارش محاسبه نشده</small>}</span>

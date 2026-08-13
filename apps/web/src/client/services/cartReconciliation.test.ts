@@ -23,7 +23,7 @@ const menu = (
 ): NonNullable<CartMenuSnapshot> => ({
   isOpen: true,
   items: [{ id: 12, foodName: 'قورمه‌سبزی', price: 430000, isAvailable: true, remainingPortions: 4,
-    foodId: 7, allowsPersianRice: false, ...overrides }],
+    foodId: 7, slug: 'ghormeh-sabzi', allowsPersianRice: false, ...overrides }],
   persianRice,
 })
 
@@ -55,6 +55,7 @@ describe('cart reconciliation', () => {
     expect(result.items[0]).toMatchObject({
       dailyMenuItemId: 44,
       foodId: 7,
+      slug: 'ghormeh-sabzi',
       availability: 'available',
       remainingPortions: 9,
     })

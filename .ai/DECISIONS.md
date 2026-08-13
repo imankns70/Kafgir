@@ -1,5 +1,16 @@
 # Decisions
 
+## 2026-08-13 — Customer navigation and async action feedback
+
+- Call the authenticated customer destination `حساب من`; reserve profile wording for descriptive
+  copy rather than the primary navigation label.
+- Use the phone receiver for customer contact navigation. The headset icon implies live support and
+  should not represent a page that primarily exposes telephone links.
+- Persist the food slug on cart lines and refresh it during reconciliation so cart detail links use
+  the same canonical `/foods/[slug]?menuItemId=...` route as menu cards.
+- Long-running address/order mutations must disable the initiating controls, expose a live Persian
+  status, and use the restrained spatula-in-plate animation shared by Web and Electron.
+
 ## 2026-08-13 — Invoice branding
 
 - Use the full/compact Kafgir lockup in application navigation, but use only the square symbol in

@@ -40,6 +40,8 @@ export function addStoredCartItem(item: CartItem) {
     ? current.map((value) => sameLine(value, item)
       ? {
           ...value,
+          foodId: item.foodId ?? value.foodId,
+          slug: item.slug ?? value.slug,
           foodName: item.foodName,
           unitPrice: item.unitPrice,
           originalUnitPrice: item.originalUnitPrice ?? null,

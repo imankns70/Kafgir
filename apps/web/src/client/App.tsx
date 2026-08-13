@@ -182,6 +182,7 @@ function App() {
         cartItem.dailyMenuItemId === item.id && Boolean(cartItem.withPersianRice) === upgraded
       const refreshed = {
         foodId: item.foodId,
+        slug: item.slug,
         foodName: item.foodName,
         withPersianRice: upgraded,
         persianRiceTitle: rice?.title ?? null,
@@ -240,10 +241,10 @@ function App() {
         </button>
         <div className="header-actions">
           <button className={`profile-button ${page === 'profile' ? 'active' : ''}`} onClick={() => setPage('profile')} aria-label="پروفایل و سفارش‌های من" aria-current={page === 'profile' ? 'page' : undefined}>
-            <Icon name="profile" size="md" /><span>{isCustomerAuthenticated ? 'کفگیر من' : 'ورود'}</span>
+            <Icon name="profile" size="md" /><span>{isCustomerAuthenticated ? 'حساب من' : 'ورود'}</span>
           </button>
           <button className={`profile-button ${page === 'contact' ? 'active' : ''}`} onClick={() => setPage('contact')} aria-label="تماس با کفگیر" aria-current={page === 'contact' ? 'page' : undefined}>
-            <Icon name="support" size="md" /><span>تماس با ما</span>
+            <Icon name="phone" size="md" /><span>تماس با ما</span>
           </button>
           {page === 'menu' && (
           <button className="cart-button" onClick={openCart} aria-label={`سبد خرید، ${cart.length} قلم`}>
@@ -285,12 +286,12 @@ function App() {
             <span className="nav-icon-wrap"><Icon name="cart" size="lg" />{cart.length > 0 && <span className="nav-count">{cart.length}</span>}</span>
             <span>سبد خرید</span>
           </button>
-          <button className={page === 'profile' ? 'active' : ''} onClick={() => setPage('profile')} aria-label={isCustomerAuthenticated ? 'کفگیر من' : 'ورود'} aria-current={page === 'profile' ? 'page' : undefined}>
+          <button className={page === 'profile' ? 'active' : ''} onClick={() => setPage('profile')} aria-label={isCustomerAuthenticated ? 'حساب من' : 'ورود'} aria-current={page === 'profile' ? 'page' : undefined}>
             <Icon name="profile" size="lg" />
-            <span>{isCustomerAuthenticated ? 'کفگیر من' : 'ورود'}</span>
+            <span>{isCustomerAuthenticated ? 'حساب من' : 'ورود'}</span>
           </button>
           <button className={page === 'contact' ? 'active' : ''} onClick={() => setPage('contact')} aria-label="تماس" aria-current={page === 'contact' ? 'page' : undefined}>
-            <Icon name="support" size="lg" />
+            <Icon name="phone" size="lg" />
             <span>تماس</span>
           </button>
         </nav>
