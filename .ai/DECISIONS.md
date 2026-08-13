@@ -12,6 +12,9 @@
 
 - GitHub Actions owns repository validation only: clean install, lint, unit tests, and build on pull
   requests and `main` pushes.
+- Build the contracts workspace immediately after `npm ci` and before lint. Its package exports
+  generated `dist` types, so downstream workspaces cannot type-check on a clean runner until that
+  artifact exists; relying on a locally retained `dist` directory would hide the dependency order.
 - Netlify's native Git integration remains the only production deploy trigger. Do not add a Netlify
   CLI deploy or build-hook call to GitHub Actions, because that would duplicate the existing `main`
   deploy and require broader long-lived secrets.

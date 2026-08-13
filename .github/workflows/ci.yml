@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build shared contracts
+        run: npm run build --workspace @kafgir/contracts
+
       - name: Lint workspaces
         run: npm run lint
 

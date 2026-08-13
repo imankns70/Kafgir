@@ -12,6 +12,8 @@
 
 - GitHub Actions now runs workspace lint, unit tests, and production builds for pull requests and
   pushes to `main` on Node.js 24 with npm's lockfile-backed clean install.
+- A fresh runner builds `@kafgir/contracts` before lint because its workspace package exports generated
+  `dist` declarations; unlike a developer checkout, `npm ci` has no pre-existing contract output.
 - The workflow has read-only repository permissions, cancels superseded runs on the same ref, and
   does not hold Netlify credentials or deploy the site.
 - Netlify remains the sole deployment owner through its existing Git integration with `main`, which

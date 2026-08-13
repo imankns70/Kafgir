@@ -10,6 +10,7 @@
 
 - [x] Run lint, unit tests, and production builds for pull requests and pushes to `main`.
 - [x] Use Node.js 24, `npm ci`, read-only repository permissions, and concurrency cancellation.
+- [x] Build generated shared-contract declarations before lint on a clean CI runner.
 - [x] Keep production deployment exclusively on Netlify's existing Git integration.
 
 ## Completed — 2026-08-13 account/cart/loading polish
