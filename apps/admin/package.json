@@ -4,7 +4,9 @@
   "private": true,
   "main": "./out/main/index.js",
   "scripts": {
+    "predev": "npm run build --workspace @kafgir/contracts",
     "dev": "electron-vite dev",
+    "prebuild": "npm run build --workspace @kafgir/contracts",
     "build": "electron-vite build",
     "package": "npm run build && electron-builder --win nsis --x64",
     "lint": "tsc --noEmit",

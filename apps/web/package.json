@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "predev": "npm run build --workspace @kafgir/contracts",
     "dev": "next dev --hostname 0.0.0.0",
+    "prebuild": "npm run build --workspace @kafgir/contracts",
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
