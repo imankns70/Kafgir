@@ -1,5 +1,23 @@
 # Decisions
 
+## 2026-08-14 — Keep compact metadata controls with their content
+
+- Render the cart detail link in the food heading rather than the quantity/remove action row. In RTL,
+  heading space distribution places the food name at the right and the secondary detail action at the
+  visual upper-left without absolute positioning.
+- Let the order-address text size to its content beside the location icon instead of occupying a
+  full-width grid track, which prevents a misleading visual gap on mobile while preserving wrapping.
+
+## 2026-08-14 — Separate code validation from Netlify deployment
+
+- GitHub Actions owns repository validation only: clean install, lint, unit tests, and build on pull
+  requests and `main` pushes.
+- Netlify's native Git integration remains the only production deploy trigger. Do not add a Netlify
+  CLI deploy or build-hook call to GitHub Actions, because that would duplicate the existing `main`
+  deploy and require broader long-lived secrets.
+- Grant the CI workflow only `contents: read`; no write, package, deployment, or environment permission
+  is needed for validation.
+
 ## 2026-08-13 — Customer navigation and async action feedback
 
 - Call the authenticated customer destination `حساب من`; reserve profile wording for descriptive

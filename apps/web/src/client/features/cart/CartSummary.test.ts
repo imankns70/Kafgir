@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vitest'
 import type { CartItem } from '../../types'
-import { removalWouldEmptyCart } from './CartSummary'
+import { CartSummary, removalWouldEmptyCart } from './CartSummary'
 
 const item = (id: number, quantity = 1): CartItem => ({
   dailyMenuItemId: id,
@@ -25,5 +27,16 @@ describe('empty-cart confirmation', () => {
 
   it('does not interrupt a normal quantity decrease', () => {
     expect(removalWouldEmptyCart([item(1, 2)], 1, 1)).toBe(false)
+  })
+})
+
+describe('cart item presentation', () => {
+  it('renders the food detail action inside the item heading', () => {
+    const html = renderToStaticMarkup(createElement(CartSummary, {
+      items: [{ ...item(1), slug: 'food-1' }],
+      onQuantityChange: vi.fn(),
+    }))
+
+    expect(html).toMatch(/cart-item-heading[\s\S]*cart-name[\s\S]*cart-detail-button[\s\S]*cart-unit-price/)
   })
 })

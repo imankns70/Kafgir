@@ -975,12 +975,14 @@ select:disabled {
 }
 
 .cart-item-info { display: grid; gap: 3px; min-width: 0; }
+.cart-item-heading { display:flex;align-items:start;justify-content:space-between;gap:10px;min-width:0 }
+.cart-item-heading .cart-name { min-width:0;overflow-wrap:anywhere }
 .cart-unit-price { display:flex;align-items:center;flex-wrap:wrap;gap:5px }
 .cart-unit-price .price-discount-meta { order:2 }
 .cart-unit-price > small { order:3 }
 .cart-item-warning { display: inline-flex; align-items: center; gap: 5px; color: var(--kafgir-color-error); font-size: var(--kafgir-type-caption); font-weight: 700; }
 .cart-item-actions { display: flex; align-items: center; gap: 8px; }
-.cart-detail-button { min-height:38px;gap:5px;padding:6px 10px;text-decoration:none }
+.cart-detail-button { flex:none;min-height:34px;gap:5px;padding:5px 9px;text-decoration:none }
 /* Carries `primary-button` in the markup, so it is the same filled control as «ورود و ثبت سفارش».
    Only the icon/label gap is tightened for this short button. */
 .cart-remove-button { gap: 5px; }
@@ -1387,8 +1389,7 @@ select:disabled {
   .food-placeholder-art { width: 104px; height: 68px; }
   .page-actions { align-items: center; }
   .page-actions .outline-button { min-height: 40px; padding: 7px 10px; font-size: .78rem; }
-  .cart-item-actions { display:grid;grid-template-columns:1fr 1fr;width:100% }
-  .cart-item-actions .quantity-controls { grid-column:1 / -1;justify-content:center }
+  .cart-item-actions { display:flex;flex-wrap:wrap;width:auto }
   .cart-detail-button,.cart-remove-button { justify-content:center }
   .cart-sync-panel { grid-template-columns: auto minmax(0, 1fr); }
   .cart-sync-panel > button { grid-column: 1 / -1; width: 100%; }
@@ -1679,9 +1680,9 @@ select:disabled {
 .order-card-date { display:flex;align-items:center;gap:6px;color:var(--kafgir-color-text-secondary);font-size:var(--kafgir-type-caption) }
 .order-card-date svg { color:var(--kafgir-color-secondary) }
 .order-card-foods { overflow:hidden;border-block:1px dashed var(--kafgir-color-border);padding-block:10px;color:var(--kafgir-color-text-secondary);font-size:var(--kafgir-type-body-sm);text-overflow:ellipsis;white-space:nowrap }
-.order-card-address { display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:9px }
+.order-card-address { display:flex;align-items:flex-start;gap:7px;max-width:100% }
 .order-card-address>svg { margin-block-start:3px;color:var(--kafgir-color-primary) }
-.order-card-address div { display:grid;gap:3px }
+.order-card-address div { display:grid;flex:0 1 auto;gap:3px;min-width:0 }
 .order-card-address p { display:-webkit-box;overflow:hidden;margin:0;color:var(--kafgir-color-text-primary);font-size:var(--kafgir-type-body-sm);line-height:1.8;-webkit-box-orient:vertical;-webkit-line-clamp:2;white-space:normal }
 .order-card-finance { border-radius:var(--kafgir-radius-md);padding:10px 12px;background:var(--kafgir-color-background-secondary) }
 .order-card-finance>div { display:grid;gap:4px }
