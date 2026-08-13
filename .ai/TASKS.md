@@ -1,5 +1,18 @@
 # Tasks
 
+## Completed — 2026-08-13 order and build recovery
+
+- [x] Remove card-to-card from active application choices and operational seed data.
+- [x] Redesign the responsive order-success summary.
+- [x] Allow order confirmation without opening ingredient inventory while retaining menu-capacity checks.
+- [x] Combine matched Persian-rice upgrades with their dish in Web and Admin invoice presentation.
+- [x] Put mobile first in manual orders and preload existing customer details and saved addresses.
+- [x] Add delivery-method and available delivery-slot selection to manual orders.
+- [x] Reproduce the fresh-checkout `@kafgir/contracts` resolution failure affecting Web and Electron.
+- [x] Add automatic contracts compilation before independent Web/Admin development and production builds.
+- [x] Validate lint, 343 tests, missing-dist Web build, missing-dist Electron build, and diff integrity.
+- [x] Merge order-flow PR #11 and build-recovery PR #12 into `main`.
+
 ## Complete
 
 - [x] Add migration `0017_social_publishing.sql`, shared contracts and server-core services for

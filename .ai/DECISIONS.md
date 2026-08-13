@@ -1,5 +1,22 @@
 # Decisions
 
+## 2026-08-13 — Orders, invoices, and workspace build dependencies
+
+- Keep Persian-rice upgrades as separate persisted order items for capacity and inventory, but
+  combine matched rice and dish items into one customer-facing/Admin invoice row.
+- Treat daily-menu capacity as the order sales constraint. Missing opening ingredient inventory
+  must not prevent order confirmation; inventory consumption can surface a negative balance for
+  later operational reconciliation.
+- Start Admin manual orders with normalized Iranian mobile lookup. Reuse the canonical customer and
+  a selected saved address when found, while still allowing a new delivery address.
+- Require a currently available delivery time slot for manually entered delivery orders; pickup
+  orders do not require a slot.
+- Card-to-card is not an active application payment method until payment methods receive their own
+  managed base-data table. Do not offer or seed it in the current flow.
+- `@kafgir/contracts` remains a compiled workspace package. Every independently runnable Web or
+  Electron `dev`/`build` command must compile it first instead of relying on stale or pre-existing
+  ignored `dist` files.
+
 ## Product and brand
 
 - Kafgir serves homemade Persian food in Andimeshk and sells by portion.
@@ -13,6 +30,7 @@
 
 - Use an npm workspace containing `apps/web`, `apps/admin`, `packages/contracts`, and `packages/server-core`.
 - Next.js App Router owns the customer Mini App and HTTP API.
+- Netlify is the active customer Web deployment platform; repository files for older hosting targets do not identify the live deployment.
 - PostgreSQL and Drizzle own persistence.
 - Electron is Windows x64 and online-only. Under the approved single-owner/single-PC threat model, only its main process may access PostgreSQL directly through the shared server core.
 - Shared transport schemas and numeric enums live in `packages/contracts`.
