@@ -77,6 +77,7 @@ export function reconcileCart(items: CartItem[], menu: CartMenuSnapshot): CartRe
       ...cartItem,
       dailyMenuItemId: resolvedMenuItemId,
       foodId: latest?.foodId ?? cartItem.foodId,
+      slug: latest?.slug ?? cartItem.slug,
       foodName: latest?.foodName ?? cartItem.foodName,
       persianRiceTitle: latestRice?.title ?? cartItem.persianRiceTitle,
       persianRicePrice: latestRice?.price ?? cartItem.persianRicePrice ?? 0,

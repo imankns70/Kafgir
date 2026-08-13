@@ -78,6 +78,10 @@ const normalizedFoodName = (value: string) => value.trim().replace(/\s+/g, ' ').
 const asciiDigits = (value: string) => value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
   .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
 const integerDigits = (value: string) => asciiDigits(value).replace(/\D/g, '')
+
+function ButtonLoading({ label }: { label: string }) {
+  return <span className="button-loading" role="status" aria-live="polite"><span className="button-loading-mark" aria-hidden="true"><i /></span><span>{label}</span></span>
+}
 const parseMoneyInput = (value: string) => Number(asciiDigits(value).replace(/[,\s٬،]/g, '')) || 0
 const formatMoneyInput = (value: number) => value > 0 ? groupedNumber(value) : ''
 const persianOnes = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه']
@@ -1275,6 +1279,7 @@ function ManualOrderPage() {
   const [quantity, setQuantity] = useState(1)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
   useEffect(() => {
     const date = today()
     void Promise.all([adminApi.menu(date), adminApi.deliveryDay(date)])
@@ -1396,6 +1401,7 @@ function ManualOrderPage() {
       deliveryTimeSlotId: delivery === DeliveryMethod.Delivery ? Number(deliveryTimeSlotId) : null,
       items: cart.map((item) => ({ dailyMenuItemId: item.id, withPersianRice: item.withPersianRice, quantity: item.quantity })),
     }
+    setIsSubmittingOrder(true)
     try {
       const order = await adminApi.createOrder(request)
       clearOrder()
@@ -1404,6 +1410,8 @@ function ManualOrderPage() {
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
       setMessage(null)
+    } finally {
+      setIsSubmittingOrder(false)
     }
   }
   return <PageFrame title="ثبت سفارش" actions={<span className="eyebrow">ثبت سفارش تلفنی یا حضوری از منوی امروز</span>}>
@@ -1452,8 +1460,8 @@ function ManualOrderPage() {
         </select></label>
         <label>یادداشت مشتری<textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} /></label>
         <div className="manual-submit-row">
-          <button type="button" className="secondary" onClick={clearOrder}>سفارش جدید</button>
-          <button className="primary" disabled={cart.length === 0 || !fullName.trim() || !phone.trim()}>ثبت سفارش</button>
+          <button type="button" className="secondary" disabled={isSubmittingOrder} onClick={clearOrder}>سفارش جدید</button>
+          <button className="primary" disabled={isSubmittingOrder || cart.length === 0 || !fullName.trim() || !phone.trim()}>{isSubmittingOrder ? <ButtonLoading label={delivery === DeliveryMethod.Delivery && !selectedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} /> : 'ثبت سفارش'}</button>
         </div>
       </section>
       <section className="manual-order-main">

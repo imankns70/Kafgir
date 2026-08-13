@@ -128,6 +128,7 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
     const nextCart = addStoredCartItem({
       dailyMenuItemId: food.menuItemId,
       foodId: food.foodId,
+      slug: food.slug,
       withPersianRice: rice != null,
       persianRiceTitle: rice?.title ?? null,
       persianRicePrice: rice?.price ?? 0,

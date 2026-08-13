@@ -464,3 +464,10 @@ input[type="number"]::-webkit-inner-spin-button {
   .metric-help-tooltip { transition: none; }
   .analytics-skeleton > span { animation: none; }
 }
+
+.button-loading { display:inline-flex;align-items:center;justify-content:center;gap:8px }
+.button-loading-mark { position:relative;display:inline-grid;width:21px;height:21px;flex:none;place-items:center;border:1px solid currentColor;border-radius:50% }
+.button-loading-mark::before { content:"";position:absolute;width:3px;height:8px;border:1px solid currentColor;border-radius:1px 1px 3px 3px;transform:translateY(-3px) }
+.button-loading-mark i { display:block;width:2px;height:9px;border-radius:2px;background:currentColor;transform-origin:50% 0;animation:kafgir-button-stir .8s ease-in-out infinite alternate }
+@keyframes kafgir-button-stir { from { transform:translate(-2px,4px) rotate(-20deg) } to { transform:translate(2px,4px) rotate(20deg) } }
+@media (prefers-reduced-motion: reduce) { .button-loading-mark i { animation:none } }

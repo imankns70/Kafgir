@@ -373,7 +373,7 @@ export async function getMenuCartSnapshotByDate(
   const foodNames = [...new Set(requestedItems.flatMap((item) => item.foodName ? [item.foodName.trim()] : []))]
 
   const items = await sqlClient<MenuCartSnapshotDto['items']>`
-    SELECT i.id, f.id AS "foodId", f.name AS "foodName",
+    SELECT i.id, f.id AS "foodId", f.slug, f.name AS "foodName",
            COALESCE(i.discount_price, i.price)::float8 AS price,
            CASE WHEN i.discount_price IS NOT NULL THEN i.price::float8 ELSE NULL END AS "originalPrice",
            CASE WHEN i.discount_price IS NOT NULL

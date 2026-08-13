@@ -156,7 +156,7 @@ export const menuCartSnapshotSchema = z.object({
     allowsPersianRice: true,
     remainingPortions: true,
     isAvailable: true,
-  })),
+  }).extend({ slug: z.string().optional() })),
   persianRice: persianRiceSchema.nullable().default(null),
 })
 
@@ -780,6 +780,8 @@ export interface CartItem {
   dailyMenuItemId: number
   /** Stable catalog identity used to remap a cart line when today's menu row is recreated. */
   foodId?: number
+  /** Public route identity for opening this dish from a persisted cart line. */
+  slug?: string
   withPersianRice?: boolean
   persianRiceTitle?: string | null
   persianRicePrice?: number
