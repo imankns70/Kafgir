@@ -1,6 +1,38 @@
 # Project state
 
-- Status: Next.js, Electron, and PostgreSQL implementation complete in the repository; live database migration and Liara deployment remain operator-dependent.
+## 2026-08-13 — Order flow improvements and build recovery
+
+- PR #11 (`ea24d3dd`) improved the customer and Admin order flow: card-to-card was removed from
+  active payment choices and seed data, the order-success view was redesigned responsively, and
+  Persian-rice upgrades are now folded into the parent dish for customer and Admin invoice display.
+- Persian-rice upgrades remain independent stored order items so pricing, capacity, and inventory
+  accounting stay auditable; only the invoice presentation is combined.
+- Confirming an order is no longer blocked merely because opening ingredient stock was not entered.
+  Daily-menu capacity remains the sales guard and consumption may expose a negative inventory
+  balance that operators must reconcile.
+- Electron manual ordering now starts with mobile number, automatically finds existing customers,
+  preloads their profile and saved addresses, allows choosing a saved or new address, and requires
+  an available delivery slot when delivery is selected.
+- A production regression after PR #11 was traced to `@kafgir/contracts` exporting from ignored
+  `dist` output. A fresh checkout or independently started Web/Admin workspace could not resolve the
+  package, producing `OrderInvoice.tsx:1:1` in Next.js and preventing Electron startup.
+- PR #12 (`cd540350`) adds Web and Admin `predev`/`prebuild` hooks that compile contracts first.
+  Both applications now build independently from a checkout where `packages/contracts/dist` does
+  not yet exist.
+- No database migration was required for these changes.
+
+### Verification for the 2026-08-13 recovery
+
+- Reproduced the missing-contract failure from a clean `main` checkout after removing contracts
+  build output.
+- Independent Next.js production build from the missing-dist state: passed.
+- Independent Electron production build from the missing-dist state: passed.
+- Full TypeScript lint: passed.
+- Full test suite: 343 passed (Contracts 28, Server Core 92, Web 206, Electron Admin 17), with
+  guarded database integration cases skipped when no test database URL is supplied.
+- `git diff --check`: passed.
+
+- Status: Next.js, Electron, and PostgreSQL implementation complete in the repository; the customer Web application is deployed through Netlify and uses Neon PostgreSQL.
 - Brand: Kafgir / کفگیر.
 - Canonical visual identity: `branding/logo.png`; generated transparent PNG, favicon/PWA sizes, and Electron ICO are derived from it.
 - Customer application and server: `apps/web`.
