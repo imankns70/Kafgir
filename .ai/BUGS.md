@@ -2,6 +2,30 @@
 
 ## Resolved
 
+### 2026-08-13 — Invoice brand wordmark overlapped the order number on mobile
+
+- **Symptoms:** The compact Kafgir logo's wordmark rendered over the invoice order number on narrow
+  screens.
+- **Root cause:** The invoice constrained the two-part compact lockup to a 72px mobile grid column;
+  its wordmark could not fit and overflowed into the title column.
+- **Fix:** Use the square brand symbol only inside the invoice and give it an explicit responsive
+  width and height. The full lockup remains in the application header.
+- **Verification:** Invoice markup regression test, TypeScript lint, and production builds passed.
+
+### 2026-08-13 — Available food reported as absent from today's menu
+
+- **Symptoms:** The customer cart reported that «برنج هندی» was no longer in today's menu even
+  though Admin showed the food as available with remaining capacity.
+- **Root cause:** Browser cart persistence and reconciliation identified a food only by
+  `daily_menu_items.id`. Replacing or recreating today's menu row assigned a new id, so the old cart
+  could not recognize the same catalog food.
+- **Fix:** Store and request the stable `foods.id`, let the cart snapshot return today's matching
+  row, and rewrite the cart line to the current menu-item id. Legacy carts fall back to their saved
+  unique food name once and are upgraded automatically.
+- **Verification:** Regression tests cover stable-id and legacy-name remapping; full lint, Web test
+  suite, Next.js build, Electron build, and diff check passed.
+- **Migration:** None.
+
 ### 2026-08-13 — Web `OrderInvoice.tsx:1:1` build failure and Electron startup failure
 
 - **Symptoms:** Next.js reported a module-resolution error at the first import of

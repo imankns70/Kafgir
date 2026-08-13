@@ -20,7 +20,7 @@ export function OrderInvoice({ order, allowPrint = true }: { order: OrderDto; al
   const invoiceItems = buildInvoiceOrderLines(order.items)
   return <section className="customer-invoice" aria-labelledby={`invoice-title-${order.id}`}>
     <header className="invoice-heading">
-      <BrandLogo variant="compact" />
+      <BrandLogo variant="symbol" className="invoice-brand-symbol" />
       <div>
         <span>فاکتور سفارش</span>
         <h2 id={`invoice-title-${order.id}`}>شماره <bdi dir="ltr">{formatNumber(order.orderNumber)}</bdi></h2>

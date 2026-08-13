@@ -64,7 +64,10 @@ function App() {
       const latestMenu = await getTodayMenu({ limit: 12 })
       setMenu(latestMenu)
       const cartSnapshot = cartRef.current.length > 0
-        ? await getTodayMenuCartSnapshot(cartRef.current.map((item) => ({ dailyMenuItemId: item.dailyMenuItemId, withPersianRice: Boolean(item.withPersianRice) })))
+        ? await getTodayMenuCartSnapshot(cartRef.current.map((item) => ({
+            dailyMenuItemId: item.dailyMenuItemId, foodId: item.foodId, foodName: item.foodName,
+            withPersianRice: Boolean(item.withPersianRice),
+          })))
         : latestMenu ? { isOpen: latestMenu.isOpen, items: [], persianRice: latestMenu.persianRice } : null
       const reconciled = reconcileCart(cartRef.current, cartSnapshot)
       updateCart(reconciled.items)
@@ -103,7 +106,10 @@ function App() {
     const refreshCartSnapshot = async () => {
       if (document.visibilityState !== 'visible' || cartRef.current.length === 0) return
       try {
-        const snapshot = await getTodayMenuCartSnapshot(cartRef.current.map((item) => ({ dailyMenuItemId: item.dailyMenuItemId, withPersianRice: Boolean(item.withPersianRice) })))
+        const snapshot = await getTodayMenuCartSnapshot(cartRef.current.map((item) => ({
+          dailyMenuItemId: item.dailyMenuItemId, foodId: item.foodId, foodName: item.foodName,
+          withPersianRice: Boolean(item.withPersianRice),
+        })))
         const reconciled = reconcileCart(cartRef.current, snapshot)
         updateCart(reconciled.items)
         setCartMessages(reconciled.messages)
@@ -175,6 +181,7 @@ function App() {
       const sameLine = (cartItem: CartItem) =>
         cartItem.dailyMenuItemId === item.id && Boolean(cartItem.withPersianRice) === upgraded
       const refreshed = {
+        foodId: item.foodId,
         foodName: item.foodName,
         withPersianRice: upgraded,
         persianRiceTitle: rice?.title ?? null,

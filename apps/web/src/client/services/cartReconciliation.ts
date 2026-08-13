@@ -35,6 +35,8 @@ export function cartItemIssue(item: CartItem): string | null {
 
 export function reconcileCart(items: CartItem[], menu: CartMenuSnapshot): CartReconciliation {
   const menuItems = new Map(menu?.items.map((item) => [item.id, item]) ?? [])
+  const menuItemsByFoodId = new Map(menu?.items.map((item) => [item.foodId, item]) ?? [])
+  const menuItemsByFoodName = new Map(menu?.items.map((item) => [item.foodName.trim(), item]) ?? [])
   const messages: string[] = !menu
     ? ['منوی امروز هنوز برای سفارش در دسترس نیست.']
     : menu.isOpen ? [] : ['سفارش‌گیری منوی امروز بسته است.']
@@ -47,7 +49,11 @@ export function reconcileCart(items: CartItem[], menu: CartMenuSnapshot): CartRe
   const claimed = new Map<number, number>()
 
   const nextItems = items.map((cartItem) => {
+    // Menu rows may be recreated by Admin while the underlying food remains the same. Prefer the
+    // exact row, then its stable food id. The name fallback heals carts saved before foodId existed.
     const latest = menuItems.get(cartItem.dailyMenuItemId)
+      ?? (cartItem.foodId ? menuItemsByFoodId.get(cartItem.foodId) : undefined)
+      ?? menuItemsByFoodName.get(cartItem.foodName.trim())
     const upgraded = Boolean(cartItem.withPersianRice)
     const latestRice = upgraded ? rice : null
     let availability: CartAvailability = 'available'
@@ -61,13 +67,16 @@ export function reconcileCart(items: CartItem[], menu: CartMenuSnapshot): CartRe
     else if (latestRice && latestRice.remainingPortions <= 0) availability = 'sold-out'
 
     // An upgraded line can only go as far as the tighter of the dish share and the Persian rice.
-    const alreadyClaimed = claimed.get(cartItem.dailyMenuItemId) ?? 0
+    const resolvedMenuItemId = latest?.id ?? cartItem.dailyMenuItemId
+    const alreadyClaimed = claimed.get(resolvedMenuItemId) ?? 0
     const dishShare = Math.max(0, (latest?.remainingPortions ?? 0) - alreadyClaimed)
-    claimed.set(cartItem.dailyMenuItemId, alreadyClaimed + cartItem.quantity)
+    claimed.set(resolvedMenuItemId, alreadyClaimed + cartItem.quantity)
     const resolvedRemaining = Math.min(dishShare, latestRice?.remainingPortions ?? Number.MAX_SAFE_INTEGER)
 
     const next: CartItem = {
       ...cartItem,
+      dailyMenuItemId: resolvedMenuItemId,
+      foodId: latest?.foodId ?? cartItem.foodId,
       foodName: latest?.foodName ?? cartItem.foodName,
       persianRiceTitle: latestRice?.title ?? cartItem.persianRiceTitle,
       persianRicePrice: latestRice?.price ?? cartItem.persianRicePrice ?? 0,

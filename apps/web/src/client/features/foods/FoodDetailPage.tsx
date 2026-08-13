@@ -127,6 +127,7 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
     const remaining = Math.min(food.remainingCapacity, rice?.remainingPortions ?? food.remainingCapacity)
     const nextCart = addStoredCartItem({
       dailyMenuItemId: food.menuItemId,
+      foodId: food.foodId,
       withPersianRice: rice != null,
       persianRiceTitle: rice?.title ?? null,
       persianRicePrice: rice?.price ?? 0,

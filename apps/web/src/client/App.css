@@ -1254,7 +1254,7 @@ select:disabled {
 .order-success-invoice { scroll-margin-block-start:100px }
 .customer-invoice { display:grid;gap:18px;border:1px solid var(--kafgir-color-border-strong);border-radius:var(--kafgir-radius-lg);padding:22px;background:var(--kafgir-color-surface-elevated);box-shadow:var(--kafgir-shadow-card);text-align:start }
 .invoice-heading { display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;border-block-end:1px solid var(--kafgir-color-border);padding-block-end:15px }
-.invoice-heading .brand-logo { width:94px;max-height:58px }
+.invoice-heading .invoice-brand-symbol { width:58px;height:58px }
 .invoice-heading>div { display:grid;gap:2px }
 .invoice-heading>div>span { color:var(--kafgir-color-secondary);font-size:var(--kafgir-type-caption);font-weight:700 }
 .invoice-heading h2 { margin:0;color:var(--kafgir-color-text-primary);font-size:1.2rem }
@@ -1467,8 +1467,8 @@ select:disabled {
   .customer-order-line { grid-template-columns:minmax(0,1fr) auto }
   .customer-order-line span:last-child { grid-column:1/-1;color:var(--kafgir-color-primary);font-weight:700 }
   .customer-invoice { gap:14px;padding:14px }
-  .invoice-heading { grid-template-columns:74px minmax(0,1fr);gap:10px }
-  .invoice-heading .brand-logo { width:72px }
+  .invoice-heading { grid-template-columns:52px minmax(0,1fr);gap:10px }
+  .invoice-heading .invoice-brand-symbol { width:52px;height:52px }
   .invoice-heading>.status-badge { grid-column:1/-1;justify-self:start }
   .invoice-meta { grid-template-columns:1fr 1fr }
   .invoice-meta .invoice-address { grid-column:1/-1 }
