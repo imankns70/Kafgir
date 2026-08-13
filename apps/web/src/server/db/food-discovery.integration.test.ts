@@ -240,4 +240,15 @@ integration('food discovery PostgreSQL behavior', () => {
     expect(snapshot?.isOpen).toBe(true)
     expect(snapshot?.items.map((item) => item.id)).toEqual([requestedId])
   })
+
+  it('remaps a stale menu item request to todays row using the stable food identity', async () => {
+    const menu = await getMenuByDate('2099-02-01', true)
+    const current = menu!.items.find((item) => item.foodId === foodId)!
+    const snapshot = await getMenuCartSnapshotByDate('2099-02-01', [{
+      dailyMenuItemId: current.id + 100000,
+      foodId,
+      foodName: current.foodName,
+    }])
+    expect(snapshot?.items).toContainEqual(expect.objectContaining({ id: current.id, foodId }))
+  })
 })

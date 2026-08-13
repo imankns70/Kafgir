@@ -1,5 +1,24 @@
 # Project state
 
+## 2026-08-13 — Mobile invoice brand layout
+
+- Customer invoices use the square Kafgir symbol instead of the compact icon-plus-wordmark lockup.
+  The explicit 58px desktop / 52px mobile size prevents the brand from overlapping order numbers,
+  status badges, or print content.
+
+## 2026-08-13 — Cart remapping across daily-menu replacement
+
+- Cart lines now persist the stable catalog `foodId` in addition to `dailyMenuItemId`.
+- Cart reconciliation first matches today's exact menu row, then remaps by stable food identity
+  when Admin has recreated/replaced the daily-menu row.
+- Existing browser carts created before `foodId` was stored are healed once by their saved food
+  name, then persisted with today's row id and stable food id.
+- Remapping refreshes today's price, discount, availability, and remaining capacity without asking
+  the customer to remove and re-add the food.
+- No database migration is required.
+- Verification: two regression tests cover recreated rows and legacy carts; full lint, Web tests,
+  Next.js build, Electron build, and diff integrity passed.
+
 ## 2026-08-13 — Order flow improvements and build recovery
 
 - PR #11 (`ea24d3dd`) improved the customer and Admin order flow: card-to-card was removed from

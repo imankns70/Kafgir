@@ -4,6 +4,7 @@ import { cartItemIssue, reconcileCart, type CartMenuSnapshot } from './cartRecon
 
 const item = (overrides: Partial<CartItem> = {}): CartItem => ({
   dailyMenuItemId: 12,
+  foodId: 7,
   foodName: 'قورمه‌سبزی',
   unitPrice: 430000,
   quantity: 2,
@@ -22,7 +23,7 @@ const menu = (
 ): NonNullable<CartMenuSnapshot> => ({
   isOpen: true,
   items: [{ id: 12, foodName: 'قورمه‌سبزی', price: 430000, isAvailable: true, remainingPortions: 4,
-    allowsPersianRice: false, ...overrides }],
+    foodId: 7, allowsPersianRice: false, ...overrides }],
   persianRice,
 })
 
@@ -44,6 +45,34 @@ describe('cart reconciliation', () => {
     const result = reconcileCart([item()], { isOpen: true, items: [], persianRice: null })
     expect(result.items[0]?.availability).toBe('not-on-menu')
     expect(result.messages[0]).toContain('دیگر در منوی امروز نیست')
+  })
+
+  it('remaps a cart line when Admin recreated today menu row for the same food', () => {
+    const result = reconcileCart(
+      [item({ dailyMenuItemId: 12, quantity: 1 })],
+      menu({ id: 44, foodId: 7, remainingPortions: 9 }),
+    )
+    expect(result.items[0]).toMatchObject({
+      dailyMenuItemId: 44,
+      foodId: 7,
+      availability: 'available',
+      remainingPortions: 9,
+    })
+    expect(result.messages).toEqual([])
+  })
+
+  it('heals a legacy cart without foodId by matching its saved food name once', () => {
+    const result = reconcileCart(
+      [item({ dailyMenuItemId: 12, foodId: undefined, foodName: 'برنج هندی', quantity: 1 })],
+      menu({ id: 45, foodId: 8, foodName: 'برنج هندی', remainingPortions: 6 }),
+    )
+    expect(result.items[0]).toMatchObject({
+      dailyMenuItemId: 45,
+      foodId: 8,
+      availability: 'available',
+      remainingPortions: 6,
+    })
+    expect(result.messages).toEqual([])
   })
 
   it('prices an upgraded line separately and caps it at the Persian rice capacity', () => {

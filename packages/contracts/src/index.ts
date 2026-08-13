@@ -136,6 +136,8 @@ export const publicDailyMenuQuerySchema = z.object({
 export const menuCartSnapshotRequestSchema = z.object({
   items: z.array(z.object({
     dailyMenuItemId: z.number().int().positive(),
+    foodId: z.number().int().positive().optional(),
+    foodName: z.string().trim().min(1).max(150).optional(),
     withPersianRice: z.boolean().default(false),
   })).max(100).refine((values) => new Set(values.map((item) =>
     `${item.dailyMenuItemId}:${item.withPersianRice}`)).size === values.length,
@@ -146,6 +148,7 @@ export const menuCartSnapshotSchema = z.object({
   isOpen: z.boolean(),
   items: z.array(dailyMenuItemSchema.pick({
     id: true,
+    foodId: true,
     foodName: true,
     price: true,
     originalPrice: true,
@@ -775,6 +778,8 @@ export interface OrderReportQuery {
  */
 export interface CartItem {
   dailyMenuItemId: number
+  /** Stable catalog identity used to remap a cart line when today's menu row is recreated. */
+  foodId?: number
   withPersianRice?: boolean
   persianRiceTitle?: string | null
   persianRicePrice?: number

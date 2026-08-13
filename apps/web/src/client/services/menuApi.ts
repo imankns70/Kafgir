@@ -23,7 +23,12 @@ export async function getTodayMenu(query: TodayMenuQuery = {}): Promise<PublicDa
   }
 }
 
-export async function getTodayMenuCartSnapshot(items: Array<{ dailyMenuItemId: number; withPersianRice?: boolean }>): Promise<MenuCartSnapshotDto | null> {
+export async function getTodayMenuCartSnapshot(items: Array<{
+  dailyMenuItemId: number
+  foodId?: number
+  foodName?: string
+  withPersianRice?: boolean
+}>): Promise<MenuCartSnapshotDto | null> {
   try {
     return await apiPost<MenuCartSnapshotDto>('/api/menus/today/cart-snapshot', { items })
   } catch (error) {

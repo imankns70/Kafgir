@@ -1,5 +1,19 @@
 # Decisions
 
+## 2026-08-13 — Invoice branding
+
+- Use the full/compact Kafgir lockup in application navigation, but use only the square symbol in
+  dense invoice headers so branding never competes with the order number and status.
+
+## 2026-08-13 — Stable cart identity
+
+- A cart line must not use `daily_menu_items.id` as its only identity because Admin can recreate a
+  daily-menu row while the catalog food and capacity remain valid.
+- Persist `foods.id` as the stable cart identity and keep the menu-item id as today's order target.
+- During reconciliation, remap stale rows by `foodId`; use the saved food name only as a one-time
+  compatibility fallback for carts written before `foodId` was introduced.
+- After a successful remap, replace the stored menu-item id and refresh all current commercial data.
+
 ## 2026-08-13 — Orders, invoices, and workspace build dependencies
 
 - Keep Persian-rice upgrades as separate persisted order items for capacity and inventory, but

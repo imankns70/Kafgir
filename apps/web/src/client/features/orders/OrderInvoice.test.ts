@@ -36,6 +36,8 @@ describe('OrderInvoice', () => {
     expect(html).toContain('387,000 تومان')
     expect(html).toContain('774,000 تومان')
     expect(html).toContain('اندیمشک، خیابان نمونه')
+    expect(html).toContain('brand-logo-symbol')
+    expect(html).not.toContain('brand-logo-wordmark')
     expect(html).not.toContain('چاپ یا ذخیره فاکتور')
   })
 

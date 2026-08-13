@@ -1,5 +1,18 @@
 # Tasks
 
+## Completed — 2026-08-13 mobile invoice logo
+
+- [x] Replace the overflowing compact invoice lockup with the square Kafgir symbol.
+- [x] Add explicit desktop/mobile invoice symbol dimensions and a markup regression assertion.
+
+## Completed — 2026-08-13 cart menu-row remapping
+
+- [x] Reproduce a valid-capacity food being reported absent after its daily-menu row was recreated.
+- [x] Add stable food identity to cart storage and cart-snapshot requests/responses.
+- [x] Remap stale cart lines to today's menu row and refresh capacity and price.
+- [x] Heal legacy carts without `foodId` using their saved unique food name.
+- [x] Add regression tests for both new and legacy carts and validate lint/build/tests.
+
 ## Completed — 2026-08-13 order and build recovery
 
 - [x] Remove card-to-card from active application choices and operational seed data.

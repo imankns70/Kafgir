@@ -351,7 +351,12 @@ export async function getPublicMenuPageByDate(
 
 export async function getMenuCartSnapshotByDate(
   menuDate: string,
-  requestedItems: Array<{ dailyMenuItemId: number; riceMenuItemId?: number | null }>,
+  requestedItems: Array<{
+    dailyMenuItemId: number
+    foodId?: number
+    foodName?: string
+    riceMenuItemId?: number | null
+  }>,
 ): Promise<MenuCartSnapshotDto | null> {
   const menus = await sqlClient<Array<{ id: number; isOpen: boolean }>>`
     SELECT id, is_open AS "isOpen"
@@ -364,9 +369,11 @@ export async function getMenuCartSnapshotByDate(
   const persianRice = await getPersianRice(menu.id)
   if (requestedItems.length === 0) return { isOpen: menu.isOpen, items: [], persianRice }
   const itemIds = [...new Set(requestedItems.map((item) => item.dailyMenuItemId))]
+  const foodIds = [...new Set(requestedItems.flatMap((item) => item.foodId ? [item.foodId] : []))]
+  const foodNames = [...new Set(requestedItems.flatMap((item) => item.foodName ? [item.foodName.trim()] : []))]
 
   const items = await sqlClient<MenuCartSnapshotDto['items']>`
-    SELECT i.id, f.name AS "foodName",
+    SELECT i.id, f.id AS "foodId", f.name AS "foodName",
            COALESCE(i.discount_price, i.price)::float8 AS price,
            CASE WHEN i.discount_price IS NOT NULL THEN i.price::float8 ELSE NULL END AS "originalPrice",
            CASE WHEN i.discount_price IS NOT NULL
@@ -379,7 +386,11 @@ export async function getMenuCartSnapshotByDate(
     JOIN foods f ON f.id = i.food_id
     JOIN food_categories c ON c.id = f.category_id
     WHERE i.daily_menu_id = ${menu.id}
-      AND i.id IN ${sqlClient(itemIds)}
+      AND (
+        i.id IN ${sqlClient(itemIds)}
+        OR (${foodIds.length > 0} AND f.id IN ${sqlClient(foodIds.length > 0 ? foodIds : [-1])})
+        OR (${foodNames.length > 0} AND f.name IN ${sqlClient(foodNames.length > 0 ? foodNames : [''])})
+      )
     ORDER BY i.id
   `
   return { isOpen: menu.isOpen, persianRice, items }
