@@ -2,6 +2,7 @@ import type { NextConfig } from 'next'
 import { resolve } from 'node:path'
 
 const nextConfig: NextConfig = {
+  cacheComponents: true,
   output: 'standalone',
   devIndicators: false,
   allowedDevOrigins: ['192.168.70.176',
