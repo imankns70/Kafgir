@@ -7,23 +7,11 @@ import type {
 import { sqlClient } from '../db/client'
 import { NotFoundError } from '../errors'
 import { businessDate } from '../time'
+import { getFoodCatalogDetail } from './food-catalog-service'
 
-type DetailBase = {
-  foodId: number
-  slug: string
-  title: string
+type OperationalDetail = {
   isActive: boolean
-  shortDescription: string | null
-  fullDescription: string | null
-  ingredients: string | null
-  portionDescription: string | null
-  allergyInformation: string | null
-  preparationTimeMinutes: number | null
-  categoryId: number
-  categoryTitle: string
-  categorySlug: string
-  categoryIcon: string | null
-  primaryBadgeTagId: number | null
+  allowsPersianRice: boolean
   menuItemId: number | null
   menuDate: string | null
   isMenuOpen: boolean | null
@@ -34,11 +22,10 @@ type DetailBase = {
   capacityPortions: number | null
   soldPortions: number | null
   isAvailable: boolean | null
-  allowsPersianRice: boolean
 }
 
 export function evaluateFoodAvailability(base: Pick<
-  DetailBase,
+  OperationalDetail,
   'isActive' | 'menuItemId' | 'isMenuOpen' | 'isAvailable'
   | 'capacityPortions' | 'soldPortions' | 'orderDeadline'
 >) {
@@ -63,67 +50,47 @@ export async function getFoodDetail(
   menuItemId: number | null,
   userId: number | null,
 ): Promise<FoodDetailDto> {
+  // Stable catalog copy (descriptions, category, tags and images) is cached separately so route
+  // prefetching can reuse it. Everything below remains live because price, capacity, menu state and
+  // customer interaction can change at any time.
+  const catalog = await getFoodCatalogDetail(slug)
   const today = businessDate()
-  const rows = await sqlClient<DetailBase[]>`
-    SELECT f.id AS "foodId", f.slug, f.name AS title, f.is_active AS "isActive",
-           f.description AS "shortDescription", f.full_description AS "fullDescription",
-           f.ingredients, f.portion_description AS "portionDescription",
-           f.allergy_information AS "allergyInformation",
-           f.preparation_time_minutes AS "preparationTimeMinutes",
-           c.id AS "categoryId", c.title AS "categoryTitle", c.slug AS "categorySlug",
-           c.icon AS "categoryIcon", f.primary_badge_tag_id AS "primaryBadgeTagId",
-           f.allows_persian_rice AS "allowsPersianRice",
-           mi.id AS "menuItemId", m.menu_date AS "menuDate", m.is_open AS "isMenuOpen",
-           m.order_deadline AS "orderDeadline",
-           COALESCE(mi.discount_price, mi.price)::float8 AS price,
-           CASE WHEN mi.discount_price IS NOT NULL THEN mi.price::float8 ELSE NULL END AS "originalPrice",
-           CASE WHEN mi.discount_price IS NOT NULL
-             THEN ROUND(((mi.price - mi.discount_price) / mi.price) * 100)::int
-             ELSE NULL END AS "discountPercentage",
-           mi.capacity_portions AS "capacityPortions", mi.sold_portions AS "soldPortions",
-           mi.is_available AS "isAvailable"
-    FROM foods f
-    JOIN food_categories c ON c.id = f.category_id
-    LEFT JOIN LATERAL (
-      SELECT i.*
-      FROM daily_menu_items i
-      JOIN daily_menus selected_menu ON selected_menu.id = i.daily_menu_id
-      WHERE i.food_id = f.id
-        AND (${menuItemId}::int IS NULL OR i.id = ${menuItemId})
-        AND (${menuItemId}::int IS NOT NULL OR selected_menu.menu_date >= ${today}::date)
-      ORDER BY selected_menu.menu_date, i.id
-      LIMIT 1
-    ) mi ON true
-    LEFT JOIN daily_menus m ON m.id = mi.daily_menu_id
-    WHERE f.slug = ${slug}
-    LIMIT 1
-  `
-  const base = rows[0]
-  if (!base) throw new NotFoundError('غذا پیدا نشد.')
 
-  const [tags, images, interaction, related, persianRice] = await Promise.all([
-    sqlClient<Array<{ id: number; title: string; slug: string; icon: string | null; group: FoodDetailDto['tags'][number]['group'] }>>`
-      SELECT t.id, t.title, t.slug, t.icon, t.group_name AS "group"
-      FROM food_to_tags ft
-      JOIN food_tags t ON t.id = ft.tag_id
-      WHERE ft.food_id = ${base.foodId} AND t.is_active = true AND t.is_customer_visible = true
-      ORDER BY t.display_order, t.id
-    `,
-    sqlClient<FoodDetailDto['images']>`
-      SELECT id, image_url AS "imageUrl", alt_text AS "altText",
-             display_order AS "displayOrder", is_primary AS "isPrimary"
-      FROM food_images
-      WHERE food_id = ${base.foodId}
-      ORDER BY is_primary DESC, display_order, id
+  const [operationalRows, interaction, related] = await Promise.all([
+    sqlClient<OperationalDetail[]>`
+      SELECT f.is_active AS "isActive", f.allows_persian_rice AS "allowsPersianRice",
+             mi.id AS "menuItemId", m.menu_date AS "menuDate", m.is_open AS "isMenuOpen",
+             m.order_deadline AS "orderDeadline",
+             COALESCE(mi.discount_price, mi.price)::float8 AS price,
+             CASE WHEN mi.discount_price IS NOT NULL THEN mi.price::float8 ELSE NULL END AS "originalPrice",
+             CASE WHEN mi.discount_price IS NOT NULL
+               THEN ROUND(((mi.price - mi.discount_price) / mi.price) * 100)::int
+               ELSE NULL END AS "discountPercentage",
+             mi.capacity_portions AS "capacityPortions", mi.sold_portions AS "soldPortions",
+             mi.is_available AS "isAvailable"
+      FROM foods f
+      LEFT JOIN LATERAL (
+        SELECT i.*
+        FROM daily_menu_items i
+        JOIN daily_menus selected_menu ON selected_menu.id = i.daily_menu_id
+        WHERE i.food_id = f.id
+          AND (${menuItemId}::int IS NULL OR i.id = ${menuItemId})
+          AND (${menuItemId}::int IS NOT NULL OR selected_menu.menu_date >= ${today}::date)
+        ORDER BY selected_menu.menu_date, i.id
+        LIMIT 1
+      ) mi ON true
+      LEFT JOIN daily_menus m ON m.id = mi.daily_menu_id
+      WHERE f.id = ${catalog.foodId}
+      LIMIT 1
     `,
     sqlClient<Array<{ likeCount: number; isLiked: boolean; isFavorite: boolean }>>`
       SELECT
-        (SELECT COUNT(*)::int FROM food_likes WHERE food_id = ${base.foodId}) AS "likeCount",
+        (SELECT COUNT(*)::int FROM food_likes WHERE food_id = ${catalog.foodId}) AS "likeCount",
         (${userId}::int IS NOT NULL AND EXISTS(
-          SELECT 1 FROM food_likes WHERE food_id = ${base.foodId} AND user_id = ${userId}
+          SELECT 1 FROM food_likes WHERE food_id = ${catalog.foodId} AND user_id = ${userId}
         )) AS "isLiked",
         (${userId}::int IS NOT NULL AND EXISTS(
-          SELECT 1 FROM food_favorites WHERE food_id = ${base.foodId} AND user_id = ${userId}
+          SELECT 1 FROM food_favorites WHERE food_id = ${catalog.foodId} AND user_id = ${userId}
         )) AS "isFavorite"
     `,
     sqlClient<FoodDetailDto['relatedFoods']>`
@@ -146,67 +113,65 @@ export async function getFoodDetail(
         SELECT image_url FROM food_images
         WHERE food_id = rf.id ORDER BY is_primary DESC, display_order, id LIMIT 1
       ) ri ON true
-      WHERE rf.id <> ${base.foodId} AND rf.is_active = true AND NOT rf.is_persian_rice
+      WHERE rf.id <> ${catalog.foodId} AND rf.is_active = true AND NOT rf.is_persian_rice
         AND m.menu_date >= ${today}::date AND m.is_open = true
         AND i.is_available = true AND i.capacity_portions > i.sold_portions
       ORDER BY
-        CASE WHEN rf.category_id = ${base.categoryId} THEN 0 ELSE 1 END,
+        CASE WHEN rf.category_id = ${catalog.category.id} THEN 0 ELSE 1 END,
         (SELECT COUNT(*) FROM food_to_tags own_tags
          JOIN food_to_tags related_tags ON related_tags.tag_id = own_tags.tag_id
-         WHERE own_tags.food_id = ${base.foodId} AND related_tags.food_id = rf.id) DESC,
+         WHERE own_tags.food_id = ${catalog.foodId} AND related_tags.food_id = rf.id) DESC,
         m.menu_date, i.id
       LIMIT 4
     `,
-    // The Persian upgrade belongs to the whole menu, not to one dish, so it is fetched by menu.
-    base.menuItemId ? sqlClient<PersianRiceDto[]>`
-      SELECT ri.id AS "menuItemId", rf.id AS "foodId",
-             rf.name AS title, rf.image_url AS "imageUrl",
-             COALESCE(ri.discount_price, ri.price)::float8 AS price,
-             ri.capacity_portions AS "capacityPortions", ri.sold_portions AS "soldPortions",
-             ri.capacity_portions - ri.sold_portions AS "remainingPortions",
-             (ri.is_available AND rf.is_active) AS "isAvailable"
-      FROM daily_menu_items ri
-      JOIN foods rf ON rf.id = ri.food_id
-      WHERE rf.is_persian_rice
-        AND ri.daily_menu_id = (SELECT daily_menu_id FROM daily_menu_items WHERE id = ${base.menuItemId})
-      ORDER BY ri.id
-      LIMIT 1
-    ` : Promise.resolve([]),
   ])
 
-  const state = evaluateFoodAvailability(base)
-  const primaryBadge = base.primaryBadgeTagId
-    ? tags.find((tag) => tag.id === base.primaryBadgeTagId) ?? null
-    : null
+  const operational = operationalRows[0]
+  if (!operational) throw new NotFoundError('غذا پیدا نشد.')
+
+  // The Persian upgrade belongs to the selected menu, not to the catalog entry, so it stays live.
+  const persianRice = operational.menuItemId
+    ? await sqlClient<PersianRiceDto[]>`
+        SELECT ri.id AS "menuItemId", rf.id AS "foodId",
+               rf.name AS title, rf.image_url AS "imageUrl",
+               COALESCE(ri.discount_price, ri.price)::float8 AS price,
+               ri.capacity_portions AS "capacityPortions", ri.sold_portions AS "soldPortions",
+               ri.capacity_portions - ri.sold_portions AS "remainingPortions",
+               (ri.is_available AND rf.is_active) AS "isAvailable"
+        FROM daily_menu_items ri
+        JOIN foods rf ON rf.id = ri.food_id
+        WHERE rf.is_persian_rice
+          AND ri.daily_menu_id = (SELECT daily_menu_id FROM daily_menu_items WHERE id = ${operational.menuItemId})
+        ORDER BY ri.id
+        LIMIT 1
+      `
+    : []
+
+  const state = evaluateFoodAvailability(operational)
   return {
-    menuItemId: base.menuItemId,
-    foodId: base.foodId,
-    slug: base.slug,
-    title: base.title,
-    isActive: base.isActive,
-    shortDescription: base.shortDescription,
-    fullDescription: base.fullDescription,
-    category: {
-      id: base.categoryId,
-      title: base.categoryTitle,
-      slug: base.categorySlug,
-      icon: base.categoryIcon,
-    },
-    tags,
-    allowsPersianRice: base.allowsPersianRice,
+    menuItemId: operational.menuItemId,
+    foodId: catalog.foodId,
+    slug: catalog.slug,
+    title: catalog.title,
+    isActive: operational.isActive,
+    shortDescription: catalog.shortDescription,
+    fullDescription: catalog.fullDescription,
+    category: catalog.category,
+    tags: catalog.tags,
+    allowsPersianRice: operational.allowsPersianRice,
     persianRice: persianRice[0] ?? null,
-    primaryBadge,
-    images,
-    ingredients: base.ingredients,
-    portionDescription: base.portionDescription,
-    allergyInformation: base.allergyInformation,
-    preparationTimeMinutes: base.preparationTimeMinutes,
-    price: base.price,
-    originalPrice: base.originalPrice,
-    discountPercentage: base.discountPercentage,
-    menuDate: base.menuDate,
+    primaryBadge: catalog.primaryBadge,
+    images: catalog.images,
+    ingredients: catalog.ingredients,
+    portionDescription: catalog.portionDescription,
+    allergyInformation: catalog.allergyInformation,
+    preparationTimeMinutes: catalog.preparationTimeMinutes,
+    price: operational.price,
+    originalPrice: operational.originalPrice,
+    discountPercentage: operational.discountPercentage,
+    menuDate: operational.menuDate,
     remainingCapacity: state.remaining,
-    orderDeadline: base.orderDeadline?.toISOString() ?? null,
+    orderDeadline: operational.orderDeadline?.toISOString() ?? null,
     isOrderable: state.isOrderable,
     availabilityReason: state.reason,
     likeCount: interaction[0]?.likeCount ?? 0,
