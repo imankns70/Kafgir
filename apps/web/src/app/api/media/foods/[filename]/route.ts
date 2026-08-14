@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server'
 import { routeError } from '@/server/http'
 import { readFoodImage } from '@/server/storage/food-images'
 
-export const runtime = 'nodejs'
-
 type Context = { params: Promise<{ filename: string }> }
 
 export async function GET(_request: Request, context: Context) {
