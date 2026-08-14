@@ -11,6 +11,7 @@ import { cartItemIssue } from '../../services/cartReconciliation'
 import { Icon } from '../../design-system/Icon'
 import { ButtonLoading } from '../../design-system/ButtonLoading'
 import { DeliverySlotPicker } from './DeliverySlotPicker'
+import { SavedAddressPicker } from './SavedAddressPicker'
 import { formatNumber } from '../../utils/format'
 import {
   DeliveryMethod,
@@ -306,14 +307,12 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       {form.paymentMethod === PaymentMethod.Pos && 'پرداخت با دستگاه پوز هنگام تحویل یا دریافت حضوری انجام می‌شود.'}
       {form.paymentMethod === PaymentMethod.Online && 'پس از ثبت سفارش به مرحله پرداخت آنلاین هدایت می‌شوید.'}
     </div>
-    {form.deliveryMethod === DeliveryMethod.Delivery && savedAddresses.length > 0 && <label className="field">آدرس‌های ذخیره‌شده<select value={selectedAddressId} onChange={(e) => setSelectedAddressId(e.target.value)}>
-      {savedAddresses.map((address) => <option key={address.id} value={address.id}>{address.title}{address.isDefault ? ' - پیش‌فرض' : ''}</option>)}
-      <option value={newAddressValue}>افزودن آدرس جدید</option>
-    </select></label>}
-    {form.deliveryMethod === DeliveryMethod.Delivery && selectedSavedAddress && <div className="saved-address-card">
-      <strong>{selectedSavedAddress.title}</strong>
-      <span>{selectedSavedAddress.city}، {selectedSavedAddress.addressLine}</span>
-    </div>}
+    {form.deliveryMethod === DeliveryMethod.Delivery && savedAddresses.length > 0 && <SavedAddressPicker
+      addresses={savedAddresses}
+      selectedAddressId={selectedAddressId}
+      newAddressValue={newAddressValue}
+      onSelect={setSelectedAddressId}
+    />}
     {form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && <label className="field">آدرس<textarea value={form.addressLine} onChange={(e) => setField('addressLine', e.target.value)} /></label>}
     <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} />
     <label className="field">توضیح سفارش<textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
