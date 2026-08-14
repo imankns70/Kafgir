@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 import type { FoodDetailDto } from '@kafgir/contracts'
 import type { CartItem } from '../../types'
@@ -220,13 +221,13 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
 
   return <div className="app-shell food-detail-shell">
     <header className="app-header food-detail-header">
-      <a className="brand-home-link" href="/" aria-label="بازگشت به صفحه اصلی کفگیر">
+      <Link className="brand-home-link" href="/" aria-label="بازگشت به صفحه اصلی کفگیر">
         <BrandLogo variant="compact" />
-      </a>
+      </Link>
       <div className="food-detail-header-actions">
-        <a className="icon-action food-detail-cart-action" href="/?page=cart" aria-label={`سبد خرید، ${cartCount} قلم`}>
+        <Link className="icon-action food-detail-cart-action" href="/?page=cart" aria-label={`سبد خرید، ${cartCount} قلم`}>
           <span className="nav-icon-wrap"><Icon name="cart" />{cartCount > 0 && <span className="nav-count">{formatNumber(cartCount)}</span>}</span>
-        </a>
+        </Link>
         {isCustomerAuthenticated && <button className={food.isFavoriteByCurrentUser ? 'icon-action active' : 'icon-action'} disabled={interactionBusy}
           onClick={() => void changeInteraction('favorite')} aria-label="افزودن یا حذف از علاقه‌مندی‌ها"><Icon name="favorite" /></button>}
         <button type="button" className="checkout-back-link" onClick={() => history.back()}>
@@ -294,7 +295,7 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
 
         {food.relatedFoods.length > 0 && <section className="related-foods">
           <h2>غذاهای پیشنهادی</h2>
-          <div>{food.relatedFoods.map((related) => <a key={related.menuItemId} href={`/foods/${related.slug}?menuItemId=${related.menuItemId}`}>
+          <div>{food.relatedFoods.map((related) => <Link key={related.menuItemId} href={`/foods/${related.slug}?menuItemId=${related.menuItemId}`}>
             <FoodImage src={related.imageUrl} alt={related.title} />
             <strong>{related.title}</strong>
             {related.allowsPersianRice && <span className="rice-upgrade-hint">با امکان برنج ایرانی</span>}
@@ -303,7 +304,7 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
                 originalPrice={related.originalPrice}
                 discountPercentage={related.discountPercentage} />
             </div>
-          </a>)}</div>
+          </Link>)}</div>
         </section>}
       </section>
     </main>
