@@ -16,6 +16,11 @@ const emitCustomerAuthChanged = (authenticated: boolean) => {
   window.dispatchEvent(new CustomEvent('kafgir:customer-auth-changed', { detail: { authenticated } }))
 }
 
+const emitOrderChanged = () => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event('kafgir:order-changed'))
+}
+
 export async function getMyCustomerProfile(request: CustomerProfileLookupRequest): Promise<CustomerProfileDto | null> {
   try {
     return await apiPost<CustomerProfileDto>('/api/customers/me', request)
@@ -64,8 +69,14 @@ export const deleteCustomerAddress = (id: number) =>
 export const getCustomerOrders = (page = 1) =>
   apiGet<CustomerOrdersPageDto>(`/api/customers/me/orders?page=${page}`)
 
-export const getActiveCustomerOrder = () =>
-  apiGet<CustomerOrderSummaryDto | null>('/api/customers/me/orders/active')
+export const getActiveCustomerOrders = () =>
+  apiGet<CustomerOrderSummaryDto[]>('/api/customers/me/orders/active')
+
+export const confirmCustomerOrderDelivered = async (id: number) => {
+  const order = await apiPost<CustomerOrderDetailDto>(`/api/customers/me/orders/${id}/delivered`, {})
+  emitOrderChanged()
+  return order
+}
 
 export const getCustomerOrder = (id: number) =>
   apiGet<CustomerOrderDetailDto>(`/api/customers/me/orders/${id}`)
