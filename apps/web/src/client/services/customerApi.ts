@@ -1,6 +1,7 @@
 import type {
   CustomerAddressWriteRequest,
   CustomerOrderDetailDto,
+  CustomerOrderSummaryDto,
   CustomerOrdersPageDto,
   CustomerProfileDto,
   CustomerProfileLookupRequest,
@@ -9,6 +10,11 @@ import type {
   OrderReviewWriteRequest,
 } from '../types'
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from './apiClient'
+
+const emitCustomerAuthChanged = (authenticated: boolean) => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent('kafgir:customer-auth-changed', { detail: { authenticated } }))
+}
 
 export async function getMyCustomerProfile(request: CustomerProfileLookupRequest): Promise<CustomerProfileDto | null> {
   try {
@@ -22,17 +28,26 @@ export async function getMyCustomerProfile(request: CustomerProfileLookupRequest
 export const getCustomerSession = () =>
   apiGet<CustomerSessionDto>('/api/auth/customer/session')
 
-export const loginCustomerWithTelegram = (telegramInitData: string) =>
-  apiPost<CustomerSessionDto>('/api/auth/customer/telegram', { telegramInitData })
+export const loginCustomerWithTelegram = async (telegramInitData: string) => {
+  const session = await apiPost<CustomerSessionDto>('/api/auth/customer/telegram', { telegramInitData })
+  emitCustomerAuthChanged(session.authenticated)
+  return session
+}
 
 export const requestCustomerOtp = (phoneNumber: string) =>
   apiPost<{ accepted: boolean }>('/api/auth/customer/otp/request', { phoneNumber })
 
-export const verifyCustomerOtp = (phoneNumber: string, code: string) =>
-  apiPost<CustomerSessionDto>('/api/auth/customer/otp/verify', { phoneNumber, code })
+export const verifyCustomerOtp = async (phoneNumber: string, code: string) => {
+  const session = await apiPost<CustomerSessionDto>('/api/auth/customer/otp/verify', { phoneNumber, code })
+  emitCustomerAuthChanged(session.authenticated)
+  return session
+}
 
-export const logoutCustomer = () =>
-  apiPost<{ authenticated: boolean }>('/api/auth/customer/logout', {})
+export const logoutCustomer = async () => {
+  const result = await apiPost<{ authenticated: boolean }>('/api/auth/customer/logout', {})
+  emitCustomerAuthChanged(false)
+  return result
+}
 
 export const updateCustomerProfile = (preferredName: string) =>
   apiPatch<CustomerProfileDto>('/api/customers/me', { preferredName })
@@ -48,6 +63,9 @@ export const deleteCustomerAddress = (id: number) =>
 
 export const getCustomerOrders = (page = 1) =>
   apiGet<CustomerOrdersPageDto>(`/api/customers/me/orders?page=${page}`)
+
+export const getActiveCustomerOrder = () =>
+  apiGet<CustomerOrderSummaryDto | null>('/api/customers/me/orders/active')
 
 export const getCustomerOrder = (id: number) =>
   apiGet<CustomerOrderDetailDto>(`/api/customers/me/orders/${id}`)

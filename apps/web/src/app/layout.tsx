@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Script from 'next/script'
 import '../client/index.css'
 import '../client/App.css'
+import '../client/ActiveOrderTracker.css'
+import { ActiveOrderTracker } from '../client/ActiveOrderTracker'
 import { CustomerAnalytics } from '../client/CustomerAnalytics'
 
 export const metadata: Metadata = {
@@ -26,6 +28,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         <CustomerAnalytics />
         {children}
+        <ActiveOrderTracker />
         <Script src="https://telegram.org/js/telegram-web-app.js" strategy="beforeInteractive" />
       </body>
     </html>
