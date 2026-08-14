@@ -9,12 +9,11 @@ const activeStatuses = new Set<OrderStatus>([
 ])
 
 /**
- * Returns the newest in-flight order for the signed-in customer.
- * The regular order-card query already prioritizes active orders, so requesting one row keeps this
- * endpoint small while reusing the existing customer-ownership and presentation mapping.
+ * Returns the customer's in-flight orders, newest first within the active-order group.
+ * The regular order-card query already prioritizes active orders, so one bounded page keeps this
+ * endpoint lightweight while preserving the same ownership and presentation mapping.
  */
-export async function getActiveCustomerOrderCard(userId: number): Promise<CustomerOrderSummaryDto | null> {
-  const page = await listCustomerOrderCards(userId, 1, 1)
-  const order = page.items[0] ?? null
-  return order && activeStatuses.has(order.status) ? order : null
+export async function listActiveCustomerOrderCards(userId: number): Promise<CustomerOrderSummaryDto[]> {
+  const page = await listCustomerOrderCards(userId, 1, 25)
+  return page.items.filter((order) => activeStatuses.has(order.status))
 }
