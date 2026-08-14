@@ -1,5 +1,6 @@
 # Instructions for coding agents
 
+- Use `development` for normal implementation work. Do not push iterative feature/fix commits directly to `main`; promote tested work to `main` only as a deliberate release merge/squash.
 - Keep the architecture simple and avoid over-engineering.
 - Respect npm workspace and application boundaries.
 - `packages/contracts` owns shared transport schemas and must not depend on either application.
