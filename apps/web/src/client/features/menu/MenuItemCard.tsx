@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { useState } from 'react'
 import type { CartItem, DailyMenuItemDto, PersianRiceDto } from '../../types'
 import { formatMoney, formatNumber } from '../../utils/format'
@@ -36,9 +37,9 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
 
   return <article className="menu-card">
     <div className="card-media">
-      <a href={`/foods/${item.slug}?menuItemId=${item.id}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
+      <Link href={`/foods/${item.slug}?menuItemId=${item.id}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
         <FoodImage src={item.imageUrl} alt={item.foodName} />
-      </a>
+      </Link>
       {item.primaryBadge && <span className="food-card-badge">
         {item.primaryBadge.icon && <span aria-hidden="true">{item.primaryBadge.icon}</span>}
         {item.primaryBadge.title}
@@ -48,7 +49,7 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
       </span>}
     </div>
     <div className="menu-card-body">
-      <h3 title={item.foodName}><a href={`/foods/${item.slug}?menuItemId=${item.id}`}>{item.foodName}</a></h3>
+      <h3 title={item.foodName}><Link href={`/foods/${item.slug}?menuItemId=${item.id}`}>{item.foodName}</Link></h3>
       {item.foodDescription && <p className="menu-card-description" title={item.foodDescription}>{item.foodDescription}</p>}
 
       <div className="menu-card-meta" aria-label="اطلاعات غذا">
