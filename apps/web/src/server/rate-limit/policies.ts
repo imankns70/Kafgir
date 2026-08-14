@@ -72,6 +72,33 @@ export const rateLimitPolicies = {
     windowMs: 10 * minute,
   },
 
+  /**
+   * Order reviews and customer delivery confirmations. Both are ownership-checked writes a customer
+   * performs a handful of times per order, so the budget only has to stop scripted churn.
+   */
+  orderFeedbackPerIdentity: {
+    name: 'order-feedback-identity',
+    limit: 30,
+    windowMs: 10 * minute,
+  },
+  orderFeedbackPerIp: {
+    name: 'order-feedback-ip',
+    limit: 120,
+    windowMs: 10 * minute,
+  },
+
+  /**
+   * Visitor heartbeats. Unauthenticated and it writes a row, so it needs a ceiling — but a generous
+   * one: the browser sends roughly one every two minutes per open tab, and a customer may have
+   * several. Keyed on the trusted IP only. The visitor id in the body is caller-chosen, so limiting
+   * per visitor would let a script mint itself a fresh budget for every request.
+   */
+  analyticsHeartbeatPerIp: {
+    name: 'analytics-heartbeat-ip',
+    limit: 240,
+    windowMs: 10 * minute,
+  },
+
   /** Likes and favorites are cheap but externally repeatable toggles. */
   foodInteractionPerIdentity: {
     name: 'food-interaction-identity',

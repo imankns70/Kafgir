@@ -200,6 +200,13 @@
   records stay in PostgreSQL; plain OTP values are never persisted or written to structured logs.
 - Store the 30-day customer session only in a secure HttpOnly same-origin cookie with a customer
   JWT audience separate from Electron admin authorization.
+- The same-origin check compares the `Origin` header's host with the `Host` header, plus the scheme
+  reported by `x-forwarded-proto` when a proxy sets one. It must not compare against
+  `new URL(request.url).origin`: Next derives that from the address the server is BOUND to, so
+  `next dev --hostname 0.0.0.0` reported `http://0.0.0.0:3000` against a browser `Origin` of
+  `http://localhost:3000` and rejected every same-origin POST in local development. `Host` is
+  caller-supplied but so is `Origin`, and a browser will not let a cross-site script forge either,
+  so the pairing is what carries the guarantee.
 - Authorize personal orders by the authenticated user's `customer_profile_id`, never by a phone,
   Telegram username, or customer identifier supplied by the client.
 - Merge matching phone-only customer records only after successful OTP proof. Prefer the currently
@@ -508,7 +515,9 @@
 - Overlapping windows are rejected. Two windows covering the same minute would split capacity the
   kitchen planned as one run, and a customer could not tell them apart.
 - Slot selection is optional in the contract so Electron manual phone orders can still be created
-  without one; the customer checkout requires it.
+  without one. The requirement for customer checkout is enforced in `POST /api/orders`, not only in
+  the browser: the contract cannot express "required on this route", and leaving the rule to the
+  client meant dropping the field from the request skipped the cutoff and capacity rules entirely.
 
 ## 2026-08-08 — Toolchain
 

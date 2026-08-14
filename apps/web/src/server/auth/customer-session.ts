@@ -81,15 +81,43 @@ export function clearCustomerCookie(response: NextResponse) {
   })
 }
 
+/**
+ * Rejects a cross-origin state-changing request.
+ *
+ * The comparison is against the `Host` header — the address the caller actually asked for — and not
+ * against `new URL(request.url).origin`. Next builds `request.url` from the address the server is
+ * BOUND to, so `next dev --hostname 0.0.0.0` makes it `http://0.0.0.0:3000` while every browser
+ * sends `Origin: http://localhost:3000`. Comparing those two rejected every same-origin POST in
+ * local development: login, checkout, cart reconciliation, profile and address writes, likes,
+ * reviews and the analytics heartbeat all failed.
+ *
+ * `Host` is caller-supplied, but so is `Origin`, and it is the PAIRING that carries the guarantee: a
+ * browser sets `Origin` to the attacking page's own origin and will not let a script forge either
+ * header, so an attacker cannot make the two agree. This is the check Django and Rails perform.
+ */
 export function requireSameOrigin(request: Request) {
   const origin = request.headers.get('origin')
   if (!origin) return
-  const requestOrigin = new URL(request.url).origin
   const configured = (process.env.CUSTOMER_ALLOWED_ORIGINS ?? '')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
-  if (origin !== requestOrigin && !configured.includes(origin)) {
+  if (configured.includes(origin)) return
+
+  let originUrl: URL
+  try {
+    originUrl = new URL(origin)
+  } catch {
+    throw new UnauthorizedError('مبدأ درخواست معتبر نیست.')
+  }
+  // A proxy that terminates TLS reports the scheme the client used; without one there is nothing to
+  // compare against, and the host match is the whole check.
+  const forwardedProtocol = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim()
+  const protocolMatches = !forwardedProtocol || originUrl.protocol === `${forwardedProtocol}:`
+  // Every real HTTP/1.1 request carries `Host`. Falling back to the request URL only matters for
+  // synthetic requests, and it is the same value the host header would have held.
+  const expectedHost = request.headers.get('host') ?? new URL(request.url).host
+  if (originUrl.host !== expectedHost || !protocolMatches) {
     throw new UnauthorizedError('مبدأ درخواست معتبر نیست.')
   }
 }

@@ -46,4 +46,43 @@ describe('customer session', () => {
     })
     expect(() => requireSameOrigin(request)).toThrow('مبدأ درخواست معتبر نیست.')
   })
+
+  it('accepts a browser origin when the server is bound to a different address', () => {
+    // `next dev --hostname 0.0.0.0` makes Next report `request.url` as the bind address while the
+    // browser sends the address it actually asked for. Comparing the two rejected every
+    // same-origin POST in local development.
+    const request = new Request('http://0.0.0.0:3000/api/analytics/heartbeat', {
+      method: 'POST',
+      headers: { origin: 'http://localhost:3000', host: 'localhost:3000' },
+    })
+    expect(() => requireSameOrigin(request)).not.toThrow()
+  })
+
+  it('rejects an origin whose host does not match the requested host', () => {
+    const request = new Request('http://0.0.0.0:3000/api/orders', {
+      method: 'POST',
+      headers: { origin: 'https://attacker.example', host: 'localhost:3000' },
+    })
+    expect(() => requireSameOrigin(request)).toThrow('مبدأ درخواست معتبر نیست.')
+  })
+
+  it('rejects a matching host reached over the wrong scheme behind a TLS proxy', () => {
+    const request = new Request('https://kafgir.example/api/orders', {
+      method: 'POST',
+      headers: {
+        origin: 'http://kafgir.example',
+        host: 'kafgir.example',
+        'x-forwarded-proto': 'https',
+      },
+    })
+    expect(() => requireSameOrigin(request)).toThrow('مبدأ درخواست معتبر نیست.')
+  })
+
+  it('rejects a malformed origin header', () => {
+    const request = new Request('http://localhost:3000/api/orders', {
+      method: 'POST',
+      headers: { origin: 'not-a-url', host: 'localhost:3000' },
+    })
+    expect(() => requireSameOrigin(request)).toThrow('مبدأ درخواست معتبر نیست.')
+  })
 })

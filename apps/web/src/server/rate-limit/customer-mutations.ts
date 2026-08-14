@@ -4,7 +4,8 @@ import { rateLimitKey } from './key'
 import { defaultRateLimitMessage, rateLimitPolicies } from './policies'
 import { RateLimitError, type RateLimitPolicy } from './store'
 
-export type CustomerMutationGroup = 'order' | 'cartSnapshot' | 'customerAccount' | 'foodInteraction'
+export type CustomerMutationGroup =
+  'order' | 'cartSnapshot' | 'customerAccount' | 'foodInteraction' | 'orderFeedback'
 
 const customerMutationPolicies = {
   order: {
@@ -22,6 +23,10 @@ const customerMutationPolicies = {
   foodInteraction: {
     identity: rateLimitPolicies.foodInteractionPerIdentity,
     ip: rateLimitPolicies.foodInteractionPerIp,
+  },
+  orderFeedback: {
+    identity: rateLimitPolicies.orderFeedbackPerIdentity,
+    ip: rateLimitPolicies.orderFeedbackPerIp,
   },
 } as const satisfies Record<CustomerMutationGroup, { identity: RateLimitPolicy; ip: RateLimitPolicy }>
 

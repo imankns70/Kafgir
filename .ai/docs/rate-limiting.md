@@ -36,10 +36,19 @@ the generic limiter in V1; it does not imply that a hidden general policy is att
 | `PUT/DELETE /api/customers/me/addresses/[id]` | 30/10 minutes, shared account bucket | 120/10 minutes |
 | `PUT/DELETE /api/foods/[slug]/like` | 60/minute, shared interaction bucket | 180/minute |
 | `PUT/DELETE /api/foods/[slug]/favorite` | 60/minute, shared interaction bucket | 180/minute |
+| `POST/PUT /api/customers/me/orders/[id]/review` | 30/10 minutes, shared feedback bucket | 120/10 minutes |
+| `POST /api/customers/me/orders/[id]/delivered` | 30/10 minutes, shared feedback bucket | 120/10 minutes |
+| `POST /api/analytics/heartbeat` | — (unauthenticated) | 240/10 minutes |
 
 Order identity is the authenticated customer or validated Telegram user. Cart identity prefers the
 authenticated customer, then the first-party VisitorId, then trusted IP as an anonymous fallback.
-Account and food-interaction routes use the authenticated/resolved internal customer identity.
+Account, food-interaction and order-feedback routes use the authenticated/resolved internal customer
+identity.
+
+The analytics heartbeat is the one limited route with no identity dimension. Its `visitorId` is
+caller-chosen, so limiting per visitor would let a script mint a fresh budget per request; only the
+trusted IP is used. Its service-level write throttle suppresses the row `UPDATE`, not the request, so
+the generic limiter is what bounds unauthenticated session inserts.
 
 ### General — currently unrestricted reads
 
@@ -68,10 +77,6 @@ No general-read limiter is attached merely to complete this classification.
 - `POST /api/auth/customer/telegram` — validated signed Telegram login, not included in approved V1
   rate-limit scope.
 - `POST /api/auth/customer/logout` — same-origin cookie clearing.
-- `POST /api/analytics/heartbeat` — same-origin and independently write-throttled by its analytics
-  service, not by the generic rate limiter.
-- `POST/PUT /api/customers/me/orders/[id]/review` — authenticated, ownership-checked and same-origin,
-  but not included in the previously approved Phase 4 mutation set.
 
 ### External callback / processor
 

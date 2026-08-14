@@ -35,6 +35,7 @@ describe('order analytics isolation', () => {
         saveAddress: false,
         paymentMethod: 1,
         deliveryMethod: 1,
+        deliveryTimeSlotId: 3,
         customerNote: null,
         items: [{ dailyMenuItemId: 1, quantity: 1 }],
       }),

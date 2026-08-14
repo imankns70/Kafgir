@@ -44,8 +44,17 @@ vi.mock('@/server/services/customer-auth-service', () => ({
   confirmedPhoneForUser: vi.fn(async () => '09121234567'),
 }))
 
-vi.mock('@/server/services/order-service', () => ({
-  createOrder: vi.fn(async () => ({ id: 1 })),
+const orderServiceMocks = vi.hoisted(() => ({ createOrder: vi.fn(async () => ({ id: 1 })) }))
+
+vi.mock('@/server/services/order-service', () => orderServiceMocks)
+
+vi.mock('@/server/services/customer-order-service', () => ({
+  getCustomerOrderDetail: vi.fn(async () => ({ id: 9, status: 5, review: null })),
+  saveCustomerOrderReview: vi.fn(async () => ({ id: 3, rating: 5, comment: null })),
+}))
+
+vi.mock('@/server/services/customer-order-delivery-service', () => ({
+  confirmCustomerOrderDelivered: vi.fn(async () => ({ id: 9, status: 5 })),
 }))
 
 vi.mock('@/server/telegram/validation', () => ({
@@ -77,6 +86,8 @@ import { POST as createAddress } from './customers/me/addresses/route'
 import { DELETE as deleteAddress, PUT as updateAddress } from './customers/me/addresses/[id]/route'
 import { PUT as likeFood } from './foods/[slug]/like/route'
 import { DELETE as removeFavorite } from './foods/[slug]/favorite/route'
+import { POST as saveReview } from './customers/me/orders/[id]/review/route'
+import { POST as confirmDelivered } from './customers/me/orders/[id]/delivered/route'
 
 const jsonRequest = (path: string, method: string, body?: unknown) => new NextRequest(`http://localhost${path}`, {
   method,
@@ -100,6 +111,7 @@ describe('customer mutation route wiring', () => {
       addressLine: 'نشانی کامل مشتری',
       paymentMethod: 1,
       deliveryMethod: 2,
+      deliveryTimeSlotId: 3,
       items: [{ dailyMenuItemId: 1, quantity: 1, withPersianRice: false }],
     }))
 
@@ -123,6 +135,7 @@ describe('customer mutation route wiring', () => {
       addressLine: 'نشانی کامل مشتری',
       paymentMethod: 1,
       deliveryMethod: 2,
+      deliveryTimeSlotId: 3,
       items: [{ dailyMenuItemId: 1, quantity: 1, withPersianRice: false }],
     }))
 
@@ -182,6 +195,37 @@ describe('customer mutation route wiring', () => {
     expect(mocks.enforceIdentity).toHaveBeenCalledTimes(4)
     for (const call of mocks.enforceIp.mock.calls) expect(call[1]).toBe('customerAccount')
     for (const call of mocks.enforceIdentity.mock.calls) expect(call).toEqual(['customerAccount', 'customer:42'])
+  })
+
+  it('refuses a customer order that names no delivery window', async () => {
+    const response = await createOrder(jsonRequest('/api/orders', 'POST', {
+      fullName: 'مشتری تست',
+      phoneNumber: '09121234567',
+      city: 'اندیمشک',
+      addressLine: 'نشانی کامل مشتری',
+      paymentMethod: 1,
+      deliveryMethod: 2,
+      items: [{ dailyMenuItemId: 1, quantity: 1, withPersianRice: false }],
+    }))
+
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'برای ثبت سفارش، یک بازه زمانی تحویل انتخاب کنید.',
+    })
+    expect(orderServiceMocks.createOrder).not.toHaveBeenCalled()
+  })
+
+  it('protects review and delivery confirmation with the shared feedback policy', async () => {
+    const context = { params: Promise.resolve({ id: '9' }) }
+    const responses = await Promise.all([
+      saveReview(jsonRequest('/api/customers/me/orders/9/review', 'POST', { rating: 5, comment: null }), context),
+      confirmDelivered(jsonRequest('/api/customers/me/orders/9/delivered', 'POST'), context),
+    ])
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200])
+    expect(mocks.requireSameOrigin).toHaveBeenCalledTimes(2)
+    for (const call of mocks.enforceIp.mock.calls) expect(call[1]).toBe('orderFeedback')
+    for (const call of mocks.enforceIdentity.mock.calls) expect(call).toEqual(['orderFeedback', 'customer:42'])
   })
 
   it('protects like and favorite mutations with the shared interaction policy', async () => {

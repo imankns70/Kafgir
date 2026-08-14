@@ -1,6 +1,6 @@
 ## Git workflow
 
-Use `development` as the default branch for day-to-day implementation work.
+ 
 
 - Do not push feature work, small fixes, or iterative commits directly to `main`.
 - Keep related implementation commits on `development` until the work is tested and ready to release.

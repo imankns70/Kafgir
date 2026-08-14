@@ -3,7 +3,7 @@ import { createOrderSchema } from '@kafgir/contracts'
 import { readJson, routeError } from '@/server/http'
 import { createOrder } from '@/server/services/order-service'
 import { validateTelegramInitData } from '@/server/telegram/validation'
-import { UnauthorizedError } from '@/server/errors'
+import { AppError, UnauthorizedError } from '@/server/errors'
 import { optionalCustomer, requireSameOrigin } from '@/server/auth/customer-session'
 import { confirmedPhoneForUser } from '@/server/services/customer-auth-service'
 import { normalizeIranianMobile } from '@/server/auth/customer-phone'
@@ -35,6 +35,12 @@ export async function POST(request: Request) {
       ? customerRateLimitIdentity(customer.userId)
       : telegramRateLimitIdentity(telegram.identity!.userId!)
     await enforceCustomerMutationIdentity('order', rateIdentity)
+    // The window is optional in the shared contract only because Electron takes phone orders without
+    // one. A customer checkout must always name it: otherwise dropping the field from the request is
+    // by itself enough to skip the cutoff and capacity rules the picker enforces in the browser.
+    if (body.deliveryTimeSlotId == null) {
+      throw new AppError('برای ثبت سفارش، یک بازه زمانی تحویل انتخاب کنید.')
+    }
     const identity = telegram.identity ?? {
       userId: body.telegramUserId ?? null,
       username: body.telegramUsername ?? null,

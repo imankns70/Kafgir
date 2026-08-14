@@ -427,7 +427,8 @@
   baskets spanning two menus are now rejected rather than assumed impossible.
 - `GET /api/delivery-slots` returns available/unavailable plus a reason code per window, and no
   remaining counts. Checkout shows unavailable windows disabled with their Persian reason and blocks
-  submission until one is chosen.
+  submission until one is chosen; `POST /api/orders` rejects a customer order that names no window,
+  so the rule does not depend on the browser.
 - Orders keep a title/start/end snapshot, so editing a window later never rewrites historical order
   details. Orders created before this feature keep null values and display «زمان تحویل ثبت نشده».
 - Electron Admin gained «بازه‌های ارسال» (master windows, overlap rejected) and «ظرفیت ارسال روزانه»

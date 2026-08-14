@@ -5,8 +5,9 @@ import { optionalCustomer, requireSameOrigin } from '@/server/auth/customer-sess
 import { readJson } from '@/server/http'
 import { errorFields, logger } from '@/server/logging/logger'
 import { setAnalyticsCookies } from '@/server/analytics-request'
+import { rateLimitPolicies, withRateLimit } from '@/server/rate-limit'
 
-export async function POST(request: Request) {
+async function handle(request: Request) {
   try {
     requireSameOrigin(request)
     const body = await readJson(request, analyticsHeartbeatSchema)
@@ -21,3 +22,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Analytics unavailable.' }, { status: 503 })
   }
 }
+
+export const POST = withRateLimit(
+  { policy: rateLimitPolicies.analyticsHeartbeatPerIp, operation: 'analyticsHeartbeat' },
+  handle,
+)
