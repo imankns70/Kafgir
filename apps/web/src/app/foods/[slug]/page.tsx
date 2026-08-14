@@ -1,11 +1,11 @@
 import { Suspense } from 'react'
+import { cacheLife, cacheTag } from 'next/cache'
 import { FoodDetailPage } from '@/client/features/foods/FoodDetailPage'
 import { BrandedState } from '@/client/design-system/BrandedState'
-import { getFoodDetail } from '@/server/services/food-discovery-service'
+import { getFoodCatalogDetail } from '@/server/services/food-catalog-service'
 
 type Props = {
   params: Promise<{ slug: string }>
-  searchParams: Promise<{ menuItemId?: string }>
 }
 
 function FoodDetailFallback() {
@@ -20,22 +20,26 @@ function FoodDetailFallback() {
   )
 }
 
-async function FoodDetailContent({ params, searchParams }: Props) {
-  const { slug } = await params
-  const menuItemValue = (await searchParams).menuItemId
-  const menuItemId = menuItemValue && Number.isInteger(Number(menuItemValue))
-    ? Number(menuItemValue)
-    : null
-  const initialFood = await getFoodDetail(slug, menuItemId, null)
+async function CachedFoodDetail({ slug }: { slug: string }) {
+  'use cache'
+
+  cacheLife({ stale: 30, revalidate: 60, expire: 3600 })
+  cacheTag('food-catalog', `food-catalog:${slug}`)
+
+  const initialCatalog = await getFoodCatalogDetail(slug)
 
   return (
     <FoodDetailPage
-      key={`${slug}:${menuItemId ?? 'none'}`}
+      key={slug}
       slug={slug}
-      menuItemId={menuItemId}
-      initialFood={initialFood}
+      initialCatalog={initialCatalog}
     />
   )
+}
+
+async function FoodDetailContent({ params }: Props) {
+  const { slug } = await params
+  return <CachedFoodDetail slug={slug} />
 }
 
 export default function FoodPage(props: Props) {
