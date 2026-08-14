@@ -163,7 +163,10 @@ export function CustomerOrderDetails({ order, onBack, onReview }: {
       <button className="checkout-back-link" onClick={onBack}>سفارش‌های من <Icon name="back" size="sm" /></button>
     </div>
     <section className="panel order-detail-hero">
-      <div className="order-detail-hero-head"><div><span>وضعیت فعلی</span><StatusBadge status={order.status} /></div><time>{formatPersianDateTime(order.createdAt)}</time></div>
+      <div className="order-detail-hero-head">
+        <div className="order-detail-current-state"><span>وضعیت فعلی</span><StatusBadge status={order.status} /></div>
+        <time>{formatPersianDateTime(order.createdAt)}</time>
+      </div>
       <OrderProgress order={order} />
     </section>
     <div className="customer-order-detail-grid">
