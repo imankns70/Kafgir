@@ -16,7 +16,11 @@ import { favoriteFood, getFoodDetails, likeFood } from '../../services/foodDisco
 import { bindTelegramBackButton, getTelegramInitData } from '../../services/telegram'
 import { formatMoney, formatNumber } from '../../utils/format'
 
-type Props = { slug: string; menuItemId: number | null }
+type Props = {
+  slug: string
+  menuItemId: number | null
+  initialFood: FoodDetailDto
+}
 
 function FoodInfoSection({ title, value }: { title: string; value: string | null }) {
   return <section className="panel food-copy-section">
@@ -25,10 +29,10 @@ function FoodInfoSection({ title, value }: { title: string; value: string | null
   </section>
 }
 
-export function FoodDetailPage({ slug, menuItemId }: Props) {
-  const [food, setFood] = useState<FoodDetailDto | null>(null)
+export function FoodDetailPage({ slug, menuItemId, initialFood }: Props) {
+  const [food, setFood] = useState<FoodDetailDto | null>(initialFood)
   const [activeImage, setActiveImage] = useState(0)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [interactionBusy, setInteractionBusy] = useState(false)
   const [cartQuantity, setCartQuantity] = useState(0)
@@ -38,19 +42,29 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
   const [cartCount, setCartCount] = useState(0)
   const [isCustomerAuthenticated, setIsCustomerAuthenticated] = useState(false)
 
-  const load = async () => {
-    setLoading(true)
+  const load = async (showLoading = false) => {
+    if (showLoading) setLoading(true)
     setError(null)
     try {
       const result = await getFoodDetails(slug, menuItemId)
       setFood(result)
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'دریافت جزئیات غذا ممکن نشد.')
+      if (showLoading) {
+        setError(reason instanceof Error ? reason.message : 'دریافت جزئیات غذا ممکن نشد.')
+      }
     } finally {
-      setLoading(false)
+      if (showLoading) setLoading(false)
     }
   }
 
+  useEffect(() => {
+    setFood(initialFood)
+    setError(null)
+    setLoading(false)
+  }, [initialFood])
+
+  // Server data paints the page immediately. This background refresh only personalizes interaction
+  // state and catches any operational price/capacity change that happened after the server render.
   useEffect(() => { void load() }, [slug, menuItemId])
   useEffect(() => {
     const refreshPrice = async () => {
@@ -154,7 +168,7 @@ export function FoodDetailPage({ slug, menuItemId }: Props) {
   }
 
   if (loading) return <div className="app-shell"><BrandedState animated title="در حال آماده‌کردن جزئیات غذا…" message="چند لحظه صبر کنید." /></div>
-  if (error && !food) return <div className="app-shell"><BrandedState title="دریافت جزئیات ممکن نشد" message={error} tone="error"><button className="outline-button" onClick={() => void load()}>تلاش دوباره</button></BrandedState></div>
+  if (error && !food) return <div className="app-shell"><BrandedState title="دریافت جزئیات ممکن نشد" message={error} tone="error"><button className="outline-button" onClick={() => void load(true)}>تلاش دوباره</button></BrandedState></div>
   if (!food) return <div className="app-shell"><BrandedState title="غذا پیدا نشد" message="ممکن است این غذا حذف شده باشد." tone="warning" /></div>
 
   const imageCount = food.images.length
