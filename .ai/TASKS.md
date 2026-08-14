@@ -1,5 +1,23 @@
 # Tasks
 
+## Completed — 2026-08-14 active orders, checkout addresses, and food-detail UX
+
+- [x] Add a mobile-only global active-order tracker that remains visible across customer views.
+- [x] Support multiple simultaneous active orders with a selectable list and per-order progress/details.
+- [x] Allow the authenticated owner to confirm receipt only from `Ready`, using the shared Delivered
+  transition so status history and delivery timestamp remain authoritative.
+- [x] Keep delivery confirmation independent from payment settlement.
+- [x] Replace the saved-address native select with a readable picker that shows title and full address.
+- [x] Redesign food-detail information hierarchy and hide the `توضیح کوتاه` / `توضیح کامل` labels while
+  preserving their values and keeping practical portion/allergy/ingredient labels.
+- [x] Validate lint, tests, Web build, and Electron build, then promote the product changes to `main`.
+
+## Completed — 2026-08-14 development-first Netlify workflow
+
+- [x] Use `development` for routine work and reserve `main` for production releases.
+- [x] Run CI on both development and main.
+- [x] Add Netlify monorepo ignore rules so unrelated Admin/docs/AI-only changes do not consume a Web build.
+
 ## Completed — 2026-08-14 mobile order/cart layout polish
 
 - [x] Keep the delivery address title and text visually adjacent to its location icon.
@@ -146,7 +164,7 @@
 - [x] Change Mini App basket badges to count distinct foods instead of summed portions.
 - [x] Swap the `ادامه خرید` basket-page button text/icon order for the RTL layout.
 - [x] Remove separate address-description fields from Web/Admin/contracts/database and keep one address textarea.
-- [x] Show labeled short/full description, portion contents, and allergy sections on the Mini App food-detail page.
+- [x] Show short/full description values on the Mini App food-detail page without database-style headings; keep portion contents and allergy sections labelled.
 - [x] Keep the food-detail purchase controls under the photo on desktop without moving the mobile sticky bar structure.
 - [x] Animate the Mini App serving-dish mark only during menu and food-detail loading states.
 - [x] Enforce Vazir Farsi-digit rendering for typed values in all Electron Admin form controls.

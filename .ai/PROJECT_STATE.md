@@ -1,5 +1,35 @@
 # Project state
 
+## 2026-08-14 — Active-order tracking, checkout address picker, and food-detail UX
+
+- The customer Web app has a mobile-only persistent active-order tracker mounted at the root layout,
+  so an in-flight order remains visible while the customer moves between menu, cart, profile, contact,
+  and food-detail views.
+- Active tracking supports multiple concurrent orders. The compact pill shows the active-order count and
+  the bottom sheet lists each order separately with current status, progress, food summary, delivery time,
+  address, and last status update.
+- A customer may confirm `تحویل گرفتم` only for their own order while it is `Ready`. The shared order
+  status transition records `Delivered`, `delivered_at`, and order status history; a concurrent Admin
+  delivery update is handled safely. Delivery confirmation does not imply payment settlement.
+- Active-order polling is intentionally conservative: about 60 seconds while an active order exists and
+  5 minutes while idle, with immediate refresh on focus/visibility, authentication changes, and order changes.
+- Checkout saved-address selection uses a custom readable picker instead of a native one-line select. Each
+  choice shows the address title, default marker when applicable, city, and the complete wrapped address.
+- Food-detail UX now treats short/full descriptions as editorial customer copy: the values remain visible,
+  but the database-like `توضیح کوتاه` / `توضیح کامل` headings are hidden. Portion contents, allergy
+  information, and ingredients retain useful labels, while missing optional customer copy is not advertised.
+- The food-detail visual layer is scoped to the food-detail shell and keeps the existing desktop purchase
+  controls plus the mobile sticky purchase bar intact.
+- No database migration was required for these changes. The final lint, unit-test, Web build, and Electron
+  build pipeline passed before the application changes were promoted to `main`.
+
+## 2026-08-14 — Development-first release flow
+
+- Routine implementation now lands on `development`; `main` is the production release boundary.
+- GitHub CI validates both `development` and `main`, while Netlify remains connected to `main` for production.
+- Netlify monorepo ignore rules skip builds for changes that do not affect the customer Web application,
+  reducing unnecessary production credit usage.
+
 ## 2026-08-14 — Mobile order-address and cart-detail layout
 
 - Customer order cards keep the delivery-location icon and its title/address in one compact flex row,

@@ -1,5 +1,36 @@
 # Decisions
 
+## 2026-08-14 — Mobile active orders and customer-owned delivery confirmation
+
+- Treat `PendingConfirmation`, `Confirmed`, `Preparing`, and `Ready` as active customer orders; delivered
+  and cancelled orders must disappear from the persistent tracker.
+- Keep the tracker mobile-only and global to the customer Web layout, with a compact always-available pill
+  and a bottom sheet for detailed progress rather than a large persistent card.
+- When several active orders exist, show them as a list and let the customer select the order whose details
+  they want to inspect; do not collapse multiple independent orders into one synthetic status.
+- Customer receipt confirmation is permitted only for the authenticated owner and only from `Ready`.
+  Reuse the shared order-status transition so `Delivered`, `delivered_at`, and history are written through
+  one authoritative path. Do not automatically change payment state when physical delivery is confirmed.
+- Keep background polling conservative and refresh immediately on foreground/order/authentication events.
+
+## 2026-08-14 — Checkout address and food-detail presentation
+
+- Saved delivery addresses are multi-line content, so checkout uses a custom address picker that can show
+  both the address title/default marker and the complete city/address text. A native one-line select is not
+  the preferred customer experience for saved addresses.
+- `shortDescription` and `fullDescription` are customer-facing editorial content, not form labels. Preserve
+  their values but do not display the literal `توضیح کوتاه` or `توضیح کامل` headings on the food page.
+- Keep practical scanning labels for portion contents, allergy information, and ingredients; hide optional
+  customer-copy blocks entirely when no value exists instead of showing `ثبت نشده`.
+- Scope the richer food-detail styling to `.food-detail-shell` in a dedicated UX stylesheet so it cannot
+  leak into checkout, profile, order, or other general panels.
+
+## 2026-08-14 — Development-first production releases
+
+- Make `development` the normal integration branch and move `main` only when a tested release is ready.
+- Keep Netlify production deployment bound to `main`; use monorepo ignore rules to skip Web builds for
+  unrelated paths rather than adding a second deployment mechanism.
+
 ## 2026-08-14 — Keep compact metadata controls with their content
 
 - Render the cart detail link in the food heading rather than the quantity/remove action row. In RTL,
