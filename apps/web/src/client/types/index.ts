@@ -7,6 +7,11 @@ import type { CartItem as ContractCartItem } from '@kafgir/contracts'
 
 export type CartAvailability = 'available' | 'sold-out' | 'unavailable' | 'menu-closed' | 'not-on-menu'
 export type CartItem = ContractCartItem & {
+  /**
+   * The Tehran business date this line belongs to. Cart contents must never roll over into the next
+   * day's menu, even when the same food appears again with a new daily-menu row.
+   */
+  menuDate?: string | null
   availability?: CartAvailability
   availabilityMessage?: string | null
 }
