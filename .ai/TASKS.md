@@ -302,6 +302,9 @@
   the eight approved customer analytics metrics.
 - [x] Add the separate Electron «آمار کاربران امروز» dashboard section, accessible Persian tooltips,
   non-overlapping visible-only 30-second polling, and temporary-failure stale-value behavior.
+- [x] Correct the Electron analytics tooltip color cascade and improve Persian tooltip typography,
+  width, edge alignment and metric-specific accessible labels.
+- [x] Add tag-driven Windows Electron packaging and GitHub Release publishing.
 - [x] Apply migration `0019_lightweight_customer_analytics.sql` to the configured development database.
 - [ ] Run `customer-analytics.integration.test.ts` against a disposable migrated PostgreSQL database
   after setting `TEST_DATABASE_URL`; the local machine currently has no Docker executable.

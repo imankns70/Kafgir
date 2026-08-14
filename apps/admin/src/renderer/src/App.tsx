@@ -422,7 +422,7 @@ function DashboardPage() {
         {analyticsError && <span role="status">{analyticsError}</span>}
       </div>
       {analytics ? <div className="metric-grid analytics-metric-grid">{analyticsCards.map(([id, label, value, help]) => <article className={`metric analytics-metric ${id === 'online-now' ? 'online-metric' : ''}`} key={id}>
-        <div className="analytics-metric-title"><span>{label}</span><MetricHelp id={id} text={help} /></div>
+        <div className="analytics-metric-title"><span>{label}</span><MetricHelp id={id} label={label} text={help} /></div>
         <strong>{value}</strong>
       </article>)}</div> : analyticsLoaded
         ? <div className="message error" role="status">آمار کاربران فعلاً در دسترس نیست.</div>
@@ -431,10 +431,10 @@ function DashboardPage() {
   </PageFrame>
 }
 
-function MetricHelp({ id, text }: { id: string; text: string }) {
+function MetricHelp({ id, label, text }: { id: string; label: string; text: string }) {
   const tooltipId = `analytics-tooltip-${id}`
   return <span className="metric-help">
-    <button type="button" aria-label="روش محاسبه" aria-describedby={tooltipId}>؟</button>
+    <button type="button" aria-label={`روش محاسبه ${label}`} aria-describedby={tooltipId}>؟</button>
     <span id={tooltipId} className="metric-help-tooltip" role="tooltip">{text}</span>
   </span>
 }

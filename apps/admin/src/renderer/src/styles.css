@@ -411,23 +411,35 @@ input[type="number"]::-webkit-inner-spin-button {
   position: absolute;
   z-index: 40;
   inset-block-start: 48px;
-  inset-inline: 12px;
+  inset-inline-start: 12px;
+  width: min(360px, calc(100vw - 320px));
+  max-width: calc(100vw - 48px);
   visibility: hidden;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
+  border: 1px solid #61704499;
+  border-radius: 12px;
+  padding: 13px 15px;
   opacity: 0;
-  color: #fff;
-  background: #3f4b2d;
-  box-shadow: 0 8px 24px #2b2b2b30;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.8;
+  background: #fffaf3;
+  box-shadow: 0 12px 32px #2b2b2b38;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 2;
   text-align: right;
   direction: rtl;
+  white-space: normal;
+  overflow-wrap: anywhere;
   pointer-events: none;
   transform: translateY(-3px);
   transition: opacity .14s ease, transform .14s ease, visibility .14s ease;
+}
+
+/* This selector must outrank the generic `.metric span` text color. */
+.analytics-metric .metric-help-tooltip { color: #2b2b2b; }
+
+/* Keep the wider tooltip inside the viewport for cards in the final grid column. */
+.analytics-metric-grid > .analytics-metric:nth-child(4n) .metric-help-tooltip {
+  inset-inline-start: auto;
+  inset-inline-end: 12px;
 }
 
 .metric-help:hover .metric-help-tooltip,
@@ -458,6 +470,10 @@ input[type="number"]::-webkit-inner-spin-button {
 
 @media (max-width: 1200px) {
   .analytics-skeleton { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+  .analytics-metric-grid > .analytics-metric:nth-child(even) .metric-help-tooltip {
+    inset-inline-start: auto;
+    inset-inline-end: 12px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

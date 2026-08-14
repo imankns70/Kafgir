@@ -478,7 +478,12 @@
   session attribution on orders. The configured local development database has been migrated.
 - Electron Dashboard keeps its operational cards and adds the separate 8-card «آمار کاربران امروز»
   section through one direct typed IPC operation. It polls every 30 seconds only while visible,
-  retains prior values on failure, and exposes accessible Persian calculation tooltips.
+  retains prior values on failure, and exposes accessible Persian calculation tooltips. Tooltip
+  contrast, typography, viewport-safe alignment and metric-specific screen-reader labels were refined
+  after the initial release so the longer Persian descriptions remain readable.
+- Tagged Electron versions are packaged on `windows-latest` by
+  `.github/workflows/electron-release.yml`; the generated NSIS installer and update metadata are
+  attached to the corresponding GitHub Release.
 - Analytics uses the same `Asia/Tehran` business-day boundary as order reporting. Authentication
   associates the current guest session without changing VisitorId; analytics failure cannot block
   login or ordering. Full definitions are in `.ai/docs/customer-analytics.md`.
