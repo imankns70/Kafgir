@@ -1,3 +1,13 @@
+## Git workflow
+
+Use `development` as the default branch for day-to-day implementation work.
+
+- Do not push feature work, small fixes, or iterative commits directly to `main`.
+- Keep related implementation commits on `development` until the work is tested and ready to release.
+- Promote tested work to `main` in one deliberate release merge/squash so Netlify creates far fewer production deploys.
+- Changes that do not affect the customer web app should stay off `main` until they are part of a deliberate release.
+- Before a release to `main`, run the relevant tests/build and make sure CI is green.
+
 ## Documentation synchronization
 
 After completing a significant task, synchronize project documentation only when needed.
