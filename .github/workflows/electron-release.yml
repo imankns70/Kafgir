@@ -53,7 +53,11 @@ jobs:
           "@
           Set-Content -Path release-notes.md -Value $notes -Encoding utf8
 
-          gh release create $env:GITHUB_REF_NAME $assets `
-            --verify-tag `
-            --title "Kafgir Admin $env:GITHUB_REF_NAME" `
-            --notes-file release-notes.md
+          if (gh release view $env:GITHUB_REF_NAME 2>$null) {
+            gh release upload $env:GITHUB_REF_NAME $assets --clobber
+          } else {
+            gh release create $env:GITHUB_REF_NAME $assets `
+              --verify-tag `
+              --title "Kafgir Admin $env:GITHUB_REF_NAME" `
+              --notes-file release-notes.md
+          }
