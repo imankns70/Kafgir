@@ -1,4 +1,5 @@
 import type { CartAvailability, CartItem, MenuCartSnapshotDto } from '../types'
+import { currentBusinessDate } from './cartStorage'
 
 export type CartMenuSnapshot = MenuCartSnapshotDto | null
 
@@ -33,7 +34,11 @@ export function cartItemIssue(item: CartItem): string | null {
   return null
 }
 
-export function reconcileCart(items: CartItem[], menu: CartMenuSnapshot): CartReconciliation {
+export function reconcileCart(
+  items: CartItem[],
+  menu: CartMenuSnapshot,
+  businessDate = currentBusinessDate(),
+): CartReconciliation {
   const menuItems = new Map(menu?.items.map((item) => [item.id, item]) ?? [])
   const menuItemsByFoodId = new Map(menu?.items.map((item) => [item.foodId, item]) ?? [])
   const menuItemsByFoodName = new Map(menu?.items.map((item) => [item.foodName.trim(), item]) ?? [])
@@ -48,20 +53,32 @@ export function reconcileCart(items: CartItem[], menu: CartMenuSnapshot): CartRe
   // of that dish left behind — otherwise 8 plain + 8 upgraded looks fine until the server refuses it.
   const claimed = new Map<number, number>()
 
-  const nextItems = items.map((cartItem) => {
-    // Menu rows may be recreated by Admin while the underlying food remains the same. Prefer the
-    // exact row, then its stable food id. The name fallback heals carts saved before foodId existed.
-    const latest = menuItems.get(cartItem.dailyMenuItemId)
-      ?? (cartItem.foodId ? menuItemsByFoodId.get(cartItem.foodId) : undefined)
-      ?? menuItemsByFoodName.get(cartItem.foodName.trim())
+  const nextItems = items.flatMap((cartItem): CartItem[] => {
+    // A cart line belongs to exactly one Tehran business day. Never roll yesterday's choice into
+    // today's menu just because the same food happens to be offered again.
+    if (cartItem.menuDate && cartItem.menuDate !== businessDate) return []
+
+    const exact = menuItems.get(cartItem.dailyMenuItemId)
+    // Rows may be recreated by Admin during the same business day. Only dated, same-day carts may
+    // heal by stable food id/name. Undated legacy lines must match their exact row or be discarded;
+    // otherwise an old cart could be mistaken for today's menu during the one-time migration.
+    const canRemapWithinDay = cartItem.menuDate === businessDate
+    const latest = exact
+      ?? (canRemapWithinDay && cartItem.foodId ? menuItemsByFoodId.get(cartItem.foodId) : undefined)
+      ?? (canRemapWithinDay ? menuItemsByFoodName.get(cartItem.foodName.trim()) : undefined)
+
+    // Once today's menu exists, a dish removed from it should disappear from the order draft rather
+    // than linger as a dead line. Sold-out/unavailable rows are different: they stay visible so the
+    // customer can understand what changed and adjust intentionally.
+    if (menu && !latest) return []
+
     const upgraded = Boolean(cartItem.withPersianRice)
     const latestRice = upgraded ? rice : null
     let availability: CartAvailability = 'available'
 
     if (!menu) availability = 'not-on-menu'
     else if (!menu.isOpen) availability = 'menu-closed'
-    else if (!latest) availability = 'not-on-menu'
-    else if (!latest.isAvailable) availability = 'unavailable'
+    else if (!latest?.isAvailable) availability = 'unavailable'
     else if (latest.remainingPortions <= 0) availability = 'sold-out'
     else if (upgraded && (!latest.allowsPersianRice || !latestRice || !latestRice.isAvailable)) availability = 'unavailable'
     else if (latestRice && latestRice.remainingPortions <= 0) availability = 'sold-out'
@@ -75,6 +92,7 @@ export function reconcileCart(items: CartItem[], menu: CartMenuSnapshot): CartRe
 
     const next: CartItem = {
       ...cartItem,
+      menuDate: businessDate,
       dailyMenuItemId: resolvedMenuItemId,
       foodId: latest?.foodId ?? cartItem.foodId,
       slug: latest?.slug ?? cartItem.slug,
@@ -96,7 +114,7 @@ export function reconcileCart(items: CartItem[], menu: CartMenuSnapshot): CartRe
     const issue = cartItemIssue(next)
     if (issue) messages.push(issue)
     // Current prices are applied silently. Only actionable availability issues are surfaced.
-    return next
+    return [next]
   })
 
   return { items: nextItems, messages: [...new Set(messages)] }
