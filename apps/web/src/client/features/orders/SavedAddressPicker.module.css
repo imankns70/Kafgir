@@ -1,0 +1,194 @@
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.label {
+  color: var(--kafgir-color-text-secondary);
+  font-size: var(--kafgir-type-body-sm);
+  font-weight: 700;
+}
+
+.picker {
+  position: relative;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 24px;
+  gap: 10px;
+  align-items: center;
+  min-height: 72px;
+  padding: 10px 12px;
+  border: 1px solid var(--kafgir-color-border);
+  border-radius: var(--kafgir-radius-lg);
+  background: var(--kafgir-color-surface);
+  box-shadow: 0 4px 14px rgba(67, 42, 28, .06);
+  cursor: pointer;
+  list-style: none;
+  transition: border-color var(--kafgir-motion-fast) var(--kafgir-ease), box-shadow var(--kafgir-motion-fast) var(--kafgir-ease), background-color var(--kafgir-motion-fast) var(--kafgir-ease);
+}
+
+.summary::-webkit-details-marker { display: none; }
+.summary::marker { content: ''; }
+.summary:hover { border-color: color-mix(in srgb, var(--kafgir-color-primary) 42%, var(--kafgir-color-border)); }
+.summary:focus-visible {
+  outline: 3px solid var(--kafgir-color-focus);
+  outline-offset: 3px;
+}
+
+.picker[open] .summary {
+  border-color: var(--kafgir-color-primary);
+  background: color-mix(in srgb, var(--kafgir-color-primary-soft) 44%, var(--kafgir-color-surface));
+  box-shadow: 0 7px 20px rgba(67, 42, 28, .1);
+}
+
+.locationIcon,
+.optionIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  color: var(--kafgir-color-primary);
+  background: var(--kafgir-color-primary-soft);
+}
+
+.copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  text-align: right;
+}
+
+.titleRow {
+  display: flex;
+  min-width: 0;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.titleRow strong {
+  color: var(--kafgir-color-text-primary);
+  font-size: .9rem;
+  line-height: 1.45;
+}
+
+.defaultBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: var(--kafgir-radius-pill);
+  color: var(--kafgir-color-primary);
+  background: var(--kafgir-color-primary-soft);
+  font-size: .68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.fullAddress {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--kafgir-color-text-secondary);
+  font-size: .78rem;
+  line-height: 1.7;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kafgir-color-text-muted);
+  font-size: 1.25rem;
+  transition: transform var(--kafgir-motion-fast) var(--kafgir-ease);
+}
+
+.picker[open] .chevron { transform: rotate(180deg); }
+
+.menu {
+  position: absolute;
+  z-index: calc(var(--kafgir-z-navigation) + 2);
+  inset-inline: 0;
+  top: calc(100% + 7px);
+  display: grid;
+  max-height: min(360px, 58vh);
+  overflow-y: auto;
+  padding: 7px;
+  border: 1px solid var(--kafgir-color-border);
+  border-radius: var(--kafgir-radius-lg);
+  background: var(--kafgir-color-surface-elevated);
+  box-shadow: var(--kafgir-shadow-dialog);
+}
+
+.option {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 28px;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  min-height: 68px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--kafgir-radius-md);
+  color: inherit;
+  background: transparent;
+  text-align: right;
+  cursor: pointer;
+}
+
+.option + .option { border-top: 1px solid color-mix(in srgb, var(--kafgir-color-border) 70%, transparent); }
+.option:hover { background: var(--kafgir-color-background-secondary); }
+.option.selected { background: color-mix(in srgb, var(--kafgir-color-primary-soft) 70%, var(--kafgir-color-surface)); }
+.option:focus-visible {
+  outline: 2px solid var(--kafgir-color-focus);
+  outline-offset: -2px;
+}
+
+.optionIcon {
+  width: 36px;
+  height: 36px;
+}
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kafgir-color-primary);
+}
+
+.newAddress {
+  margin-top: 4px;
+  border-top: 1px dashed var(--kafgir-color-border-strong) !important;
+}
+
+@media (max-width: 639px) {
+  .summary {
+    grid-template-columns: 36px minmax(0, 1fr) 20px;
+    min-height: 68px;
+    padding: 9px 10px;
+  }
+
+  .locationIcon,
+  .optionIcon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .menu {
+    max-height: min(330px, 52vh);
+  }
+
+  .option {
+    grid-template-columns: 34px minmax(0, 1fr) 24px;
+    padding-inline: 8px;
+  }
+
+  .fullAddress {
+    font-size: .75rem;
+  }
+}
