@@ -5,8 +5,6 @@ import { AppError } from '@/server/errors'
 import { readJson, routeError } from '@/server/http'
 import { deleteManagedFoodImage, storeFoodImage } from '@/server/storage/food-images'
 
-export const runtime = 'nodejs'
-
 const deleteImageSchema = z.object({
   imageUrl: z.string().trim().min(1),
 })
