@@ -2,7 +2,7 @@ export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' |
   | 'categories' | 'tags' | 'menu' | 'report' | 'ingredients' | 'inventory' | 'purchases'
   | 'suppliers' | 'recipes' | 'finance' | 'shopping' | 'payments' | 'v15-reports' | 'delivery-slots' | 'delivery-days' | 'logs'
   | 'social-dashboard' | 'social-channels' | 'social-publish' | 'social-templates'
-  | 'social-rules' | 'social-suggestions' | 'social-history'
+  | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
 
 export type NavigationGroupId = 'orders' | 'products' | 'kitchen' | 'finance' | 'social' | 'system'
 
@@ -19,6 +19,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { page: 'orders', label: 'سفارش‌ها' },
       { page: 'manual', label: 'سفارش دستی' },
+      { page: 'customer-communication', label: 'ارتباط با مشتری' },
       { page: 'menu', label: 'منوی امروز' },
       { page: 'report', label: 'گزارش کل' },
     ],

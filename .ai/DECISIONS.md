@@ -1,5 +1,18 @@
 # Decisions
 
+## 2026-08-15 — Private asynchronous support instead of public reviews or live chat
+
+- Use durable asynchronous conversations rather than WebSocket/live presence. This fits the current
+  single-instance application and lets customers return later without implying an immediate response.
+- Keep every conversation customer-owned and private; there is no public review list or cross-customer
+  visibility. «همکاری» is deliberately absent from the subject list.
+- Model unread state per message and derive each inbox count from unread messages instead of storing a
+  second counter that could drift.
+- Treat order reviews as a handling queue with New, Seen, and Resolved states. A private Admin reply
+  creates/reuses one conversation linked uniquely to that review rather than adding public reply text.
+- Expose Admin support only through the existing typed Electron IPC allowlist and role permissions;
+  no renderer SQL or generic database operation is introduced.
+
 ## 2026-08-15 — Deterministic order status layout and deployment evidence
 
 - In the order-detail hero, keep the current-status label on the visual right, center the order

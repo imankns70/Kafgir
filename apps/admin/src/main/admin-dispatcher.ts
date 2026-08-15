@@ -29,6 +29,10 @@ import {
   socialRuleWriteSchema,
   socialSettingsWriteSchema,
   socialTemplateWriteSchema,
+  orderReviewHandlingStatusSchema,
+  supportConversationStatusSchema,
+  supportConversationCloseSchema,
+  supportMessageWriteSchema,
   type OrderReportQuery,
 } from '@kafgir/contracts'
 import {
@@ -115,6 +119,13 @@ import {
   saveSocialTemplate,
   testSocialChannelConnection,
   findCustomerByPhone,
+  addAdminSupportMessage,
+  getAdminSupportConversation,
+  listAdminOrderReviews,
+  listAdminSupportConversations,
+  replyToOrderReview,
+  setAdminOrderReviewStatus,
+  setAdminSupportConversationClosed,
 } from '@kafgir/server-core'
 import { readServerLogs } from '@kafgir/server-core/logging/read-logs'
 import type { AdminOperation } from '../shared/admin-operations'
@@ -203,6 +214,28 @@ export async function dispatchAdminOperation(
         updateOrderStatusSchema.parse(body.value),
         principal.userId,
       )
+    case 'support.conversations.list':
+      return listAdminSupportConversations(body.status == null
+        ? undefined : supportConversationStatusSchema.parse(Number(body.status)))
+    case 'support.conversations.get':
+      return getAdminSupportConversation(numberField(body, 'id'))
+    case 'support.conversations.reply':
+      return addAdminSupportMessage(principal.userId, numberField(body, 'id'), supportMessageWriteSchema.parse(body.value))
+    case 'support.conversations.setClosed': {
+      const value = supportConversationCloseSchema.parse(body.value)
+      return setAdminSupportConversationClosed(principal.userId, numberField(body, 'id'), value.closed)
+    }
+    case 'support.reviews.list':
+      return listAdminOrderReviews(body.status == null
+        ? undefined : orderReviewHandlingStatusSchema.parse(Number(body.status)))
+    case 'support.reviews.setStatus':
+      return setAdminOrderReviewStatus(
+        principal.userId,
+        numberField(body, 'id'),
+        orderReviewHandlingStatusSchema.parse(Number(body.status)),
+      )
+    case 'support.reviews.reply':
+      return replyToOrderReview(principal.userId, numberField(body, 'id'), supportMessageWriteSchema.parse(body.value))
     case 'units.list': return listUnits()
     case 'ingredients.list':
       return listIngredients(typeof body.search === 'string' ? body.search : '')

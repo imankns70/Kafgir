@@ -6,8 +6,12 @@ import type {
   CustomerProfileDto,
   CustomerProfileLookupRequest,
   CustomerSessionDto,
+  CustomerSupportConversationCreateRequest,
+  CustomerSupportConversationDto,
   OrderReviewDto,
   OrderReviewWriteRequest,
+  SupportConversationSummaryDto,
+  SupportMessageWriteRequest,
 } from '../types'
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from './apiClient'
 
@@ -83,3 +87,18 @@ export const getCustomerOrder = (id: number) =>
 
 export const saveCustomerOrderReview = (id: number, value: OrderReviewWriteRequest) =>
   apiPut<OrderReviewDto>(`/api/customers/me/orders/${id}/review`, value)
+
+export const getCustomerSupportConversations = () =>
+  apiGet<SupportConversationSummaryDto[]>('/api/customers/me/support')
+
+export const getCustomerSupportConversation = (id: number) =>
+  apiGet<CustomerSupportConversationDto>(`/api/customers/me/support/${id}`)
+
+export const createCustomerSupportConversation = (value: CustomerSupportConversationCreateRequest) =>
+  apiPost<CustomerSupportConversationDto>('/api/customers/me/support', value)
+
+export const sendCustomerSupportMessage = (id: number, value: SupportMessageWriteRequest) =>
+  apiPost<CustomerSupportConversationDto>(`/api/customers/me/support/${id}`, value)
+
+export const setCustomerSupportConversationClosed = (id: number, closed: boolean) =>
+  apiPatch<CustomerSupportConversationDto>(`/api/customers/me/support/${id}`, { closed })

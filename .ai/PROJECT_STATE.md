@@ -1,5 +1,23 @@
 # Project state
 
+## 2026-08-15 — Private asynchronous customer communication
+
+- Customer contact now includes an authenticated, private asynchronous inbox. Customers can start a
+  conversation by subject, optionally link one of their own orders, reply, refresh, close, and reopen it.
+- Conversations and order reviews are never exposed through a public feed. Ownership is checked from
+  the customer session, and customer writes keep same-origin and mutation-rate-limit protection.
+- Electron Admin has a new «ارتباط با مشتری» page containing unread conversations, threaded replies,
+  close/reopen controls, and a separate order-review queue with New/Seen/Resolved handling states.
+- Admin can answer an order review privately; the answer creates or reuses one review-linked support
+  conversation so the customer sees it in the same private inbox.
+- Migration `0020_private_customer_communication.sql` adds support conversations/messages plus review
+  handling metadata. It was applied atomically to the primary Kafgir Neon database on 2026-08-15;
+  both tables, all four review columns, all five expected indexes, and the Drizzle journal record were verified.
+- TypeScript checks passed for all four workspaces; Web unit tests (221), server-core tests (46), Admin
+  tests (18), contracts/support tests, Web production build, and Electron production build passed.
+- Remaining rollout work is an authenticated production smoke test after the `main` deployment and a
+  new packaged Electron release for operators who need the communication page.
+
 ## 2026-08-15 — Order-detail status layout and Netlify production gap
 
 - The customer order-detail hero now keeps `وضعیت فعلی` at the visual right, places the order

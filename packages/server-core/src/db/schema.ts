@@ -440,12 +440,58 @@ export const orderReviews = pgTable('order_reviews', {
     .references(() => customerProfiles.id, { onDelete: 'restrict' }),
   rating: integer('rating').notNull(),
   comment: varchar('comment', { length: 1000 }),
+  handlingStatus: integer('handling_status').notNull().default(1),
+  adminSeenAt: utcTimestamp('admin_seen_at'),
+  resolvedAt: utcTimestamp('resolved_at'),
+  resolvedByUserId: integer('resolved_by_user_id').references(() => users.id, { onDelete: 'set null' }),
   createdAt: utcTimestamp('created_at').notNull(),
   updatedAt: utcTimestamp('updated_at'),
 }, (table) => [
   uniqueIndex('order_reviews_order_uidx').on(table.orderId),
   index('order_reviews_customer_created_idx').on(table.customerProfileId, table.createdAt),
+  index('order_reviews_handling_created_idx').on(table.handlingStatus, table.createdAt),
   check('order_reviews_rating_check', sql`${table.rating} BETWEEN 1 AND 5`),
+  check('order_reviews_handling_status_check', sql`${table.handlingStatus} BETWEEN 1 AND 3`),
+])
+
+export const supportConversations = pgTable('support_conversations', {
+  id: serial('id').primaryKey(),
+  customerProfileId: integer('customer_profile_id').notNull()
+    .references(() => customerProfiles.id, { onDelete: 'restrict' }),
+  orderId: integer('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  reviewId: integer('review_id').references(() => orderReviews.id, { onDelete: 'set null' }),
+  subject: integer('subject').notNull(),
+  status: integer('status').notNull().default(1),
+  lastMessageAt: utcTimestamp('last_message_at').notNull(),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+  closedAt: utcTimestamp('closed_at'),
+}, (table) => [
+  index('support_conversations_customer_last_idx').on(table.customerProfileId, table.lastMessageAt),
+  index('support_conversations_status_last_idx').on(table.status, table.lastMessageAt),
+  uniqueIndex('support_conversations_review_uidx').on(table.reviewId).where(sql`review_id IS NOT NULL`),
+  check('support_conversations_subject_check', sql`${table.subject} BETWEEN 1 AND 6`),
+  check('support_conversations_status_check', sql`${table.status} BETWEEN 1 AND 3`),
+])
+
+export const supportMessages = pgTable('support_messages', {
+  id: serial('id').primaryKey(),
+  conversationId: integer('conversation_id').notNull()
+    .references(() => supportConversations.id, { onDelete: 'cascade' }),
+  senderType: integer('sender_type').notNull(),
+  customerProfileId: integer('customer_profile_id')
+    .references(() => customerProfiles.id, { onDelete: 'restrict' }),
+  adminUserId: integer('admin_user_id').references(() => users.id, { onDelete: 'restrict' }),
+  message: varchar('message', { length: 2000 }).notNull(),
+  createdAt: utcTimestamp('created_at').notNull(),
+  readAt: utcTimestamp('read_at'),
+}, (table) => [
+  index('support_messages_conversation_created_idx').on(table.conversationId, table.createdAt),
+  check('support_messages_sender_type_check', sql`${table.senderType} BETWEEN 1 AND 2`),
+  check('support_messages_sender_identity_check', sql`
+    (${table.senderType} = 1 AND ${table.customerProfileId} IS NOT NULL AND ${table.adminUserId} IS NULL)
+    OR (${table.senderType} = 2 AND ${table.adminUserId} IS NOT NULL AND ${table.customerProfileId} IS NULL)
+  `),
 ])
 
 export const notificationMessages = pgTable('notification_messages', {

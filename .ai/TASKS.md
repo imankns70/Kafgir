@@ -1,5 +1,21 @@
 # Tasks
 
+## 2026-08-15 private customer communication
+
+- [x] Keep reviews and support messages private between the authenticated customer and Admin.
+- [x] Add customer asynchronous conversations with subject, optional owned-order link, unread state,
+  replies, manual refresh, and close/reopen behavior.
+- [x] Add Electron Admin inbox/reply handling and a New/Seen/Resolved order-review queue.
+- [x] Let Admin answer a review through a single private review-linked conversation.
+- [x] Add migration `0020_private_customer_communication.sql`, typed contracts, IPC permissions,
+  customer APIs, responsive Web UI, Admin UI, and regression tests.
+- [x] Exclude a collaboration subject and avoid any public customer-review surface.
+- [x] Apply migration `0020_private_customer_communication.sql` atomically to the primary Neon database,
+  record it in the Drizzle migration journal, and verify its tables, review columns, and indexes.
+- [ ] After migration and deployment, smoke-test one customer message, one Admin response, unread
+  clearing, close/reopen, and one private reply to an order review.
+- [ ] Create and install the next Electron release before expecting operators to see «ارتباط با مشتری».
+
 ## 2026-08-15 order-detail layout and production verification
 
 - [x] Swap the order-detail status badge and creation date/time while keeping the current-status

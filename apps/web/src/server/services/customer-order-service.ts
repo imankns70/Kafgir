@@ -227,6 +227,10 @@ export async function saveCustomerOrderReview(
       ON CONFLICT (order_id) DO UPDATE SET
         rating = EXCLUDED.rating,
         comment = EXCLUDED.comment,
+        handling_status = 1,
+        admin_seen_at = NULL,
+        resolved_at = NULL,
+        resolved_by_user_id = NULL,
         updated_at = NOW()
       WHERE order_reviews.customer_profile_id = ${profileId}
       RETURNING id, rating, comment, created_at AS "createdAt", updated_at AS "updatedAt"

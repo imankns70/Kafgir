@@ -63,6 +63,11 @@ import type {
   SocialSuggestionDto,
   SocialTemplateDto,
   SocialTemplateWriteRequest,
+  AdminOrderReviewDto,
+  AdminSupportConversationDto,
+  AdminSupportConversationSummaryDto,
+  OrderReviewHandlingStatus,
+  SupportConversationStatus,
 } from '@kafgir/contracts'
 import type { AdminOperation } from '../../shared/admin-operations'
 
@@ -432,6 +437,20 @@ export const adminApi = {
   }>(`/api/admin/reports/v15?from=${from}&to=${to}`),
   serverLogs: (limit = 500) => request<LogEntry[]>(`/api/admin/logs?limit=${limit}`),
   desktopLogs: (limit = 500) => window.kafgir.desktopLogs(limit) as Promise<LogEntry[]>,
+  supportConversations: (status?: SupportConversationStatus) =>
+    socialInvoke<AdminSupportConversationSummaryDto[]>('support.conversations.list', { status }),
+  supportConversation: (id: number) =>
+    socialInvoke<AdminSupportConversationDto>('support.conversations.get', { id }),
+  replySupportConversation: (id: number, message: string) =>
+    socialInvoke<AdminSupportConversationDto>('support.conversations.reply', { id, value: { message } }, true),
+  setSupportConversationClosed: (id: number, closed: boolean) =>
+    socialInvoke<AdminSupportConversationDto>('support.conversations.setClosed', { id, value: { closed } }, true),
+  orderReviews: (status?: OrderReviewHandlingStatus) =>
+    socialInvoke<AdminOrderReviewDto[]>('support.reviews.list', { status }),
+  setOrderReviewStatus: (id: number, status: OrderReviewHandlingStatus) =>
+    socialInvoke<void>('support.reviews.setStatus', { id, status }, true),
+  replyToOrderReview: (id: number, message: string) =>
+    socialInvoke<AdminSupportConversationDto>('support.reviews.reply', { id, value: { message } }, true),
   socialDashboard: () => socialInvoke<SocialDashboardDto>('social.dashboard'),
   socialChannels: () => socialInvoke<SocialChannelDto[]>('social.channels.list'),
   saveSocialChannel: (id: number | null, value: SocialChannelWriteRequest) =>

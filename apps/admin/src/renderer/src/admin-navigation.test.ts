@@ -11,12 +11,16 @@ describe('grouped admin navigation', () => {
     const pages = navigationGroups.flatMap((group) => group.items.map((item) => item.page))
     expect(pages).toHaveLength(new Set(pages).size)
     expect(pages).toEqual(expect.arrayContaining([
-      'orders', 'manual', 'menu', 'report', 'foods', 'categories', 'tags', 'recipes',
+      'orders', 'manual', 'customer-communication', 'menu', 'report', 'foods', 'categories', 'tags', 'recipes',
       'ingredients', 'inventory', 'purchases', 'suppliers', 'shopping',
       'finance', 'payments', 'v15-reports', 'logs',
       'social-dashboard', 'social-channels', 'social-publish', 'social-templates',
       'social-rules', 'social-suggestions', 'social-history',
     ]))
+  })
+
+  it('keeps private customer communication alongside orders', () => {
+    expect(navigationGroupForPage('customer-communication')).toBe('orders')
   })
 
   it('keeps nested food pages under the products group with foods active', () => {

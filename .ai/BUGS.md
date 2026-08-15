@@ -17,6 +17,18 @@
 
 ## Resolved
 
+### 2026-08-15 — Customer reviews had no private Admin handling path
+
+- **Symptoms:** Customers could submit a delivered-order rating/comment, but Admin had no dedicated
+  queue to mark it reviewed or send a private response.
+- **Root cause:** `order_reviews` stored customer input only and had no handling state or conversation
+  relationship.
+- **Fix:** Add New/Seen/Resolved metadata and a unique private support conversation link. Electron Admin
+  can now review and respond, while the customer receives the answer in their private inbox.
+- **Migration:** `0020_private_customer_communication.sql` was applied and verified on the primary Neon
+  database on 2026-08-15.
+- **Verification:** Contract/type checks, Web/Admin/server unit suites, and both production builds passed.
+
 ### 2026-08-13 — Invoice brand wordmark overlapped the order number on mobile
 
 - **Symptoms:** The compact Kafgir logo's wordmark rendered over the invoice order number on narrow

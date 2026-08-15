@@ -19,6 +19,8 @@ describe('Admin operation permissions', () => {
     expect(isAdminOperationAllowed('payments.changeStatus', ['OrderManager'])).toBe(true)
     expect(isAdminOperationAllowed('payments.refund', ['OrderManager'])).toBe(false)
     expect(isAdminOperationAllowed('inventory.adjust', ['OrderManager'])).toBe(false)
+    expect(isAdminOperationAllowed('support.conversations.reply', ['OrderManager'])).toBe(true)
+    expect(isAdminOperationAllowed('support.reviews.setStatus', ['OrderManager'])).toBe(true)
   })
 
   it('allows social review for kitchen admins but reserves publishing and configuration for owner', () => {

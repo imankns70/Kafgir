@@ -28,6 +28,7 @@ import { formatMoney as money, formatNumber, persianDateWithLatinDigitsLocale } 
 import { FinancePage, IngredientsPage, InventoryPage, PaymentsPage, PurchasesPage, RecipesPage, ShoppingPage, SuppliersPage, V15ReportsPage } from './V15Pages'
 import { DeliveryDaysPage, DeliverySlotsPage } from './DeliveryPages'
 import { LogsPage } from './LogsPage'
+import { CustomerCommunicationPage } from './CustomerCommunicationPage'
 import {
   SocialChannelsPage,
   SocialComposerPage,
@@ -1644,6 +1645,7 @@ export function App() {
     'delivery-days': <DeliveryDaysPage />,
     orders: <OrdersPage />,
     manual: <ManualOrderPage />,
+    'customer-communication': <CustomerCommunicationPage />,
     foods: <FoodsPage onCreate={() => openFoodEditor(null)} onEdit={openFoodEditor} onPhotos={openFoodPhotos} onTags={openFoodTags} />,
     'food-editor': <FoodEditorPage foodId={foodEditorId} onBack={closeFoodEditor} onSaved={closeFoodEditor} onPhotos={openFoodPhotos} onTags={openFoodTags} />,
     'food-photos': <FoodPhotosPage foodId={foodPhotoId} onBack={closeFoodPhotos} />,

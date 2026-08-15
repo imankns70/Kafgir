@@ -270,7 +270,7 @@ function App() {
         <OrderSuccess order={order} onBack={() => { setOrder(null); setPage('menu') }} />
       )}
       {page === 'profile' && <ProfilePage onBack={() => setPage('menu')} onAuthenticationChange={setIsCustomerAuthenticated} />}
-      {page === 'contact' && <ContactPage onBack={() => setPage('menu')} />}
+      {page === 'contact' && <ContactPage onBack={() => setPage('menu')} onAccount={() => setPage('profile')} />}
 
       {page !== 'success' && (
         <nav className="mobile-bottom-nav" aria-label="پیمایش اصلی">

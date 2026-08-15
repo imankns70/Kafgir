@@ -1,7 +1,11 @@
 export {
   DeliveryMethod,
+  OrderReviewHandlingStatus,
   OrderStatus,
   PaymentMethod,
+  SupportConversationStatus,
+  SupportConversationSubject,
+  SupportSenderType,
 } from '@kafgir/contracts'
 import type { CartItem as ContractCartItem } from '@kafgir/contracts'
 
@@ -26,6 +30,8 @@ export type {
   CustomerProfileDto,
   CustomerProfileLookupRequest,
   CustomerSessionDto,
+  CustomerSupportConversationCreateRequest,
+  CustomerSupportConversationDto,
   DailyMenuDto,
   DailyMenuItemDto,
   MenuCartSnapshotDto,
@@ -35,4 +41,6 @@ export type {
   OrderSummaryDto,
   PublicDailyMenuPageDto,
   PersianRiceDto,
+  SupportConversationSummaryDto,
+  SupportMessageWriteRequest,
 } from '@kafgir/contracts'
