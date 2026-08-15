@@ -1,5 +1,20 @@
 # Bugs
 
+## Open
+
+### 2026-08-15 — Netlify production is behind `main`
+
+- **Symptoms:** The live customer site does not expose the mobile active-order tracker and still
+  serves the old order-detail header layout even though both changes exist on `main`.
+- **Evidence:** A cache-busted production inspection found no `active-order-tracker-root` CSS and no
+  `grid-template-areas: "badge date label"` rule in the loaded Netlify assets.
+- **Impact:** Customers cannot use the Snapp-like persistent active-order experience in production,
+  and recent Web fixes must not be reported as published merely because their commits reached GitHub.
+- **Likely boundary:** Netlify production deployment/Git integration is stale or did not run for the
+  latest `main` updates; the source implementation itself is present in the repository.
+- **Required verification:** Trigger or repair the production deploy, then inspect live assets and
+  test the authenticated mobile tracker plus the updated order-detail header.
+
 ## Resolved
 
 ### 2026-08-13 — Invoice brand wordmark overlapped the order number on mobile

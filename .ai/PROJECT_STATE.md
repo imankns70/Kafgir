@@ -1,5 +1,22 @@
 # Project state
 
+## 2026-08-15 — Order-detail status layout and Netlify production gap
+
+- The customer order-detail hero now keeps `وضعیت فعلی` at the visual right, places the order
+  creation date/time in the center, and moves the status badge to the visual left.
+- The header uses an explicit physical grid with RTL content so the requested placement remains
+  stable in both mobile and desktop layouts instead of depending on implicit RTL grid ordering.
+- The focused customer-order tests pass (5/5) and Web TypeScript validation passes. No database
+  migration is required.
+- The active-order tracker and this layout correction are present on `main`, currently through
+  commit `f46e95714b4ecfc9523064eabac4348308679b72`.
+- A direct cache-busted inspection of the Netlify production URL on 2026-08-15 found neither the
+  active-order tracker stylesheet nor the new order-detail grid rules. Production is therefore
+  behind `main`; a GitHub commit must not be described as published until the live assets are
+  checked separately.
+- Next operational action: restore/trigger Netlify production deployment, then verify the
+  authenticated mobile active-order flow and the order-detail header on the live site.
+
 ## 2026-08-14 — Active-order tracking, checkout address picker, and food-detail UX
 
 - The customer Web app has a mobile-only persistent active-order tracker mounted at the root layout,

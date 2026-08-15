@@ -1,5 +1,20 @@
 # Tasks
 
+## 2026-08-15 order-detail layout and production verification
+
+- [x] Swap the order-detail status badge and creation date/time while keeping the current-status
+  label at the visual right.
+- [x] Make the three-part header placement deterministic across RTL mobile and desktop layouts.
+- [x] Run the focused customer-order tests (5/5) and Web TypeScript validation.
+- [x] Promote the layout correction to `main` through commit
+  `f46e95714b4ecfc9523064eabac4348308679b72`.
+- [x] Inspect the live Netlify assets without browser cache and record that production is behind
+  `main` and does not yet contain the active-order tracker or the latest order-detail layout.
+- [ ] Restore or manually trigger the Netlify production deploy from current `main`.
+- [ ] After deployment, verify the authenticated mobile active-order tracker, its bottom sheet and
+  automatic status refresh on the production URL.
+- [ ] Verify the new order-detail status/date placement on both mobile and desktop production views.
+
 ## Completed — 2026-08-14 active orders, checkout addresses, and food-detail UX
 
 - [x] Add a mobile-only global active-order tracker that remains visible across customer views.

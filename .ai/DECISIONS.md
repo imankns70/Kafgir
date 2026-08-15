@@ -1,5 +1,14 @@
 # Decisions
 
+## 2026-08-15 — Deterministic order status layout and deployment evidence
+
+- In the order-detail hero, keep the current-status label on the visual right, center the order
+  creation date/time, and place the status badge on the visual left.
+- Use an explicit LTR grid for physical placement and restore RTL direction on Persian content;
+  do not depend on browser-specific interpretation of implicit RTL grid order.
+- Treat repository delivery and production publication as separate states. A change on `main` is
+  only considered published after the Netlify production assets or live behavior confirm it.
+
 ## 2026-08-14 — Mobile active orders and customer-owned delivery confirmation
 
 - Treat `PendingConfirmation`, `Confirmed`, `Preparing`, and `Ready` as active customer orders; delivered
