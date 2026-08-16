@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PaymentMethod } from './order-enums.js'
 
 const id = z.number().int().positive()
 const optionalText = z.string().trim().max(2000).nullable().optional()
@@ -16,8 +17,6 @@ export enum InventoryTransactionType {
 }
 export enum ShoppingListStatus { Draft = 1, InProgress = 2, Completed = 3, Cancelled = 4 }
 export enum FinancialAccountType { Cash = 1, Bank = 2, GatewaySettlement = 3, PettyCash = 4, Other = 5 }
-// Keep these values identical to the order PaymentMethod enum in index.ts.
-export enum CustomerPaymentMethod { Cash = 1, OnlineGateway = 3, Pos = 4 }
 export enum PurchasePaymentMethod { Cash = 1, Bank = 2, Card = 3, Other = 4 }
 export enum PaymentStatus {
   Pending = 1, AwaitingVerification = 2, Paid = 3, Failed = 4,
@@ -182,7 +181,7 @@ export const posTerminalWriteSchema = z.object({
   isActive: z.boolean().default(true), notes: optionalText,
 })
 export const paymentWriteSchema = z.object({
-  orderId: id, paymentMethod: z.nativeEnum(CustomerPaymentMethod), financialAccountId: id,
+  orderId: id, paymentMethod: z.nativeEnum(PaymentMethod), financialAccountId: id,
   posTerminalId: id.nullable().optional(), amount: money.positive(),
   trackingNumber: z.string().trim().max(100).nullable().optional(),
   referenceNumber: z.string().trim().max(100).nullable().optional(),
@@ -194,7 +193,7 @@ export const paymentStatusWriteSchema = z.object({
 export const customerPaymentSchema = z.object({
   id, orderId: id, orderNumber: z.string(), customerFullName: z.string(),
   customerPhoneNumber: z.string(), orderTotalAmount: money,
-  paymentMethod: z.nativeEnum(CustomerPaymentMethod), amount: money,
+  paymentMethod: z.nativeEnum(PaymentMethod), amount: money,
   status: z.nativeEnum(PaymentStatus), financialAccountId: id,
   financialAccountName: z.string(), posTerminalId: id.nullable(),
   trackingNumber: z.string().nullable(), referenceNumber: z.string().nullable(),

@@ -1,6 +1,5 @@
 import {
   OrderReviewHandlingStatus,
-  SupportConversationSubject,
   SupportConversationStatus,
   SupportSenderType,
   type AdminOrderReviewDto,
@@ -69,11 +68,13 @@ const mapMessage = (row: MessageRow) => ({
 })
 
 const customerSummaryQuery = async (profileId: number, conversationId?: number) => sqlClient<SummaryRow[]>`
-  SELECT c.id, c.subject, c.status, c.order_id AS "orderId", o.order_number AS "orderNumber",
+  SELECT c.id, c.subject, ss.title AS "subjectTitle", c.status,
+         c.order_id AS "orderId", o.order_number AS "orderNumber",
          c.review_id AS "reviewId", last_message.message AS "lastMessage",
          c.last_message_at AS "lastMessageAt", c.created_at AS "createdAt",
          COALESCE(unread.count, 0)::int AS "unreadCount"
   FROM support_conversations c
+  JOIN support_subjects ss ON ss.id = c.subject
   LEFT JOIN orders o ON o.id = c.order_id
   JOIN LATERAL (
     SELECT message FROM support_messages WHERE conversation_id = c.id
@@ -127,6 +128,10 @@ export async function createCustomerSupportConversation(
   input: CustomerSupportConversationCreateRequest,
 ): Promise<CustomerSupportConversationDto> {
   const profileId = await profileIdForUser(userId)
+  const subjects = await sqlClient<{ id: number }[]>`
+    SELECT id FROM support_subjects WHERE id = ${input.subject} AND is_active = true LIMIT 1
+  `
+  if (!subjects[0]) throw new AppError('موضوع انتخاب‌شده فعال نیست.')
   if (input.orderId != null) {
     const owned = await sqlClient<{ exists: boolean }[]>`
       SELECT EXISTS(SELECT 1 FROM orders WHERE id = ${input.orderId}
@@ -200,12 +205,14 @@ export async function setCustomerSupportConversationClosed(
 }
 
 const adminSummaryQuery = async (status?: SupportConversationStatus, conversationId?: number) => sqlClient<AdminSummaryRow[]>`
-  SELECT c.id, c.subject, c.status, c.customer_profile_id AS "customerProfileId",
+  SELECT c.id, c.subject, ss.title AS "subjectTitle", c.status,
+         c.customer_profile_id AS "customerProfileId",
          cp.preferred_name AS "customerName", cp.default_phone_number AS "customerPhoneNumber",
          c.order_id AS "orderId", o.order_number AS "orderNumber", c.review_id AS "reviewId",
          last_message.message AS "lastMessage", c.last_message_at AS "lastMessageAt",
          c.created_at AS "createdAt", COALESCE(unread.count, 0)::int AS "unreadCount"
   FROM support_conversations c
+  JOIN support_subjects ss ON ss.id = c.subject
   JOIN customer_profiles cp ON cp.id = c.customer_profile_id
   LEFT JOIN orders o ON o.id = c.order_id
   JOIN LATERAL (
@@ -359,11 +366,15 @@ export async function replyToOrderReview(
     `
     let id = existing[0]?.id
     if (!id) {
+      const subjects = await tx<{ id: number }[]>`
+        SELECT id FROM support_subjects WHERE system_key = 'food-quality' LIMIT 1
+      `
+      if (!subjects[0]) throw new AppError('موضوع سیستمی کیفیت غذا پیکربندی نشده است.')
       const inserted = await tx<{ id: number }[]>`
         INSERT INTO support_conversations
           (customer_profile_id, order_id, review_id, subject, status, last_message_at, created_at, updated_at)
         VALUES (${reviews[0].customerProfileId}, ${reviews[0].orderId}, ${reviewId},
-          ${SupportConversationSubject.FoodQuality},
+          ${subjects[0].id},
           ${SupportConversationStatus.AwaitingCustomer}, NOW(), NOW(), NOW())
         RETURNING id
       `

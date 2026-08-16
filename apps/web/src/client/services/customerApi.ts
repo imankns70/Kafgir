@@ -12,6 +12,7 @@ import type {
   OrderReviewWriteRequest,
   SupportConversationSummaryDto,
   SupportMessageWriteRequest,
+  SupportSubjectDto,
 } from '../types'
 import { ApiError, apiDelete, apiGet, apiPatch, apiPost, apiPut } from './apiClient'
 
@@ -102,3 +103,5 @@ export const sendCustomerSupportMessage = (id: number, value: SupportMessageWrit
 
 export const setCustomerSupportConversationClosed = (id: number, closed: boolean) =>
   apiPatch<CustomerSupportConversationDto>(`/api/customers/me/support/${id}`, { closed })
+
+export const getSupportSubjects = () => apiGet<SupportSubjectDto[]>('/api/support/subjects')

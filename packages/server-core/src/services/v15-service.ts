@@ -1,5 +1,5 @@
 import {
-  CustomerPaymentMethod,
+  PaymentMethod,
   FinancialTransactionType,
   InventoryTransactionType,
   PaymentStatus,
@@ -571,10 +571,10 @@ export async function createPayment(input: PaymentWriteRequest, userId: number) 
     if (order[0].status === OrderStatus.Cancelled) throw new AppError('برای سفارش لغوشده نمی‌توان پرداخت ثبت کرد.')
     const account = (await lockFinancialAccounts(tx, [input.financialAccountId])).get(input.financialAccountId)!
     if (!account.isActive) throw new AppError('حساب مالی انتخاب‌شده غیرفعال است.')
-    if (input.paymentMethod === CustomerPaymentMethod.Pos && !input.posTerminalId) {
+    if (input.paymentMethod === PaymentMethod.Pos && !input.posTerminalId) {
       throw new AppError('برای پرداخت پوز، انتخاب دستگاه الزامی است.')
     }
-    if (input.paymentMethod !== CustomerPaymentMethod.Pos && input.posTerminalId) {
+    if (input.paymentMethod !== PaymentMethod.Pos && input.posTerminalId) {
       throw new AppError('دستگاه پوز فقط برای روش پرداخت پوز مجاز است.')
     }
     if (input.posTerminalId) {

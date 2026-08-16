@@ -203,12 +203,23 @@ export const foodCategories = pgTable('food_categories', {
   index('food_categories_active_order_idx').on(table.isActive, table.displayOrder),
 ])
 
+export const foodTagGroups = pgTable('food_tag_groups', {
+  code: varchar('code', { length: 40 }).primaryKey(),
+  title: varchar('title', { length: 100 }).notNull(),
+  displayOrder: integer('display_order').notNull().default(0),
+  isActive: boolean('is_active').notNull().default(true),
+  isSystem: boolean('is_system').notNull().default(false),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [index('food_tag_groups_active_order_idx').on(table.isActive, table.displayOrder)])
+
 export const foodTags = pgTable('food_tags', {
   id: serial('id').primaryKey(),
   title: varchar('title', { length: 100 }).notNull(),
   slug: varchar('slug', { length: 100 }).notNull(),
   icon: varchar('icon', { length: 30 }),
-  group: varchar('group_name', { length: 40 }).notNull(),
+  group: varchar('group_name', { length: 40 }).notNull()
+    .references(() => foodTagGroups.code, { onDelete: 'restrict', onUpdate: 'cascade' }),
   displayOrder: integer('display_order').notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
   isCustomerVisible: boolean('is_customer_visible').notNull().default(true),
@@ -402,7 +413,7 @@ export const orders = pgTable('orders', {
   index('orders_analytics_created_visitor_idx').on(table.createdAt, table.analyticsVisitorId)
     .where(sql`analytics_visitor_id IS NOT NULL`),
   check('orders_status_check', sql`${table.status} BETWEEN 1 AND 6`),
-  check('orders_payment_method_check', sql`${table.paymentMethod} BETWEEN 1 AND 4`),
+  check('orders_payment_method_check', sql`${table.paymentMethod} IN (1, 2, 3, 4)`),
   check('orders_delivery_method_check', sql`${table.deliveryMethod} BETWEEN 1 AND 2`),
   check('orders_money_check', sql`${table.subtotalAmount} >= 0 AND ${table.deliveryFee} >= 0 AND ${table.totalAmount} = ${table.subtotalAmount} + ${table.deliveryFee}`),
 ])
@@ -454,13 +465,28 @@ export const orderReviews = pgTable('order_reviews', {
   check('order_reviews_handling_status_check', sql`${table.handlingStatus} BETWEEN 1 AND 3`),
 ])
 
+export const supportSubjects = pgTable('support_subjects', {
+  id: serial('id').primaryKey(),
+  systemKey: varchar('system_key', { length: 50 }),
+  title: varchar('title', { length: 120 }).notNull(),
+  displayOrder: integer('display_order').notNull().default(0),
+  isActive: boolean('is_active').notNull().default(true),
+  isSystem: boolean('is_system').notNull().default(false),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('support_subjects_system_key_uidx').on(table.systemKey)
+    .where(sql`${table.systemKey} IS NOT NULL`),
+  index('support_subjects_active_order_idx').on(table.isActive, table.displayOrder),
+])
+
 export const supportConversations = pgTable('support_conversations', {
   id: serial('id').primaryKey(),
   customerProfileId: integer('customer_profile_id').notNull()
     .references(() => customerProfiles.id, { onDelete: 'restrict' }),
   orderId: integer('order_id').references(() => orders.id, { onDelete: 'set null' }),
   reviewId: integer('review_id').references(() => orderReviews.id, { onDelete: 'set null' }),
-  subject: integer('subject').notNull(),
+  subject: integer('subject').notNull().references(() => supportSubjects.id, { onDelete: 'restrict' }),
   status: integer('status').notNull().default(1),
   lastMessageAt: utcTimestamp('last_message_at').notNull(),
   createdAt: utcTimestamp('created_at').notNull(),
@@ -470,7 +496,6 @@ export const supportConversations = pgTable('support_conversations', {
   index('support_conversations_customer_last_idx').on(table.customerProfileId, table.lastMessageAt),
   index('support_conversations_status_last_idx').on(table.status, table.lastMessageAt),
   uniqueIndex('support_conversations_review_uidx').on(table.reviewId).where(sql`review_id IS NOT NULL`),
-  check('support_conversations_subject_check', sql`${table.subject} BETWEEN 1 AND 6`),
   check('support_conversations_status_check', sql`${table.status} BETWEEN 1 AND 3`),
 ])
 
@@ -513,6 +538,7 @@ export const notificationMessages = pgTable('notification_messages', {
   index('notification_messages_pending_idx').on(table.status, table.nextAttemptAt, table.createdAt),
   index('notification_messages_order_idx').on(table.orderId),
   check('notification_messages_channel_check', sql`${table.channel} = 1`),
+  check('notification_messages_type_check', sql`${table.type} BETWEEN 1 AND 3`),
   check('notification_messages_status_check', sql`${table.status} BETWEEN 1 AND 3`),
   check('notification_messages_retry_check', sql`${table.retryCount} >= 0`),
 ])
@@ -524,6 +550,36 @@ export const appSettings = pgTable('app_settings', {
   description: varchar('description', { length: 1000 }),
 }, (table) => [
   uniqueIndex('app_settings_key_uidx').on(table.key),
+])
+
+export const paymentMethodSettings = pgTable('payment_method_settings', {
+  method: integer('method').primaryKey(),
+  title: varchar('title', { length: 100 }).notNull(),
+  description: varchar('description', { length: 500 }),
+  isCustomerEnabled: boolean('is_customer_enabled').notNull().default(true),
+  isManualEnabled: boolean('is_manual_enabled').notNull().default(true),
+  displayOrder: integer('display_order').notNull().default(0),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [
+  check('payment_method_settings_method_check', sql`${table.method} IN (1, 2, 3, 4)`),
+  index('payment_method_settings_order_idx').on(table.displayOrder),
+])
+
+export const deliveryMethodSettings = pgTable('delivery_method_settings', {
+  method: integer('method').primaryKey(),
+  title: varchar('title', { length: 100 }).notNull(),
+  description: varchar('description', { length: 500 }),
+  isCustomerEnabled: boolean('is_customer_enabled').notNull().default(true),
+  isManualEnabled: boolean('is_manual_enabled').notNull().default(true),
+  displayOrder: integer('display_order').notNull().default(0),
+  deliveryFee: money('delivery_fee').notNull().default(0),
+  minimumOrderAmount: money('minimum_order_amount').notNull().default(0),
+  updatedAt: utcTimestamp('updated_at').notNull(),
+}, (table) => [
+  check('delivery_method_settings_method_check', sql`${table.method} IN (1, 2)`),
+  check('delivery_method_settings_amounts_check',
+    sql`${table.deliveryFee} >= 0 AND ${table.minimumOrderAmount} >= 0`),
+  index('delivery_method_settings_order_idx').on(table.displayOrder),
 ])
 
 export const units = pgTable('units', {
@@ -783,7 +839,7 @@ export const payments = pgTable('payments', {
 }, (table) => [
   index('payments_order_status_idx').on(table.orderId, table.status),
   check('payments_amount_check', sql`${table.amount} > 0`),
-  check('payments_method_check', sql`${table.paymentMethod} BETWEEN 1 AND 4`),
+  check('payments_method_check', sql`${table.paymentMethod} IN (1, 2, 3, 4)`),
   check('payments_status_check', sql`${table.status} BETWEEN 1 AND 7`),
 ])
 

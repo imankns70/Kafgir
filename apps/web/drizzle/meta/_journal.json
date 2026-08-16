@@ -148,6 +148,13 @@
       "when": 1786838400000,
       "tag": "0020_private_customer_communication",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786899860626,
+      "tag": "0021_striped_thunderbolt_ross",
+      "breakpoints": true
     }
   ]
 }

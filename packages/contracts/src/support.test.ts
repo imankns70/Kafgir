@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import {
-  SupportConversationSubject,
   customerSupportConversationCreateSchema,
   supportMessageWriteSchema,
 } from './support.js'
@@ -8,18 +7,18 @@ import {
 describe('private support contracts', () => {
   it('accepts a private message with an optional linked order', () => {
     expect(customerSupportConversationCreateSchema.parse({
-      subject: SupportConversationSubject.OrderFollowUp,
+      subject: 1,
       orderId: 42,
       message: 'لطفاً وضعیت سفارش را بررسی کنید.',
     })).toEqual({
-      subject: SupportConversationSubject.OrderFollowUp,
+      subject: 1,
       orderId: 42,
       message: 'لطفاً وضعیت سفارش را بررسی کنید.',
     })
   })
 
-  it('does not define collaboration as a customer subject', () => {
-    expect(Object.values(SupportConversationSubject)).not.toContain('Collaboration')
+  it('accepts a database-defined subject identifier instead of a closed enum', () => {
+    expect(customerSupportConversationCreateSchema.parse({ subject: 27, message: 'موضوع سفارشی' }).subject).toBe(27)
   })
 
   it('rejects empty and oversized messages', () => {

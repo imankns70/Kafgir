@@ -1,5 +1,7 @@
-import type { CreateOrderRequest, OrderDto } from '../types'
-import { apiPost } from './apiClient'
+import type { CreateOrderRequest, OrderDto, PublicOrderOptionsDto } from '../types'
+import { apiGet, apiPost } from './apiClient'
+
+export const getOrderOptions = () => apiGet<PublicOrderOptionsDto>('/api/order-options')
 
 export const createOrder = async (request: CreateOrderRequest) => {
   const order = await apiPost<OrderDto>('/api/orders', request)

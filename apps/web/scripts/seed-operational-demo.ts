@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { loadEnvFile } from 'node:process'
 import postgres from 'postgres'
 import {
-  CustomerPaymentMethod,
+  PaymentMethod,
   FinancialAccountType,
   PaymentStatus,
   PurchasePaymentMethod,
@@ -248,7 +248,7 @@ async function main() {
     const posExists = await sql`SELECT 1 FROM payments WHERE tracking_number='DEMO-POS-001'`
     if (!posExists[0] && available > 0) {
       const amount = Math.min(500_000, available)
-      const id = await core.createPayment({ orderId: selectedOrder.id, paymentMethod: CustomerPaymentMethod.Pos,
+      const id = await core.createPayment({ orderId: selectedOrder.id, paymentMethod: PaymentMethod.Pos,
         financialAccountId: bankId, posTerminalId: terminalId, amount, trackingNumber: 'DEMO-POS-001',
         referenceNumber: 'DEMO-REF-POS', receiptImageUrl: null, description: 'پرداخت حضوری با کارت‌خوان صندوق' }, userId)
       await core.changePaymentStatus(id, { status: PaymentStatus.Paid, description: 'تراکنش پوز با موفقیت تأیید شد.' }, userId)

@@ -15,6 +15,9 @@ import {
   type FoodCategoryWriteRequest,
   type FoodDto,
   type FoodTagDto,
+  type FoodTagGroupDto,
+  type DeliveryMethodSettingDto,
+  type PaymentMethodSettingDto,
   type FoodTagWriteRequest,
   type FoodWriteRequest,
   type IngredientDto,
@@ -29,6 +32,7 @@ import { FinancePage, IngredientsPage, InventoryPage, PaymentsPage, PurchasesPag
 import { DeliveryDaysPage, DeliverySlotsPage } from './DeliveryPages'
 import { LogsPage } from './LogsPage'
 import { CustomerCommunicationPage } from './CustomerCommunicationPage'
+import { ReferenceDataPage } from './ReferenceDataPage'
 import {
   SocialChannelsPage,
   SocialComposerPage,
@@ -142,6 +146,7 @@ const statusLabel: Record<OrderStatus, string> = {
 
 const paymentMethodLabel: Record<PaymentMethod, string> = {
   [PaymentMethod.Cash]: 'نقدی',
+  [PaymentMethod.CardToCard]: 'کارت‌به‌کارت',
   [PaymentMethod.Online]: 'آنلاین',
   [PaymentMethod.Pos]: 'دستگاه پوز',
 }
@@ -693,10 +698,6 @@ function OrderTable({ orders, onOpen, rowOffset = 0, selectedId }: {
 }
 
 const emptyCategory: FoodCategoryWriteRequest = { title: '', slug: '', icon: null, displayOrder: 0, isActive: true }
-const tagGroupLabels: Record<FoodTagWriteRequest['group'], string> = {
-  status: 'وضعیت', protein: 'پروتئین', diet: 'رژیم', taste: 'طعم',
-  serving: 'سرو', service: 'خدمت', style: 'سبک', marketing: 'بازاریابی',
-}
 const emptyTag: FoodTagWriteRequest = {
   title: '', slug: '', icon: null, group: 'status', displayOrder: 0,
   isActive: true, isCustomerVisible: true,
@@ -738,11 +739,15 @@ function CategoriesPage() {
 
 function TagsPage() {
   const [rows, setRows] = useState<FoodTagDto[]>([])
+  const [groups, setGroups] = useState<FoodTagGroupDto[]>([])
   const [form, setForm] = useState<FoodTagWriteRequest>(emptyTag)
   const [editId, setEditId] = useState<number | null>(null)
   const [groupFilter, setGroupFilter] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const load = async () => setRows(await adminApi.foodTags())
+  const load = async () => {
+    const [tags, referenceData] = await Promise.all([adminApi.foodTags(), adminApi.referenceData()])
+    setRows(tags); setGroups(referenceData.foodTagGroups)
+  }
   useEffect(() => { void load().catch((reason) => setError(String(reason))) }, [])
   const save = async (event: FormEvent) => {
     event.preventDefault()
@@ -767,7 +772,7 @@ function TagsPage() {
       <label>عنوان<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label>
       <label>عنوان انگلیسی<input dir="ltr" value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value.toLowerCase() })} required /></label>
       <label>گروه<select value={form.group} onChange={(event) => setForm({ ...form, group: event.target.value as FoodTagWriteRequest['group'] })}>
-        {Object.entries(tagGroupLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+        {groups.filter((item) => item.isActive || item.code === form.group).map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}</select></label>
       <label>آیکن<input value={form.icon ?? ''} onChange={(event) => setForm({ ...form, icon: event.target.value || null })} /></label>
       <label>ترتیب<input type="number" min="0" value={form.displayOrder} onChange={(event) => setForm({ ...form, displayOrder: Number(event.target.value) })} /></label>
       <label className="switch"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />فعال</label>
@@ -775,9 +780,9 @@ function TagsPage() {
       <button className="primary">{editId ? 'ذخیره' : 'افزودن'}</button>
     </form>
     <div className="toolbar"><label>گروه<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">همه گروه‌ها</option>
-      {Object.entries(tagGroupLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div>
+      {groups.map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}</select></label></div>
     <div className="panel table-wrap"><table><thead><tr><th>عنوان</th><th>گروه</th><th>عنوان انگلیسی</th><th>نمایش مشتری</th><th>وضعیت</th><th /></tr></thead>
-      <tbody>{visible.map((row) => <tr key={row.id}><td>{row.icon} {row.title}</td><td>{tagGroupLabels[row.group]}</td><td dir="ltr">{row.slug}</td><td>{row.isCustomerVisible ? 'بله' : 'خیر'}</td><td><StatusPill active={row.isActive} /></td><td><button onClick={() => edit(row)}>ویرایش</button></td></tr>)}</tbody></table></div>
+      <tbody>{visible.map((row) => <tr key={row.id}><td>{row.icon} {row.title}</td><td>{groups.find((item) => item.code === row.group)?.title ?? row.group}</td><td dir="ltr">{row.slug}</td><td>{row.isCustomerVisible ? 'بله' : 'خیر'}</td><td><StatusPill active={row.isActive} /></td><td><button onClick={() => edit(row)}>ویرایش</button></td></tr>)}</tbody></table></div>
   </PageFrame>
 }
 
@@ -1273,6 +1278,8 @@ function ManualOrderPage() {
   const [delivery, setDelivery] = useState(DeliveryMethod.Pickup)
   const [deliveryTimeSlotId, setDeliveryTimeSlotId] = useState('')
   const [payment, setPayment] = useState(PaymentMethod.Cash)
+  const [deliveryMethods, setDeliveryMethods] = useState<DeliveryMethodSettingDto[]>([])
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodSettingDto[]>([])
   const [address, setAddress] = useState('')
   const [customerNote, setCustomerNote] = useState('')
   const [selectedItemId, setSelectedItemId] = useState('')
@@ -1283,10 +1290,16 @@ function ManualOrderPage() {
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
   useEffect(() => {
     const date = today()
-    void Promise.all([adminApi.menu(date), adminApi.deliveryDay(date)])
-      .then(([dailyMenu, day]) => {
+    void Promise.all([adminApi.menu(date), adminApi.deliveryDay(date), adminApi.referenceData()])
+      .then(([dailyMenu, day, referenceData]) => {
         setMenu(dailyMenu)
         setDeliveryDay(day)
+        const availableDeliveryMethods = referenceData.deliveryMethods.filter((item) => item.isManualEnabled)
+        const availablePaymentMethods = referenceData.paymentMethods.filter((item) => item.isManualEnabled)
+        setDeliveryMethods(availableDeliveryMethods)
+        setPaymentMethods(availablePaymentMethods)
+        if (availableDeliveryMethods[0]) setDelivery(availableDeliveryMethods[0].method)
+        if (availablePaymentMethods[0]) setPayment(availablePaymentMethods[0].method)
         setError(null)
       })
       .catch((reason) => {
@@ -1339,6 +1352,8 @@ function ManualOrderPage() {
   const selectedAddress = customer?.addresses.find((item) => item.id === Number(selectedAddressId))
   const availableDeliverySlots = deliveryDay?.slots.filter((slot) => slot.unavailableReason === null) ?? []
   const cartTotal = cart.reduce((sum, item) => sum + (item.price + item.persianRicePrice) * item.quantity, 0)
+  const selectedDeliveryMethod = deliveryMethods.find((item) => item.method === delivery)
+  const orderTotal = cartTotal + (selectedDeliveryMethod?.deliveryFee ?? 0)
   const addSelected = () => {
     if (!selectedItem) return
     const withRice = withPersianRice && selectedItem.allowsPersianRice && riceAvailable
@@ -1376,9 +1391,9 @@ function ManualOrderPage() {
     setCustomer(null)
     setCustomerLookup('idle')
     setSelectedAddressId('new')
-    setDelivery(DeliveryMethod.Pickup)
+    setDelivery(deliveryMethods[0]?.method ?? DeliveryMethod.Pickup)
     setDeliveryTimeSlotId('')
-    setPayment(PaymentMethod.Cash)
+    setPayment(paymentMethods[0]?.method ?? PaymentMethod.Cash)
     setAddress('')
     setCustomerNote('')
     setSelectedItemId('')
@@ -1389,6 +1404,14 @@ function ManualOrderPage() {
   }
   const submit = async (event: FormEvent) => {
     event.preventDefault()
+    if (!selectedDeliveryMethod || !paymentMethods.some((item) => item.method === payment)) {
+      setError('روش پرداخت یا دریافت فعالی برای سفارش دستی انتخاب نشده است.')
+      return
+    }
+    if (cartTotal < selectedDeliveryMethod.minimumOrderAmount) {
+      setError(`حداقل مبلغ سفارش برای این روش ${money(selectedDeliveryMethod.minimumOrderAmount)} است.`)
+      return
+    }
     if (delivery === DeliveryMethod.Delivery && !deliveryTimeSlotId) {
       setError('برای سفارش ارسالی، بازه ارسال را انتخاب کنید.')
       return
@@ -1438,7 +1461,7 @@ function ManualOrderPage() {
           setDelivery(method)
           setDeliveryTimeSlotId(method === DeliveryMethod.Delivery ? String(availableDeliverySlots[0]?.slotId ?? '') : '')
         }}>
-          <option value={DeliveryMethod.Pickup}>تحویل حضوری</option><option value={DeliveryMethod.Delivery}>ارسال</option>
+          {deliveryMethods.map((item) => <option value={item.method} key={item.method}>{item.title}</option>)}
         </select></label>
         {delivery === DeliveryMethod.Delivery && customer && customer.addresses.length > 0 && <label>آدرس‌های مشتری<select value={selectedAddressId} onChange={(event) => {
           const value = event.target.value
@@ -1457,7 +1480,7 @@ function ManualOrderPage() {
           </option>)}
         </select></label>}
         <label>روش پرداخت<select value={payment} onChange={(event) => setPayment(Number(event.target.value) as PaymentMethod)}>
-          <option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.Online}>آنلاین</option>
+          {paymentMethods.map((item) => <option value={item.method} key={item.method}>{item.title}</option>)}
         </select></label>
         <label>یادداشت مشتری<textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} /></label>
         <div className="manual-submit-row">
@@ -1498,7 +1521,7 @@ function ManualOrderPage() {
             </tr>) : <tr><td colSpan={5}>هنوز آیتمی به سفارش اضافه نشده است.</td></tr>}</tbody></table></div>
           <div className="table-summary"><span>{plainNumber(cart.length)} مورد</span><span>صفحه 1 از 1</span></div>
         </section>
-        <strong className="manual-total-bar">جمع کل سفارش: {money(cartTotal)}</strong>
+        <strong className="manual-total-bar">جمع کل سفارش: {money(orderTotal)}{selectedDeliveryMethod && selectedDeliveryMethod.deliveryFee > 0 ? ` (با ${money(selectedDeliveryMethod.deliveryFee)} هزینه ارسال)` : ''}</strong>
       </section>
     </form>
   </PageFrame>
@@ -1558,7 +1581,7 @@ function ReportPage() {
       <label>نام مشتری<input value={query.customerName ?? ''} onChange={(event) => setQuery({ ...query, customerName: event.target.value })} /></label>
       <label>شماره تماس<input dir="ltr" value={query.phoneNumber ?? ''} onChange={(event) => setQuery({ ...query, phoneNumber: event.target.value })} /></label>
       <label>نوع دریافت<select value={query.deliveryMethod ?? ''} onChange={(event) => setQuery({ ...query, deliveryMethod: event.target.value ? Number(event.target.value) as DeliveryMethod : undefined })}><option value="">همه روش‌ها</option><option value={DeliveryMethod.Pickup}>حضوری</option><option value={DeliveryMethod.Delivery}>ارسال</option></select></label>
-      <label>نوع فروش<select value={query.paymentMethod ?? ''} onChange={(event) => setQuery({ ...query, paymentMethod: event.target.value ? Number(event.target.value) as PaymentMethod : undefined })}><option value="">همه روش‌ها</option><option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.Online}>آنلاین</option></select></label>
+      <label>نوع فروش<select value={query.paymentMethod ?? ''} onChange={(event) => setQuery({ ...query, paymentMethod: event.target.value ? Number(event.target.value) as PaymentMethod : undefined })}><option value="">همه روش‌ها</option><option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.CardToCard}>کارت‌به‌کارت</option><option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.Online}>آنلاین</option></select></label>
       <label>غذا<select value={query.foodName ?? ''} onChange={(event) => setQuery({ ...query, foodName: event.target.value || undefined })}><option value="">همه غذاها</option>{foods.map((food) => <option value={food.name} key={food.id}>{food.name}</option>)}</select></label>
       <div className="filter-actions">
         <button className="primary" disabled={busy}>{busy ? 'در حال دریافت…' : 'جستجو'}</button>
@@ -1664,6 +1687,7 @@ export function App() {
     payments: <PaymentsPage />,
     'v15-reports': <V15ReportsPage />,
     logs: <LogsPage />,
+    'reference-data': <ReferenceDataPage />,
     'social-dashboard': <SocialDashboardPage />,
     'social-channels': <SocialChannelsPage />,
     'social-publish': <SocialComposerPage />,

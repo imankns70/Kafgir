@@ -68,6 +68,16 @@ import type {
   AdminSupportConversationSummaryDto,
   OrderReviewHandlingStatus,
   SupportConversationStatus,
+  FoodTagGroupDto,
+  FoodTagGroupWriteRequest,
+  SupportSubjectDto,
+  SupportSubjectWriteRequest,
+  PaymentMethod,
+  PaymentMethodSettingDto,
+  PaymentMethodSettingWriteRequest,
+  DeliveryMethod,
+  DeliveryMethodSettingDto,
+  DeliveryMethodSettingWriteRequest,
 } from '@kafgir/contracts'
 import type { AdminOperation } from '../../shared/admin-operations'
 
@@ -340,6 +350,24 @@ export const adminApi = {
     request<FoodTagDto>('/api/admin/food-tags', 'POST', tag),
   updateFoodTag: (id: number, tag: FoodTagWriteRequest) =>
     request<FoodTagDto>(`/api/admin/food-tags/${id}`, 'PUT', tag),
+  referenceData: () => socialInvoke<{
+    foodTagGroups: FoodTagGroupDto[]
+    supportSubjects: SupportSubjectDto[]
+    paymentMethods: PaymentMethodSettingDto[]
+    deliveryMethods: DeliveryMethodSettingDto[]
+  }>('referenceData.get'),
+  createFoodTagGroup: (value: FoodTagGroupWriteRequest) =>
+    socialInvoke<FoodTagGroupDto>('foodTagGroups.create', { value }, true),
+  updateFoodTagGroup: (code: string, value: FoodTagGroupWriteRequest) =>
+    socialInvoke<FoodTagGroupDto>('foodTagGroups.update', { code, value }, true),
+  createSupportSubject: (value: SupportSubjectWriteRequest) =>
+    socialInvoke<SupportSubjectDto>('supportSubjects.create', { value }, true),
+  updateSupportSubject: (id: number, value: SupportSubjectWriteRequest) =>
+    socialInvoke<SupportSubjectDto>('supportSubjects.update', { id, value }, true),
+  updatePaymentMethod: (method: PaymentMethod, value: PaymentMethodSettingWriteRequest) =>
+    socialInvoke<PaymentMethodSettingDto>('paymentMethods.update', { method, value }, true),
+  updateDeliveryMethod: (method: DeliveryMethod, value: DeliveryMethodSettingWriteRequest) =>
+    socialInvoke<DeliveryMethodSettingDto>('deliveryMethods.update', { method, value }, true),
   foods: () => request<FoodDto[]>('/api/admin/foods'),
   createFood: (food: FoodWriteRequest) => request<FoodDto>('/api/admin/foods', 'POST', food),
   updateFood: (id: number, food: FoodWriteRequest) => request<void>(`/api/admin/foods/${id}`, 'PUT', food),

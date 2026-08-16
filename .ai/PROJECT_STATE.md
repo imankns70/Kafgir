@@ -555,3 +555,9 @@
   per-process, non-distributed and reset on restart, so production must remain single-instance until
   an atomic shared `IRateLimitStore` implementation is installed. Admin, health and Electron remain
   outside customer rate limiting.
+- Reference data is database-backed for food-tag groups, support subjects, payment presentation and
+  availability, and delivery presentation/availability/fees/minimums. Electron Admin manages it
+  through typed IPC; Web reads active customer options. Order creation enforces availability, fee
+  and minimum transactionally. Historic card-to-card code `2` remains valid; workflow states remain
+  typed enums and waste reasons are excluded by request. Migration `0021_striped_thunderbolt_ross.sql`
+  is applied to the configured development database. See `.ai/docs/reference-data.md`.

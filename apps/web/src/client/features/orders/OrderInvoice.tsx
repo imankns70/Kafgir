@@ -12,6 +12,7 @@ const deliveryLabels = {
 
 const paymentLabels = {
   [PaymentMethod.Cash]: 'نقدی',
+  [PaymentMethod.CardToCard]: 'کارت‌به‌کارت',
   [PaymentMethod.Online]: 'پرداخت آنلاین',
   [PaymentMethod.Pos]: 'کارت‌خوان',
 }

@@ -10,16 +10,17 @@ import {
   getCustomerSession,
   getCustomerSupportConversation,
   getCustomerSupportConversations,
+  getSupportSubjects,
   sendCustomerSupportMessage,
   setCustomerSupportConversationClosed,
 } from '../../services/customerApi'
 import {
   SupportConversationStatus,
-  SupportConversationSubject,
   SupportSenderType,
   type CustomerOrderSummaryDto,
   type CustomerSupportConversationDto,
   type SupportConversationSummaryDto,
+  type SupportSubjectDto,
 } from '../../types'
 import { formatPersianDateTime } from '../../utils/format'
 
@@ -29,15 +30,6 @@ const contacts = [
   { label: 'پشتیبانی سفارش', phone: '09166450262' },
   { label: 'پیگیری و هماهنگی', phone: '09163442440' },
 ]
-
-const subjectLabels: Record<SupportConversationSubject, string> = {
-  [SupportConversationSubject.OrderFollowUp]: 'پیگیری سفارش',
-  [SupportConversationSubject.Payment]: 'پرداخت',
-  [SupportConversationSubject.Delivery]: 'ارسال و تحویل',
-  [SupportConversationSubject.FoodQuality]: 'کیفیت غذا',
-  [SupportConversationSubject.SuggestionComplaint]: 'پیشنهاد یا انتقاد',
-  [SupportConversationSubject.Other]: 'سایر موارد',
-}
 
 const statusLabels: Record<SupportConversationStatus, string> = {
   [SupportConversationStatus.AwaitingAdmin]: 'در انتظار پاسخ کفگیر',
@@ -50,7 +42,8 @@ export function ContactPage({ onBack, onAccount }: Props) {
   const [orders, setOrders] = useState<CustomerOrderSummaryDto[]>([])
   const [conversations, setConversations] = useState<SupportConversationSummaryDto[]>([])
   const [selected, setSelected] = useState<CustomerSupportConversationDto | null>(null)
-  const [subject, setSubject] = useState(SupportConversationSubject.OrderFollowUp)
+  const [subjects, setSubjects] = useState<SupportSubjectDto[]>([])
+  const [subject, setSubject] = useState(0)
   const [orderId, setOrderId] = useState('')
   const [newMessage, setNewMessage] = useState('')
   const [reply, setReply] = useState('')
@@ -77,8 +70,16 @@ export function ContactPage({ onBack, onAccount }: Props) {
         if (cancelled) return
         setAuthenticated(session.authenticated)
         if (session.authenticated) {
-          const [inbox, orderPage] = await Promise.all([getCustomerSupportConversations(), getCustomerOrders(1)])
-          if (!cancelled) { setConversations(inbox); setOrders(orderPage.items) }
+          const [inbox, orderPage, availableSubjects] = await Promise.all([
+            getCustomerSupportConversations(), getCustomerOrders(1), getSupportSubjects(),
+          ])
+          if (!cancelled) {
+            setConversations(inbox); setOrders(orderPage.items); setSubjects(availableSubjects)
+            setSubject(availableSubjects[0]?.id ?? 0)
+          }
+        } else {
+          const availableSubjects = await getSupportSubjects()
+          if (!cancelled) { setSubjects(availableSubjects); setSubject(availableSubjects[0]?.id ?? 0) }
         }
       } catch (loadError) {
         if (!cancelled) setError(loadError instanceof Error ? loadError.message : 'ارتباط با پشتیبانی ممکن نشد.')
@@ -166,8 +167,8 @@ export function ContactPage({ onBack, onAccount }: Props) {
           <div className="support-section-heading"><div><h2>پیام جدید</h2><p className="muted">پیام شما محرمانه است و فقط تیم کفگیر آن را می‌بیند.</p></div></div>
           <form className="form-grid" onSubmit={createConversation}>
             <label className="field">موضوع
-              <select value={subject} onChange={(event) => setSubject(Number(event.target.value) as SupportConversationSubject)}>
-                {Object.entries(subjectLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+              <select value={subject} onChange={(event) => setSubject(Number(event.target.value))} required>
+                {subjects.map((item) => <option value={item.id} key={item.id}>{item.title}</option>)}
               </select>
             </label>
             <label className="field">سفارش مرتبط (اختیاری)
@@ -179,7 +180,7 @@ export function ContactPage({ onBack, onAccount }: Props) {
             <label className="field">متن پیام
               <textarea value={newMessage} onChange={(event) => setNewMessage(event.target.value)} maxLength={2000} placeholder="موضوع را با جزئیات برای ما بنویسید…" required />
             </label>
-            <button className="primary-button" disabled={isSubmitting || newMessage.trim().length < 2}>
+            <button className="primary-button" disabled={isSubmitting || subject <= 0 || newMessage.trim().length < 2}>
               {isSubmitting ? <ButtonLoading label="در حال ارسال" /> : 'ارسال پیام'}
             </button>
           </form>
@@ -192,7 +193,7 @@ export function ContactPage({ onBack, onAccount }: Props) {
           </div>
           {conversations.length === 0 ? <p className="support-empty">هنوز گفتگویی ندارید.</p> : <div className="support-conversation-list">
             {conversations.map((item) => <button type="button" className={`support-conversation-row${selected?.id === item.id ? ' active' : ''}`} onClick={() => void openConversation(item.id)} key={item.id}>
-              <span className="support-row-title"><strong>{subjectLabels[item.subject]}</strong>{item.unreadCount > 0 && <b className="support-unread">{item.unreadCount}</b>}</span>
+              <span className="support-row-title"><strong>{item.subjectTitle}</strong>{item.unreadCount > 0 && <b className="support-unread">{item.unreadCount}</b>}</span>
               <span>{item.lastMessage}</span><small>{statusLabels[item.status]} · {formatPersianDateTime(item.lastMessageAt)}</small>
             </button>)}
           </div>}
@@ -200,7 +201,7 @@ export function ContactPage({ onBack, onAccount }: Props) {
 
         {selected && <div className="panel support-thread-card">
           <div className="support-thread-head">
-            <div><h2>{subjectLabels[selected.subject]}</h2><p>{selected.orderNumber ? `سفارش #${selected.orderNumber}` : 'گفتگوی عمومی'}</p></div>
+            <div><h2>{selected.subjectTitle}</h2><p>{selected.orderNumber ? `سفارش #${selected.orderNumber}` : 'گفتگوی عمومی'}</p></div>
             <span className={`support-status status-${selected.status}`}>{statusLabels[selected.status]}</span>
           </div>
           <div className="support-messages" aria-live="polite">

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import {
   OrderReviewHandlingStatus,
   SupportConversationStatus,
-  SupportConversationSubject,
   SupportSenderType,
   type AdminOrderReviewDto,
   type AdminSupportConversationDto,
@@ -10,14 +9,6 @@ import {
 } from '@kafgir/contracts'
 import { adminApi } from './api'
 
-const subjectLabels: Record<SupportConversationSubject, string> = {
-  [SupportConversationSubject.OrderFollowUp]: 'پیگیری سفارش',
-  [SupportConversationSubject.Payment]: 'پرداخت',
-  [SupportConversationSubject.Delivery]: 'ارسال و تحویل',
-  [SupportConversationSubject.FoodQuality]: 'کیفیت غذا',
-  [SupportConversationSubject.SuggestionComplaint]: 'پیشنهاد یا انتقاد',
-  [SupportConversationSubject.Other]: 'سایر موارد',
-}
 const conversationStatusLabels: Record<SupportConversationStatus, string> = {
   [SupportConversationStatus.AwaitingAdmin]: 'منتظر پاسخ مدیریت',
   [SupportConversationStatus.AwaitingCustomer]: 'منتظر پاسخ مشتری',
@@ -123,7 +114,7 @@ export function CustomerCommunicationPage() {
         {loading && conversations.length === 0 ? <p className="communication-empty">در حال دریافت…</p> : conversations.length === 0 ? <p className="communication-empty">هنوز پیامی ثبت نشده است.</p> : <div className="communication-list">
           {conversations.map((item) => <button className={selected?.id === item.id ? 'active' : ''} onClick={() => void openConversation(item.id)} key={item.id}>
             <span><strong>{item.customerName}</strong>{item.unreadCount > 0 && <b>{item.unreadCount}</b>}</span>
-            <em>{subjectLabels[item.subject]}{item.orderNumber ? ` · سفارش #${item.orderNumber}` : ''}</em>
+            <em>{item.subjectTitle}{item.orderNumber ? ` · سفارش #${item.orderNumber}` : ''}</em>
             <small>{item.lastMessage}</small>
             <time>{conversationStatusLabels[item.status]} · {dateTime(item.lastMessageAt)}</time>
           </button>)}
@@ -131,7 +122,7 @@ export function CustomerCommunicationPage() {
       </section>
       <section className="panel communication-thread">
         {!selected ? <p className="communication-empty">برای مشاهده پیام‌ها یک گفتگو را انتخاب کنید.</p> : <>
-          <header><div><h2>{selected.customerName}</h2><bdi dir="ltr">{selected.customerPhoneNumber}</bdi><p>{subjectLabels[selected.subject]}{selected.orderNumber ? ` · سفارش #${selected.orderNumber}` : ''}</p></div><span className={`communication-status status-${selected.status}`}>{conversationStatusLabels[selected.status]}</span></header>
+          <header><div><h2>{selected.customerName}</h2><bdi dir="ltr">{selected.customerPhoneNumber}</bdi><p>{selected.subjectTitle}{selected.orderNumber ? ` · سفارش #${selected.orderNumber}` : ''}</p></div><span className={`communication-status status-${selected.status}`}>{conversationStatusLabels[selected.status]}</span></header>
           <div className="communication-messages">
             {selected.messages.map((message) => <article className={message.senderType === SupportSenderType.Admin ? 'mine' : 'customer'} key={message.id}>
               <strong>{message.senderType === SupportSenderType.Admin ? 'مدیریت' : message.senderName}</strong><p>{message.message}</p><time>{dateTime(message.createdAt)}</time>

@@ -350,3 +350,11 @@
   per-phone/per-IP verify limits with challenge locking. Admin and Telegram login untouched.
 - [x] Run `otp-rate-limit.integration.test.ts` against a migrated disposable PostgreSQL database;
   all 18 cases passed, including concurrent per-IP reservation and successful-code reuse rejection.
+- [x] Add master data for food-tag groups and support subjects with Admin management, Web consumption,
+  historical foreign keys and dynamic subject titles.
+- [x] Add hybrid payment/delivery settings with customer/manual availability, delivery fee and
+  minimum-order enforcement while preserving card-to-card code `2`.
+- [x] Consolidate payment enums, centralize notification enums, apply migration `0021` locally and
+  verify the seeded rows through `packages/server-core`.
+- [ ] Before production rollout, apply migration `0021_striped_thunderbolt_ross.sql` and review the
+  customer-visible methods, delivery fee and minimum order.

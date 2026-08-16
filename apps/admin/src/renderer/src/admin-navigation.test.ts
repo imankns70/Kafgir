@@ -13,7 +13,7 @@ describe('grouped admin navigation', () => {
     expect(pages).toEqual(expect.arrayContaining([
       'orders', 'manual', 'customer-communication', 'menu', 'report', 'foods', 'categories', 'tags', 'recipes',
       'ingredients', 'inventory', 'purchases', 'suppliers', 'shopping',
-      'finance', 'payments', 'v15-reports', 'logs',
+      'finance', 'payments', 'v15-reports', 'logs', 'reference-data',
       'social-dashboard', 'social-channels', 'social-publish', 'social-templates',
       'social-rules', 'social-suggestions', 'social-history',
     ]))

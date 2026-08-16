@@ -687,3 +687,17 @@
 - A future multi-instance deployment must supply an atomic Redis-backed `IRateLimitStore` with
   `isDistributed = true`. HMAC key derivation, policies and route integrations remain unchanged.
   Redis is not added in V1, and durable OTP-send reservations remain PostgreSQL-backed.
+
+## 2026-08-16 — Hybrid reference data
+
+- Store food-tag groups and support subjects as master data because operators need to add, rename,
+  order and disable them without a release. Preserve history through foreign keys and stable system
+  codes/keys.
+- Keep payment and delivery codes as typed behavior enums, while storing their titles, descriptions,
+  audience availability, order, fee and minimum in settings tables. The server remains authoritative
+  during order creation.
+- Preserve `CardToCard=2`; it is persisted historic data, not an unused enum gap. Replace the duplicate
+  customer-payment enum with the shared `PaymentMethod`.
+- Centralize notification channel/type/status enums. Keep workflow states code-defined because a new
+  state requires transition behavior and tests. Waste reasons are excluded from this iteration by
+  explicit user request.

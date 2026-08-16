@@ -3,7 +3,7 @@ import {
   PurchasePaymentStatus,
   PurchaseStatus,
   FinancialTransactionType,
-  CustomerPaymentMethod,
+  PaymentMethod,
   OrderStatus,
   PaymentStatus,
 } from '@kafgir/contracts'
@@ -72,7 +72,7 @@ integration.sequential('Kafgir 1.5 inventory and finance services', () => {
          delivery_address_line,status,payment_method,delivery_method,subtotal_amount,delivery_fee,
          total_amount,created_at)
       VALUES (${`IT-${suffix}`},${profileId},'Integration customer','09000000000','اندیمشک','آدرس تست',
-        ${OrderStatus.PendingConfirmation},${CustomerPaymentMethod.Cash},1,100,0,100,NOW()) RETURNING id`)[0]!.id
+        ${OrderStatus.PendingConfirmation},${PaymentMethod.Cash},1,100,0,100,NOW()) RETURNING id`)[0]!.id
   })
 
   afterAll(async () => {
@@ -190,7 +190,7 @@ integration.sequential('Kafgir 1.5 inventory and finance services', () => {
   it('creates, verifies, and refunds one customer payment with matching ledger rows', async () => {
     paymentId = await createPayment({
       orderId,
-      paymentMethod: CustomerPaymentMethod.Cash,
+      paymentMethod: PaymentMethod.Cash,
       financialAccountId: accountId,
       posTerminalId: null,
       amount: 100,

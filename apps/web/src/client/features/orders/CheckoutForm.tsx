@@ -5,14 +5,14 @@ import {
   requestCustomerOtp,
   verifyCustomerOtp,
 } from '../../services/customerApi'
-import { createOrder } from '../../services/ordersApi'
+import { createOrder, getOrderOptions } from '../../services/ordersApi'
 import { getTelegramInitData, getTelegramUser } from '../../services/telegram'
 import { cartItemIssue } from '../../services/cartReconciliation'
 import { Icon } from '../../design-system/Icon'
 import { ButtonLoading } from '../../design-system/ButtonLoading'
 import { DeliverySlotPicker } from './DeliverySlotPicker'
 import { SavedAddressPicker } from './SavedAddressPicker'
-import { formatNumber } from '../../utils/format'
+import { formatMoney, formatNumber } from '../../utils/format'
 import {
   DeliveryMethod,
   PaymentMethod,
@@ -21,6 +21,7 @@ import {
   type CustomerAddressDto,
   type CustomerProfileDto,
   type OrderDto,
+  type PublicOrderOptionsDto,
 } from '../../types'
 
 type FormState = { fullName: string; phoneNumber: string; addressLine: string; customerNote: string; deliveryMethod: DeliveryMethod; paymentMethod: PaymentMethod }
@@ -50,6 +51,8 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  const [isLoadingOptions, setIsLoadingOptions] = useState(true)
+  const [orderOptions, setOrderOptions] = useState<PublicOrderOptionsDto | null>(null)
   const [authentication, setAuthentication] = useState<AuthenticationState>('checking')
   const [authenticationMethod, setAuthenticationMethod] = useState<'telegram' | 'phone' | null>(null)
   const [customerProfile, setCustomerProfile] = useState<CustomerProfileDto | null>(null)
@@ -66,6 +69,11 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   const cartIssue = items.map(cartItemIssue).find((issue): issue is string => Boolean(issue)) ?? null
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }))
   const selectedSavedAddress = savedAddresses.find((address) => address.id.toString() === selectedAddressId)
+  const selectedDelivery = orderOptions?.deliveryMethods.find((item) => item.method === form.deliveryMethod)
+  const selectedPayment = orderOptions?.paymentMethods.find((item) => item.method === form.paymentMethod)
+  const cartSubtotal = items.reduce((sum, item) =>
+    sum + (item.unitPrice + (item.withPersianRice ? item.persianRicePrice ?? 0 : 0)) * item.quantity, 0)
+  const isBelowMinimum = Boolean(selectedDelivery && cartSubtotal < selectedDelivery.minimumOrderAmount)
 
   const applyProfile = useCallback((profile: CustomerProfileDto, requireConfirmedPhone: boolean) => {
     setCustomerProfile(profile)
@@ -118,6 +126,21 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     void loadProfile()
     return () => { isActive = false }
   }, [applyProfile])
+
+  useEffect(() => {
+    let active = true
+    void getOrderOptions().then((options) => {
+      if (!active) return
+      setOrderOptions(options)
+      const delivery = options.deliveryMethods[0]
+      const payment = options.paymentMethods[0]
+      if (delivery) setField('deliveryMethod', delivery.method)
+      if (payment) setField('paymentMethod', payment.method)
+    }).catch((reason) => {
+      if (active) setError(reason instanceof Error ? reason.message : 'دریافت روش‌های سفارش ممکن نشد.')
+    }).finally(() => { if (active) setIsLoadingOptions(false) })
+    return () => { active = false }
+  }, [])
 
   useEffect(() => {
     if (resendSeconds <= 0) return
@@ -177,6 +200,8 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     if (!form.phoneNumber.trim()) return setError('شماره موبایل الزامی است.')
     if (form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && !form.addressLine.trim()) return setError('آدرس برای ارسال سفارش الزامی است.')
     if (items.length === 0) return setError('حداقل یک غذا به سبد خرید اضافه کنید.')
+    if (!selectedDelivery || !selectedPayment) return setError('روش پرداخت یا دریافت معتبری انتخاب نشده است.')
+    if (isBelowMinimum) return setError(`حداقل مبلغ سفارش برای این روش ${formatMoney(selectedDelivery.minimumOrderAmount)} است.`)
     if (isCheckingCart) return setError('لطفاً تا پایان بررسی موجودی صبر کنید.')
     if (!isCartVerified) return setError('پیش از ثبت سفارش، موجودی سبد را دوباره بررسی کنید.')
     if (cartIssue) return setError(cartIssue)
@@ -296,17 +321,17 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     <label className="field">شماره موبایل{authentication === 'guest' ? ' (برای ورود و پیگیری سفارش)' : ''}<input className="ltr-value" dir="ltr" value={form.phoneNumber} onChange={(e) => setField('phoneNumber', e.target.value)} inputMode="tel" autoComplete="tel" readOnly={authenticationMethod === 'phone'} /></label>
     <div className="form-grid two-columns">
       <label className="field">روش دریافت<select value={form.deliveryMethod} onChange={(e) => setField('deliveryMethod', Number(e.target.value) as DeliveryMethod)}>
-        <option value={DeliveryMethod.Delivery}>ارسال</option><option value={DeliveryMethod.Pickup}>تحویل حضوری</option>
+        {orderOptions?.deliveryMethods.map((item) => <option key={item.method} value={item.method}>{item.title}</option>)}
       </select></label>
       <label className="field">روش پرداخت<select value={form.paymentMethod} onChange={(e) => setField('paymentMethod', Number(e.target.value) as PaymentMethod)}>
-        <option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.Pos}>دستگاه پوز</option><option value={PaymentMethod.Online}>پرداخت آنلاین</option>
+        {orderOptions?.paymentMethods.map((item) => <option key={item.method} value={item.method}>{item.title}</option>)}
       </select></label>
     </div>
     <div className="form-hint">
-      {form.paymentMethod === PaymentMethod.Cash && 'وجه نقد هنگام تحویل یا دریافت حضوری پرداخت می‌شود.'}
-      {form.paymentMethod === PaymentMethod.Pos && 'پرداخت با دستگاه پوز هنگام تحویل یا دریافت حضوری انجام می‌شود.'}
-      {form.paymentMethod === PaymentMethod.Online && 'پس از ثبت سفارش به مرحله پرداخت آنلاین هدایت می‌شوید.'}
+      {selectedPayment?.description}
+      {selectedDelivery && selectedDelivery.deliveryFee > 0 && <> · هزینه ارسال: {formatMoney(selectedDelivery.deliveryFee)}</>}
     </div>
+    {isBelowMinimum && <div className="form-error" role="alert">حداقل مبلغ سفارش برای این روش {formatMoney(selectedDelivery!.minimumOrderAmount)} است.</div>}
     {form.deliveryMethod === DeliveryMethod.Delivery && savedAddresses.length > 0 && <SavedAddressPicker
       addresses={savedAddresses}
       selectedAddressId={selectedAddressId}
@@ -317,7 +342,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} />
     <label className="field">توضیح سفارش<textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
     {error && <div className="form-error" role="alert">{error}</div>}
-    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || showLogin || !isCartVerified || Boolean(cartIssue) || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting
+    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || isLoadingOptions || showLogin || !isCartVerified || Boolean(cartIssue) || isBelowMinimum || !selectedDelivery || !selectedPayment || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting
       ? <ButtonLoading label={form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} />
       : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
   </form>

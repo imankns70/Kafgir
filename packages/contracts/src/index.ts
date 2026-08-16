@@ -1,30 +1,13 @@
 import { z } from 'zod'
 export * from './social.js'
 export * from './support.js'
+export * from './order-enums.js'
+export * from './reference-data.js'
 import { isoDate, timeOfDay } from './delivery.js'
 import { PaymentStatus } from './v15.js'
+import { DeliveryMethod, OrderStatus, PaymentMethod } from './order-enums.js'
 export * from './v15.js'
 export * from './delivery.js'
-
-export enum PaymentMethod {
-  Cash = 1,
-  Online = 3,
-  Pos = 4,
-}
-
-export enum DeliveryMethod {
-  Pickup = 1,
-  Delivery = 2,
-}
-
-export enum OrderStatus {
-  PendingConfirmation = 1,
-  Confirmed = 2,
-  Preparing = 3,
-  Ready = 4,
-  Delivered = 5,
-  Cancelled = 6,
-}
 
 export const nullableText = z.string().trim().nullable().optional()
 
@@ -45,9 +28,26 @@ export function normalizePersianSearch(value: string | null | undefined) {
     .toLocaleLowerCase('fa')
 }
 
-export const foodTagGroupSchema = z.enum([
-  'status', 'protein', 'diet', 'taste', 'serving', 'service', 'style', 'marketing',
-])
+export const foodTagGroupCodeSchema = z.string().trim().regex(/^[a-z][a-z0-9-]{1,39}$/u,
+  'کد گروه باید با حروف انگلیسی کوچک نوشته شود.')
+export const foodTagGroupSchema = foodTagGroupCodeSchema
+
+export const foodTagGroupDtoSchema = z.object({
+  code: foodTagGroupCodeSchema,
+  title: z.string(),
+  displayOrder: z.number().int().nonnegative(),
+  isActive: z.boolean(),
+  isSystem: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const foodTagGroupWriteSchema = z.object({
+  code: foodTagGroupCodeSchema,
+  title: z.string().trim().min(1).max(100),
+  displayOrder: z.number().int().nonnegative(),
+  isActive: z.boolean().default(true),
+})
 
 const publicFoodTagSchema = z.object({
   id: z.number().int(),
@@ -743,6 +743,8 @@ export type FoodCategoryDto = z.infer<typeof foodCategorySchema>
 export type FoodCategoryWriteRequest = z.infer<typeof foodCategoryWriteSchema>
 export type FoodTagDto = z.infer<typeof foodTagSchema>
 export type FoodTagWriteRequest = z.infer<typeof foodTagWriteSchema>
+export type FoodTagGroupDto = z.infer<typeof foodTagGroupDtoSchema>
+export type FoodTagGroupWriteRequest = z.infer<typeof foodTagGroupWriteSchema>
 export type FoodImageDto = z.infer<typeof foodImageSchema>
 export type FoodImageWriteRequest = z.infer<typeof foodImageWriteSchema>
 export type CustomerIdentityRequest = z.infer<typeof customerIdentitySchema>

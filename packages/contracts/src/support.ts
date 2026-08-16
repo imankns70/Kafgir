@@ -1,14 +1,5 @@
 import { z } from 'zod'
 
-export enum SupportConversationSubject {
-  OrderFollowUp = 1,
-  Payment = 2,
-  Delivery = 3,
-  FoodQuality = 4,
-  SuggestionComplaint = 5,
-  Other = 6,
-}
-
 export enum SupportConversationStatus {
   AwaitingAdmin = 1,
   AwaitingCustomer = 2,
@@ -26,6 +17,23 @@ export enum OrderReviewHandlingStatus {
   Resolved = 3,
 }
 
+export const supportSubjectDtoSchema = z.object({
+  id: z.number().int().positive(),
+  systemKey: z.string().nullable(),
+  title: z.string(),
+  displayOrder: z.number().int().nonnegative(),
+  isActive: z.boolean(),
+  isSystem: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const supportSubjectWriteSchema = z.object({
+  title: z.string().trim().min(1).max(120),
+  displayOrder: z.number().int().nonnegative(),
+  isActive: z.boolean().default(true),
+})
+
 export const supportConversationStatusSchema = z.nativeEnum(SupportConversationStatus)
 export const orderReviewHandlingStatusSchema = z.nativeEnum(OrderReviewHandlingStatus)
 
@@ -36,7 +44,7 @@ export const supportMessageWriteSchema = z.object({
 })
 
 export const customerSupportConversationCreateSchema = supportMessageWriteSchema.extend({
-  subject: z.nativeEnum(SupportConversationSubject),
+  subject: z.number().int().positive(),
   orderId: z.number().int().positive().nullable().optional(),
 })
 
@@ -53,7 +61,8 @@ export const supportMessageSchema = z.object({
 
 export const supportConversationSummarySchema = z.object({
   id: z.number().int().positive(),
-  subject: z.nativeEnum(SupportConversationSubject),
+  subject: z.number().int().positive(),
+  subjectTitle: z.string(),
   status: supportConversationStatusSchema,
   orderId: z.number().int().positive().nullable(),
   orderNumber: z.string().nullable(),
@@ -102,3 +111,5 @@ export type CustomerSupportConversationDto = z.infer<typeof customerSupportConve
 export type AdminSupportConversationSummaryDto = z.infer<typeof adminSupportConversationSummarySchema>
 export type AdminSupportConversationDto = z.infer<typeof adminSupportConversationSchema>
 export type AdminOrderReviewDto = z.infer<typeof adminOrderReviewSchema>
+export type SupportSubjectDto = z.infer<typeof supportSubjectDtoSchema>
+export type SupportSubjectWriteRequest = z.infer<typeof supportSubjectWriteSchema>

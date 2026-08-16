@@ -1,9 +1,6 @@
 import { sqlClient } from '../db/client'
 import { errorFields, logger } from '../logging/logger'
-
-const pending = 1
-const sent = 2
-const failed = 3
+import { NotificationChannel, NotificationStatus } from '@kafgir/contracts'
 
 type NotificationRow = {
   id: number
@@ -22,7 +19,7 @@ export async function processNotifications(batchSize = 25): Promise<number> {
     const rows = await tx<NotificationRow[]>`
       SELECT id, target, text, retry_count AS "retryCount"
       FROM notification_messages
-      WHERE channel = 1 AND status = ${pending}
+      WHERE channel = ${NotificationChannel.Telegram} AND status = ${NotificationStatus.Pending}
         AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
       ORDER BY created_at
       FOR UPDATE SKIP LOCKED
@@ -49,7 +46,7 @@ export async function processNotifications(batchSize = 25): Promise<number> {
       if (!response.ok || !body.ok) throw new Error(body.description || `Telegram HTTP ${response.status}`)
       await sqlClient`
         UPDATE notification_messages
-        SET status = ${sent}, sent_at = NOW(), last_error = NULL, next_attempt_at = NULL
+        SET status = ${NotificationStatus.Sent}, sent_at = NOW(), last_error = NULL, next_attempt_at = NULL
         WHERE id = ${message.id}
       `
       logger.info({ event: 'notification.sent', notificationId: message.id }, 'اعلان تلگرام ارسال شد')
@@ -62,7 +59,7 @@ export async function processNotifications(batchSize = 25): Promise<number> {
       await sqlClient`
         UPDATE notification_messages
         SET retry_count = ${retries},
-            status = ${terminal ? failed : pending},
+            status = ${terminal ? NotificationStatus.Failed : NotificationStatus.Pending},
             last_error = ${String(error).slice(0, 1000)},
             next_attempt_at = ${terminal ? null : new Date(Date.now() + delaySeconds * 1000)}
         WHERE id = ${message.id}

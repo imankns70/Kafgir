@@ -6,6 +6,7 @@ import {
   financialEntrySchema,
   foodCategoryWriteSchema,
   foodTagWriteSchema,
+  foodTagGroupWriteSchema,
   foodWriteSchema,
   ingredientWriteSchema,
   inventoryAdjustmentSchema,
@@ -33,6 +34,11 @@ import {
   supportConversationStatusSchema,
   supportConversationCloseSchema,
   supportMessageWriteSchema,
+  supportSubjectWriteSchema,
+  paymentMethodSettingWriteSchema,
+  deliveryMethodSettingWriteSchema,
+  PaymentMethod,
+  DeliveryMethod,
   type OrderReportQuery,
 } from '@kafgir/contracts'
 import {
@@ -126,6 +132,16 @@ import {
   replyToOrderReview,
   setAdminOrderReviewStatus,
   setAdminSupportConversationClosed,
+  createFoodTagGroup,
+  updateFoodTagGroup,
+  listFoodTagGroups,
+  createSupportSubject,
+  updateSupportSubject,
+  listSupportSubjects,
+  listPaymentMethodSettings,
+  updatePaymentMethodSetting,
+  listDeliveryMethodSettings,
+  updateDeliveryMethodSetting,
 } from '@kafgir/server-core'
 import { readServerLogs } from '@kafgir/server-core/logging/read-logs'
 import type { AdminOperation } from '../shared/admin-operations'
@@ -175,6 +191,29 @@ export async function dispatchAdminOperation(
     case 'foodTags.list': return listFoodTags(true)
     case 'foodTags.create': return createFoodTag(foodTagWriteSchema.parse(body.value))
     case 'foodTags.update': return updateFoodTag(numberField(body, 'id'), foodTagWriteSchema.parse(body.value))
+    case 'referenceData.get': {
+      const [foodTagGroups, supportSubjects, paymentMethods, deliveryMethods] = await Promise.all([
+        listFoodTagGroups(true), listSupportSubjects(true),
+        listPaymentMethodSettings('all'), listDeliveryMethodSettings('all'),
+      ])
+      return { foodTagGroups, supportSubjects, paymentMethods, deliveryMethods }
+    }
+    case 'foodTagGroups.create': return createFoodTagGroup(foodTagGroupWriteSchema.parse(body.value))
+    case 'foodTagGroups.update':
+      return updateFoodTagGroup(textField(body, 'code'), foodTagGroupWriteSchema.parse(body.value))
+    case 'supportSubjects.create': return createSupportSubject(supportSubjectWriteSchema.parse(body.value))
+    case 'supportSubjects.update':
+      return updateSupportSubject(numberField(body, 'id'), supportSubjectWriteSchema.parse(body.value))
+    case 'paymentMethods.update':
+      return updatePaymentMethodSetting(
+        Number(body.method) as PaymentMethod,
+        paymentMethodSettingWriteSchema.parse(body.value),
+      )
+    case 'deliveryMethods.update':
+      return updateDeliveryMethodSetting(
+        Number(body.method) as DeliveryMethod,
+        deliveryMethodSettingWriteSchema.parse(body.value),
+      )
     case 'foods.list': return listFoods()
     case 'foods.create': return createFood(foodWriteSchema.parse(body.value))
     case 'foods.update': return updateFood(numberField(body, 'id'), foodWriteSchema.parse(body.value))

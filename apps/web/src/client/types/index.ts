@@ -4,7 +4,6 @@ export {
   OrderStatus,
   PaymentMethod,
   SupportConversationStatus,
-  SupportConversationSubject,
   SupportSenderType,
 } from '@kafgir/contracts'
 import type { CartItem as ContractCartItem } from '@kafgir/contracts'
@@ -40,7 +39,9 @@ export type {
   OrderReviewWriteRequest,
   OrderSummaryDto,
   PublicDailyMenuPageDto,
+  PublicOrderOptionsDto,
   PersianRiceDto,
   SupportConversationSummaryDto,
   SupportMessageWriteRequest,
+  SupportSubjectDto,
 } from '@kafgir/contracts'

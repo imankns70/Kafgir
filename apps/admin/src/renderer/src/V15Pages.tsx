@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import {
   FinancialAccountType,
-  CustomerPaymentMethod,
+  PaymentMethod,
   InventoryTransactionType,
   PaymentStatus,
   PurchasePaymentMethod,
@@ -642,26 +642,26 @@ export function PaymentsPage() {
   const [terminals,setTerminals]=useState<PosTerminalDto[]>([])
   const [orders,setOrders]=useState<Awaited<ReturnType<typeof adminApi.orders>>>([])
   const [orderDate,setOrderDate]=useState(today())
-  const [methodValue,setMethodValue]=useState<CustomerPaymentMethod>(CustomerPaymentMethod.Cash)
+  const [methodValue,setMethodValue]=useState<PaymentMethod>(PaymentMethod.Cash)
   const [paymentAccountId,setPaymentAccountId]=useState(0)
   const [paymentFilter,setPaymentFilter]=useState<'all'|'pending'|'successful'|'failed'|'refunded'>('all')
   const load=useCallback(async()=>{try{const[p,a,t,o]=await Promise.all([adminApi.payments(),adminApi.financialAccounts(),adminApi.posTerminals(),adminApi.orders({date:orderDate})]);setItems(p);setAccounts(a);setTerminals(t);setOrders(o)}catch(e){setMessage(submitError(e))}},[orderDate])
   useEffect(()=>{void load()},[load])
   const status:Record<number,string>={[PaymentStatus.Pending]:'در انتظار',[PaymentStatus.AwaitingVerification]:'در انتظار تأیید',[PaymentStatus.Paid]:'پرداخت‌شده',[PaymentStatus.Failed]:'ناموفق',[PaymentStatus.Rejected]:'ردشده',[PaymentStatus.Cancelled]:'لغوشده',[PaymentStatus.Refunded]:'مستردشده'}
-  const method:Record<number,string>={[CustomerPaymentMethod.Cash]:'نقدی',[CustomerPaymentMethod.OnlineGateway]:'آنلاین',[CustomerPaymentMethod.Pos]:'پوز'}
+  const method:Record<number,string>={[PaymentMethod.Cash]:'نقدی',[PaymentMethod.CardToCard]:'کارت‌به‌کارت',[PaymentMethod.Online]:'آنلاین',[PaymentMethod.Pos]:'پوز'}
   const successful=items.filter(x=>x.status===PaymentStatus.Paid)
   const failed=items.filter(x=>[PaymentStatus.Failed,PaymentStatus.Rejected,PaymentStatus.Cancelled].includes(x.status))
   const pending=items.filter(x=>[PaymentStatus.Pending,PaymentStatus.AwaitingVerification].includes(x.status))
   const refunded=items.filter(x=>x.status===PaymentStatus.Refunded)
   const visiblePayments=paymentFilter==='successful'?successful:paymentFilter==='failed'?failed:paymentFilter==='pending'?pending:paymentFilter==='refunded'?refunded:items
-  const create=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const d=new FormData(event.currentTarget);try{await adminApi.createPayment({orderId:Number(d.get('orderId')),paymentMethod:methodValue,financialAccountId:Number(d.get('accountId')),posTerminalId:methodValue===CustomerPaymentMethod.Pos?Number(d.get('posTerminalId')):null,amount:Number(d.get('amount')),trackingNumber:String(d.get('trackingNumber')??'')||null,referenceNumber:null,receiptImageUrl:null,description:String(d.get('description')??'')||null});event.currentTarget.reset();setMessage('پرداخت سفارش ثبت شد.');await load()}catch(e){setMessage(submitError(e))}}
+  const create=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const d=new FormData(event.currentTarget);try{await adminApi.createPayment({orderId:Number(d.get('orderId')),paymentMethod:methodValue,financialAccountId:Number(d.get('accountId')),posTerminalId:methodValue===PaymentMethod.Pos?Number(d.get('posTerminalId')):null,amount:Number(d.get('amount')),trackingNumber:String(d.get('trackingNumber')??'')||null,referenceNumber:null,receiptImageUrl:null,description:String(d.get('description')??'')||null});event.currentTarget.reset();setMessage('پرداخت سفارش ثبت شد.');await load()}catch(e){setMessage(submitError(e))}}
   const change=async(id:number,next:number)=>{try{await adminApi.changePaymentStatus(id,next);setMessage('وضعیت پرداخت ثبت شد.');await load()}catch(e){setMessage(submitError(e))}}
   return <Frame title="پرداخت‌ها"><PageGuide content={paymentGuide} /><form className="panel v15-form" onSubmit={create}><h2>پرداخت جدید</h2>
     <label>تاریخ سفارش<input type="date" value={orderDate} onChange={(e)=>setOrderDate(e.target.value)}/></label>
     <label>سفارش<select name="orderId" required><option value="">انتخاب</option>{orders.map(x=><option key={x.id} value={x.id}>{x.orderNumber} — {x.customerFullName} — {money(x.totalAmount)}</option>)}</select></label>
-    <label>روش<select value={methodValue} onChange={(e)=>setMethodValue(Number(e.target.value) as CustomerPaymentMethod)}><option value={CustomerPaymentMethod.Cash}>نقدی</option><option value={CustomerPaymentMethod.OnlineGateway}>آنلاین</option><option value={CustomerPaymentMethod.Pos}>پوز</option></select></label>
+    <label>روش<select value={methodValue} onChange={(e)=>setMethodValue(Number(e.target.value) as PaymentMethod)}><option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.CardToCard}>کارت‌به‌کارت</option><option value={PaymentMethod.Online}>آنلاین</option><option value={PaymentMethod.Pos}>پوز</option></select></label>
     <label>حساب<select name="accountId" required value={paymentAccountId||''} onChange={(event)=>setPaymentAccountId(Number(event.target.value))}><option value="">انتخاب</option>{accounts.filter(x=>x.isActive).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
-    {methodValue===CustomerPaymentMethod.Pos&&<label>دستگاه پوز<select name="posTerminalId" required><option value="">انتخاب</option>{terminals.filter(x=>x.isActive&&x.financialAccountId===paymentAccountId).map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></label>}
+    {methodValue===PaymentMethod.Pos&&<label>دستگاه پوز<select name="posTerminalId" required><option value="">انتخاب</option>{terminals.filter(x=>x.isActive&&x.financialAccountId===paymentAccountId).map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></label>}
     <label>مبلغ<input name="amount" inputMode="numeric" required/></label><label>شماره پیگیری<input name="trackingNumber" dir="ltr"/></label><label>شرح<input name="description"/></label><button className="primary">ثبت پرداخت</button>
   </form><Feedback value={message}/>
   <section className="payment-status-overview" aria-label="خلاصه پرداخت مشتریان">
@@ -690,8 +690,8 @@ export function V15ReportsPage() {
   const[message,setMessage]=useState<string|null>(null)
   const load=async()=>{try{setData(await adminApi.v15Reports(from,to));setMessage(null)}catch(e){setMessage(submitError(e))}}
   const paymentMethod: Record<number, string> = {
-    [CustomerPaymentMethod.Cash]: 'نقدی', [CustomerPaymentMethod.OnlineGateway]: 'آنلاین',
-    [CustomerPaymentMethod.Pos]: 'پوز',
+    [PaymentMethod.Cash]: 'نقدی', [PaymentMethod.CardToCard]: 'کارت‌به‌کارت', [PaymentMethod.Online]: 'آنلاین',
+    [PaymentMethod.Pos]: 'پوز',
   }
   return <Frame title="گزارش‌های مدیریتی"><div className="panel v15-form"><label>از<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>تا<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label><button className="primary" onClick={()=>void load()}>نمایش گزارش</button></div><Feedback value={message}/>
     {data&&<><div className="metric-grid"><article className="metric"><span>دریافتی خالص</span><strong>{money(data.profit.income)}</strong></article><article className="metric"><span>هزینه</span><strong>{money(data.profit.expense)}</strong></article><article className="metric"><span>سود مدیریتی برآوردی</span><strong>{money(data.profit.income-data.profit.expense)}</strong></article></div>

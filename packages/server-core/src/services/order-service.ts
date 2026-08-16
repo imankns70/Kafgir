@@ -1,5 +1,8 @@
 import {
   DeliveryMethod,
+  NotificationChannel,
+  NotificationStatus,
+  NotificationType,
   OrderStatus,
   type CreateOrderRequest,
   type OrderDto,
@@ -212,6 +215,23 @@ export async function createOrder(
   const createdId = await sqlClient.begin(async (tx) => {
     const now = new Date()
     const nowSql = sqlTimestamp(now)
+    const paymentSettings = await tx<{ enabled: boolean }[]>`
+      SELECT CASE WHEN ${allowMissingTelegramIdentity}
+        THEN is_manual_enabled ELSE is_customer_enabled END AS enabled
+      FROM payment_method_settings WHERE method = ${request.paymentMethod} LIMIT 1
+    `
+    if (!paymentSettings[0]?.enabled) throw new AppError('روش پرداخت انتخاب‌شده در حال حاضر فعال نیست.')
+    const deliverySettings = await tx<{
+      enabled: boolean
+      deliveryFee: number
+      minimumOrderAmount: number
+    }[]>`
+      SELECT CASE WHEN ${allowMissingTelegramIdentity}
+        THEN is_manual_enabled ELSE is_customer_enabled END AS enabled,
+        delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount"
+      FROM delivery_method_settings WHERE method = ${request.deliveryMethod} LIMIT 1
+    `
+    if (!deliverySettings[0]?.enabled) throw new AppError('روش دریافت انتخاب‌شده در حال حاضر فعال نیست.')
     const customer = await resolveCustomer(tx, identity, fullName, phoneNumber, now, authenticatedUserId)
     let customerAddressId = request.customerAddressId ?? null
     let city = optionalText(request.city) ?? defaultCity
@@ -361,6 +381,11 @@ export async function createOrder(
     `
     const orderNumber = `${year}${(counters[0]?.value ?? 0) + 1}`
     const subtotal = orderLines.reduce((sum, line) => sum + line.menuItem.price * line.quantity, 0)
+    const deliveryFee = deliverySettings[0].deliveryFee
+    if (subtotal < deliverySettings[0].minimumOrderAmount) {
+      throw new AppError(`حداقل مبلغ سفارش برای این روش دریافت ${deliverySettings[0].minimumOrderAmount.toLocaleString('fa-IR')} تومان است.`)
+    }
+    const total = subtotal + deliveryFee
     const orderRows = await tx<{ id: number }[]>`
       INSERT INTO orders
         (order_number, customer_profile_id, customer_address_id, delivery_full_name,
@@ -372,8 +397,8 @@ export async function createOrder(
       VALUES
         (${orderNumber}, ${customer.profileId}, ${customerAddressId}, ${fullName},
          ${phoneNumber}, ${city}, ${addressLine}, ${OrderStatus.PendingConfirmation},
-         ${request.paymentMethod}, ${request.deliveryMethod}, ${subtotal}, 0,
-         ${subtotal}, ${optionalText(request.customerNote)},
+         ${request.paymentMethod}, ${request.deliveryMethod}, ${subtotal}, ${deliveryFee},
+         ${total}, ${optionalText(request.customerNote)},
          ${deliverySnapshot ? deliveryDate : null}::date, ${deliverySnapshot?.slotId ?? null},
          ${deliverySnapshot?.title ?? null},
          ${deliverySnapshot?.startTime ?? null}::time,
@@ -400,8 +425,9 @@ export async function createOrder(
         INSERT INTO notification_messages
           (channel, type, status, target, text, order_id, order_number, retry_count, created_at)
         VALUES
-          (1, 1, 1, ${adminChat},
-           ${`سفارش جدید کفگیر\nشماره سفارش: ${orderNumber}\nمشتری: ${fullName}\nموبایل: ${phoneNumber}\nمبلغ: ${subtotal.toLocaleString('en-US')} تومان\nآدرس: ${city}، ${addressLine}`},
+          (${NotificationChannel.Telegram}, ${NotificationType.NewOrderForAdmin},
+           ${NotificationStatus.Pending}, ${adminChat},
+           ${`سفارش جدید کفگیر\nشماره سفارش: ${orderNumber}\nمشتری: ${fullName}\nموبایل: ${phoneNumber}\nمبلغ: ${total.toLocaleString('en-US')} تومان\nآدرس: ${city}، ${addressLine}`},
            ${orderId}, ${orderNumber}, 0, ${nowSql})
       `
     }
@@ -422,8 +448,8 @@ export async function createOrder(
           deliveryMethod: request.deliveryMethod,
           paymentMethod: request.paymentMethod,
           subtotalAmount: subtotal,
-          deliveryFee: 0,
-          totalAmount: subtotal,
+          deliveryFee,
+          totalAmount: total,
           items: orderLines.map(({ menuItem, quantity }) => ({
             foodName: menuItem.name,
             unitPrice: menuItem.price,
@@ -434,7 +460,9 @@ export async function createOrder(
           INSERT INTO notification_messages
             (channel, type, status, target, text, order_id, order_number, retry_count, created_at)
           VALUES
-            (1, 3, 1, ${chats[0].chatId}, ${invoiceText}, ${orderId}, ${orderNumber}, 0, ${nowSql})
+            (${NotificationChannel.Telegram}, ${NotificationType.OrderInvoiceForCustomer},
+             ${NotificationStatus.Pending}, ${chats[0].chatId}, ${invoiceText},
+             ${orderId}, ${orderNumber}, 0, ${nowSql})
         `
       }
     }
@@ -628,7 +656,8 @@ export async function updateOrderStatus(id: number, request: UpdateOrderStatusRe
         INSERT INTO notification_messages
           (channel, type, status, target, text, order_id, order_number, retry_count, created_at)
         VALUES
-          (1, 2, 1, ${chats[0].chatId},
+          (${NotificationChannel.Telegram}, ${NotificationType.OrderStatusForCustomer},
+           ${NotificationStatus.Pending}, ${chats[0].chatId},
            ${`وضعیت سفارش شما در کفگیر تغییر کرد\nشماره سفارش: ${order.orderNumber}\nوضعیت: ${statusText[request.newStatus] ?? 'به‌روزرسانی شد'}`},
            ${id}, ${order.orderNumber}, 0, ${nowSql})
       `
