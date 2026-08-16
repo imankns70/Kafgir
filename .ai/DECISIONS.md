@@ -1,5 +1,11 @@
 # Decisions
 
+## 2026-08-16 — Electron release requires explicit approval
+
+- A successful Electron build or a completed feature does not authorize creating a GitHub Release.
+- Create an Electron version tag, installer release, or downloadable asset only after the user explicitly
+  requests that specific Electron release. Web/Netlify publication must not be interpreted as Electron publication.
+
 ## 2026-08-15 — Private asynchronous support instead of public reviews or live chat
 
 - Use durable asynchronous conversations rather than WebSocket/live presence. This fits the current

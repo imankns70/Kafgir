@@ -14,8 +14,8 @@
   record it in the Drizzle migration journal, and verify its tables, review columns, and indexes.
 - [ ] After migration and deployment, smoke-test one customer message, one Admin response, unread
   clearing, close/reopen, and one private reply to an order review.
-- [x] Publish Electron Admin `v1.0.2` and attach the generated Windows installer to its GitHub Release.
-- [ ] Install Electron Admin `v1.0.2` on the operator system and verify «ارتباط با مشتری» against Neon.
+- [x] Remove the unintended Electron Admin `v1.0.2` GitHub Release, installer assets, and tag; retain
+  `v1.0.1` as the only published Electron release.
 
 ## 2026-08-15 order-detail layout and production verification
 

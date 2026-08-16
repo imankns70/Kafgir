@@ -15,10 +15,10 @@
   both tables, all four review columns, all five expected indexes, and the Drizzle journal record were verified.
 - TypeScript checks passed for all four workspaces; Web unit tests (221), server-core tests (46), Admin
   tests (18), contracts/support tests, Web production build, and Electron production build passed.
-- Electron Admin `v1.0.2` was published from commit `bb86fbea2d86af18460aa20f4478562e89c29554`;
-  its GitHub Actions build passed and the Windows installer was attached to the release.
-- Remaining rollout work is restoring the Netlify production deployment, running the authenticated
-  customer/Admin production smoke test, and installing `v1.0.2` on the operator's Windows system.
+- The unintended Electron Admin `v1.0.2` GitHub Release, installer assets, and tag were removed on
+  2026-08-16 at the user's request. `v1.0.1` remains the only published Electron release.
+- Remaining rollout work is restoring the Netlify production deployment and running the authenticated
+  customer/Admin production smoke test. No Electron release is part of the current rollout.
 
 ## 2026-08-15 — Order-detail status layout and Netlify production gap
 
