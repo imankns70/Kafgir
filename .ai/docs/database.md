@@ -7,6 +7,7 @@ Kafgir uses PostgreSQL with Drizzle ORM.
 - Shared client factory: `packages/server-core/src/db/client.ts`
 - Seed utility: `apps/web/scripts/seed.ts`
 - One-time SQL Server importer: `apps/web/scripts/migrate-sqlserver.ts`
+  (order-number pre-flight rules: `apps/web/scripts/legacy-order-numbers.ts`)
 
 ## Model
 
@@ -59,6 +60,26 @@ PostgreSQL preserves:
 
 Order submission starts in `PendingConfirmation` and does not reserve capacity. Confirmation locks the order and referenced menu rows before incrementing sold portions. Cancellation restores portions when required. Persian-year order-number generation is serialized with a PostgreSQL transaction advisory lock.
 
+## Order numbers
+
+An order number is `<Persian business year><counter>`, where the counter is `MAX(numeric suffix) + 1`
+over every row sharing that year prefix, read under `pg_advisory_xact_lock`. Two properties are
+load-bearing and easy to break:
+
+- The suffix is compared **numerically**, not as text. The `::int` cast in the counter query is what
+  makes `140510` rank above `14059`; without it the counter stalls and reissues a taken number.
+- The lock plus READ COMMITTED is what makes concurrency safe: the waiter re-reads after the holder
+  commits. A stricter isolation level would reintroduce duplicates.
+
+`order-number.integration.test.ts` covers both, plus year isolation, non-numeric suffixes, and eight
+concurrent checkouts.
+
+The counter casts the suffix to `int`, so a row whose suffix exceeds `2147483647` makes the query
+throw and blocks all checkout for that year. The app's own numbering cannot reach that, but imported
+data can, so `migrate-sqlserver.ts` runs `inspectLegacyOrderNumbers` before copying anything and
+refuses the migration on oversized, over-long, empty, or duplicate values. Large-but-legal suffixes
+are warned about instead, because they permanently raise the counter for their year.
+
 Customer order history uses the immutable columns on `orders` and `order_items`; it never reconstructs
 historical addresses or prices from current profile/catalog rows. The list query aggregates order items,
 the latest payment state, persisted histories and review into one page query. Details enforce
@@ -69,4 +90,4 @@ select an explicit safe field allowlist and omit account IDs, receipt images and
 
 The guarded integration suite requires `TEST_DATABASE_URL` whose database name contains `test`. Local disposable PostgreSQL configuration is in `infra/postgres.compose.yml`.
 
-`drizzle.config.ts` loads the Next.js environment files, so `npm run db:migrate` uses `apps/web/.env.local` during local development.
+`drizzle.config.ts` loads the Next.js environment files, so `npm run db:migrate` uses `apps/web/.env.local` during local development. Electron Admin reads its own `apps/admin/.env.local` independently, with no mechanism keeping the two `DATABASE_URL` values in sync — see the `.env.local` warning in `.ai/docs/reference-data.md` for the incident this caused and the runtime guard that now catches it early.

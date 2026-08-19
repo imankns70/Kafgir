@@ -356,5 +356,11 @@
   minimum-order enforcement while preserving card-to-card code `2`.
 - [x] Consolidate payment enums, centralize notification enums, apply migration `0021` locally and
   verify the seeded rows through `packages/server-core`.
+- [x] Add a customer directory to Electron Admin with advanced search and a per-customer history pane.
+- [x] Add a customer report to Electron Admin covering customer mix, new/returning split and top
+  spenders, restricted to roles that own the customer relationship.
+- [x] Restructure the Electron Admin sidebar around the domain, split the combined «اطلاعات پایه»
+  page into one screen per entity, move checkout configuration to «تنظیمات», add the missing
+  واحدهای اندازه‌گیری screen, and filter navigation by role.
 - [ ] Before production rollout, apply migration `0021_striped_thunderbolt_ross.sql` and review the
   customer-visible methods, delivery fee and minimum order.

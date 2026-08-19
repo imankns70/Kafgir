@@ -701,3 +701,65 @@
 - Centralize notification channel/type/status enums. Keep workflow states code-defined because a new
   state requires transition behavior and tests. Waste reasons are excluded from this iteration by
   explicit user request.
+
+## 2026-08-17 — Admin information architecture
+
+- The sidebar groups destinations by what the operator is doing, not by which table backs the screen.
+  The sharpest line is between records that change during a working day and lists configured once and
+  then referenced, which is what separates «فروش و مشتریان» from «اطلاعات پایه».
+- A concept is reference data only when an operator can add a row and that row means something without
+  new code. Payment and delivery methods fail that test — their membership is fixed by an enum because
+  each value implies a handler — so they are checkout configuration under «تنظیمات», not master data.
+  By the same rule the reusable delivery windows are master data while the per-date capacity screen is
+  an operational decision and stays with sales.
+- Each master-data entity gets its own screen. One combined «اطلاعات پایه» page could not express
+  permissions: tag groups and units belong to the kitchen while checkout terms belong to the owner.
+- Sidebar entries declare the operation they need and are filtered by the signed-in roles, so a menu
+  item never leads to a permission error. Roles were already returned by `auth:login` and discarded.
+- The last customer- or manual-enabled payment/delivery method cannot be switched off. Order creation
+  rejects disabled methods, so emptying a channel breaks checkout with a message that reads like a
+  bug; pausing sales is `daily_menus.is_open`.
+- Per-entity IPC list operations replaced the aggregate `referenceData.get`, which forced any screen
+  needing one list — the tag editor, the manual-order form — to be granted the whole set including
+  payment terms.
+
+## 2026-08-17 — Electron schema-readiness guard
+
+- Root cause of "برچسب‌های غذا" throwing `relation "food_tag_groups" does not exist": Electron Admin
+  and the web app read independent `.env.local` files with no mechanism keeping `DATABASE_URL` in
+  sync. Migration 0021 was applied via `db:migrate`, which reads `apps/web/.env.local`; Electron's own
+  `apps/admin/.env.local` pointed at a different (Neon) database that never received it. Not a
+  migration or schema bug — verified the migration file, journal and FK backfill were all correct, and
+  applying `db:migrate` against Electron's actual `DATABASE_URL` fixed it cleanly with zero orphaned
+  rows.
+- Added `assertReferenceDataSchemaReady` (`packages/server-core/src/db/schema-guard.ts`), run once
+  when Electron connects. It checks for the four tables migration 0021 introduced and fails with a
+  Persian message naming the missing tables and the fix, instead of a raw `PostgresError` surfacing
+  from whichever screen happens to query first.
+- The guard is a short explicit table list, not a generic migration-journal diff: the packaged
+  Electron build does not ship `apps/web/drizzle` (see `apps/admin/package.json` `build.files`), so
+  there is no bundled manifest to compare against at runtime, and building one for a single incident
+  would be more machinery than the problem warrants.
+
+## Admin grid pagination happens in PostgreSQL, not in the renderer
+
+- Every growing admin grid pages in SQL. `packages/server-core/src/db/paginate.ts` holds the one
+  `resolvePaging` (1-based page → `LIMIT`/`OFFSET`), `pagedResult`, and `sortClause`; the shared
+  request/response shape lives in `packages/contracts/src/pagination.ts`.
+- The row count comes from `COUNT(*) OVER ()` inside the same query as the rows, not a second count
+  query. The count and the rows therefore cannot disagree about which `WHERE` clause applied — the
+  divergence that makes a filtered grid report the whole table's total is structurally impossible
+  rather than merely avoided by review.
+- Sortable columns come from an explicit whitelist keyed by UI sort name. A key that is not in the
+  map falls back to the domain default, so no UI string can reach SQL. Every `ORDER BY` ends in an
+  `id` tie-breaker; without one, rows with equal sort values can reorder between queries and the same
+  row appears on two pages.
+- `useServerPagedGrid` (`apps/admin/src/renderer/src/admin-ui.tsx`) owns the client half: a 300 ms
+  search debounce, a sequence guard so only the newest response may write state, and a reset to page
+  1 whenever a filter, search term or page size changes.
+- Lists that feed both a grid and a picker dropdown (foods, ingredients, suppliers, shopping lists)
+  keep an unpaged export alongside the paged one. The dispatcher pages only when the request actually
+  carries paging parameters, so a `<select>` still receives every row.
+- Small fixed lookups — categories, tags, units, delivery slots, payment/delivery methods, social
+  templates, financial accounts, POS terminals — stay client-paged. They are bounded by the business,
+  not by data growth, and a round trip per page would cost more than it saves.

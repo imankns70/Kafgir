@@ -558,6 +558,39 @@
 - Reference data is database-backed for food-tag groups, support subjects, payment presentation and
   availability, and delivery presentation/availability/fees/minimums. Electron Admin manages it
   through typed IPC; Web reads active customer options. Order creation enforces availability, fee
-  and minimum transactionally. Historic card-to-card code `2` remains valid; workflow states remain
-  typed enums and waste reasons are excluded by request. Migration `0021_striped_thunderbolt_ross.sql`
-  is applied to the configured development database. See `.ai/docs/reference-data.md`.
+  and minimum transactionally, and the last customer- or manual-enabled method of a channel cannot
+  be switched off. Historic card-to-card code `2` remains valid and is manual-only by default;
+  workflow states remain typed enums and waste reasons are excluded by request. Migration
+  `0021_striped_thunderbolt_ross.sql` is applied to the configured development database.
+- The Electron Admin sidebar is organised by domain, not by table: داشبورد plus فروش و مشتریان،
+  کاتالوگ غذا، انبار و تدارکات، مالی، شبکه‌های اجتماعی، اطلاعات پایه and تنظیمات. Each destination
+  declares the `AdminOperation` it needs, the sidebar hides what the signed-in roles may not open,
+  and every group carries an icon so the collapsed rail stays navigable. Master data lives on one
+  screen per entity — including a new واحدهای اندازه‌گیری screen for the existing units backend —
+  while payment and delivery method settings sit under تنظیمات because their membership is fixed by
+  an enum. See `.ai/docs/reference-data.md`.
+- Electron Admin has a customer directory at «فروش و مشتریان ← مشتریان» (`customers.search` /
+  `customers.detail`): master–detail lookup with a free-text box that routes to either the name or the
+  phone filter, plus advanced filters for given name, family name, channel, join-date range, activity
+  (all / never ordered / has ordered / lapsed by N days / has an active order), minimum orders,
+  minimum spend and city, five sort orders and paging. Kafgir stores one `preferred_name`, so the
+  family filter matches everything after the first space and a single-token name has none; both name
+  filters fold `ی`/`ي`, `ک`/`ك` and the zero-width non-joiner, so «علی پور», «علی‌پور» and «علیپور»
+  find the same customer. `normalizePersianName` and its SQL twin in the directory service must stay
+  in step — a drift makes name search fail silently, so a test asserts they agree. The detail pane shows lifetime totals, saved addresses, the last 200 orders
+  and reviews. Phone search normalises Persian and Arabic-Indic digits and treats `09…`, `+98…`,
+  `0098…` and bare-national forms as the same customer, so a partial trailing search also matches.
+  Sort keys map to a whitelisted `ORDER BY` fragment rather than reaching SQL as caller text.
+- Electron Admin has a customer report at «فروش و مشتریان ← گزارش مشتریان» (`reports.customers`),
+  covering the customer mix over a date range: total/new/active/returning customers, profiles that
+  never ordered, delivered revenue, average basket, orders per active customer, and the top 100
+  customers by delivered spend with channel, join date, order/delivered/cancelled counts and last
+  order. Revenue counts delivered orders only and order counts exclude cancellations, so the figures
+  are deliberately not comparable with the financial report, which counts recorded payments. The
+  operation is granted to Owner and OrderManager but not KitchenAdmin, because it aggregates customer
+  contact details across orders.
+- Migration 0021 is now applied to the database Electron Admin actually connects to (previously only
+  applied to the database `apps/web/.env.local` points at, a separate value from
+  `apps/admin/.env.local`). Electron now runs `assertReferenceDataSchemaReady` once at connect time
+  and fails with an actionable Persian message if a future migration drifts the same way. See the
+  `.env.local` warning in `.ai/docs/reference-data.md`.
