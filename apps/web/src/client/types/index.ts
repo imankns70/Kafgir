@@ -36,6 +36,7 @@ export type {
   MenuCartSnapshotDto,
   OrderDto,
   OrderReviewDto,
+  PendingOrderReviewDto,
   OrderReviewWriteRequest,
   OrderSummaryDto,
   PublicDailyMenuPageDto,

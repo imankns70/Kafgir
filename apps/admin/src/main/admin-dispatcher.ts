@@ -288,8 +288,16 @@ export async function dispatchAdminOperation(
       return setAdminSupportConversationClosed(principal.userId, numberField(body, 'id'), value.closed)
     }
     case 'support.reviews.list':
-      return listAdminOrderReviews(body.status == null
-        ? undefined : orderReviewHandlingStatusSchema.parse(Number(body.status)))
+      return listAdminOrderReviews({
+        handlingStatus: body.status == null
+          ? null : orderReviewHandlingStatusSchema.parse(Number(body.status)),
+        rating: body.rating == null ? null : Number(body.rating),
+        from: typeof body.from === 'string' ? body.from : null,
+        to: typeof body.to === 'string' ? body.to : null,
+        search: searchArg(body) || null,
+        page: pageArg(body),
+        pageSize: sizeArg(body),
+      })
     case 'support.reviews.setStatus':
       return setAdminOrderReviewStatus(
         principal.userId,

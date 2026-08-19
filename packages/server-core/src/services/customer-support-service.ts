@@ -10,7 +10,9 @@ import {
   type SupportConversationSummaryDto,
   type SupportMessageWriteRequest,
 } from '@kafgir/contracts'
+import type { PagedResult } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
+import { pagedResult, resolvePaging } from '../db/paginate'
 import { AppError, NotFoundError } from '../errors'
 import { logger } from '../logging/logger'
 
@@ -302,30 +304,68 @@ export async function setAdminSupportConversationClosed(
 type ReviewRow = Omit<AdminOrderReviewDto, 'createdAt' | 'updatedAt'> & {
   createdAt: DbDate
   updatedAt: DbDate | null
+  totalCount: number
 }
 
+/** Filters the admin review grid exposes. Every one of them narrows the count as well as the rows. */
+export type AdminOrderReviewQuery = {
+  handlingStatus?: OrderReviewHandlingStatus | null
+  rating?: number | null
+  from?: string | null
+  to?: string | null
+  search?: string | null
+  page?: number | null
+  pageSize?: number | null
+}
+
+/**
+ * The admin review grid. Pages in the database rather than truncating: the previous LIMIT 200
+ * silently hid older reviews once the shop accumulated more than that.
+ *
+ * Unrated-attention-first ordering is deliberate — new reviews, then lowest rating — so the
+ * complaints an operator must act on sit at the top instead of being buried by recent praise.
+ */
 export async function listAdminOrderReviews(
-  handlingStatus?: OrderReviewHandlingStatus,
-): Promise<AdminOrderReviewDto[]> {
+  query: AdminOrderReviewQuery = {},
+): Promise<PagedResult<AdminOrderReviewDto>> {
+  const paging = resolvePaging(query.page, query.pageSize)
+  const handlingStatus = query.handlingStatus ?? null
+  const rating = query.rating ?? null
+  const from = query.from || null
+  const to = query.to || null
+  const search = query.search?.trim() || null
   const rows = await sqlClient<ReviewRow[]>`
     SELECT r.id, r.order_id AS "orderId", o.order_number AS "orderNumber",
            r.customer_profile_id AS "customerProfileId", cp.preferred_name AS "customerName",
            cp.default_phone_number AS "customerPhoneNumber", r.rating, r.comment,
            r.handling_status AS "handlingStatus", c.id AS "conversationId",
-           r.created_at AS "createdAt", r.updated_at AS "updatedAt"
+           r.created_at AS "createdAt", r.updated_at AS "updatedAt",
+           COUNT(*) OVER ()::int AS "totalCount"
     FROM order_reviews r
     JOIN orders o ON o.id = r.order_id
     JOIN customer_profiles cp ON cp.id = r.customer_profile_id
     LEFT JOIN support_conversations c ON c.review_id = r.id
-    WHERE (${handlingStatus ?? null}::int IS NULL OR r.handling_status = ${handlingStatus ?? null})
-    ORDER BY (r.handling_status = ${OrderReviewHandlingStatus.New}) DESC, r.rating, r.created_at DESC
-    LIMIT 200
+    WHERE (${handlingStatus}::int IS NULL OR r.handling_status = ${handlingStatus})
+      AND (${rating}::int IS NULL OR r.rating = ${rating})
+      AND (${from}::date IS NULL OR r.created_at >= ${from}::date)
+      AND (${to}::date IS NULL OR r.created_at < (${to}::date + 1))
+      AND (${search}::text IS NULL
+           OR o.order_number ILIKE '%'||${search}||'%'
+           OR cp.preferred_name ILIKE '%'||${search}||'%'
+           OR cp.default_phone_number ILIKE '%'||${search}||'%')
+    ORDER BY (r.handling_status = ${OrderReviewHandlingStatus.New}) DESC, r.rating ASC,
+             r.created_at DESC, r.id DESC
+    LIMIT ${paging.limit} OFFSET ${paging.offset}
   `
-  return rows.map((row) => ({
-    ...row,
-    createdAt: isoDate(row.createdAt),
-    updatedAt: nullableIsoDate(row.updatedAt),
-  }))
+  return pagedResult(
+    rows.map(({ totalCount: _ignored, ...row }) => ({
+      ...row,
+      createdAt: isoDate(row.createdAt),
+      updatedAt: nullableIsoDate(row.updatedAt),
+    })),
+    rows[0]?.totalCount ?? 0,
+    paging,
+  )
 }
 
 export async function setAdminOrderReviewStatus(

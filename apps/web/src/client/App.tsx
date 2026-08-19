@@ -8,6 +8,7 @@ import { CartPage } from './features/cart/CartPage'
 import { ContactPage } from './features/contact/ContactPage'
 import { MenuPage } from './features/menu/MenuPage'
 import { OrderSuccess } from './features/orders/OrderSuccess'
+import { PostDeliveryReviewPrompt } from './features/orders/PostDeliveryReviewPrompt'
 import { ProfilePage } from './features/profile/ProfilePage'
 import { getTodayMenu, getTodayMenuCartSnapshot } from './services/menuApi'
 import { getCustomerSession, loginCustomerWithTelegram } from './services/customerApi'
@@ -296,6 +297,8 @@ function App() {
           </button>
         </nav>
       )}
+      {/* App-wide: a delivered order should surface wherever the customer happens to be. */}
+      <PostDeliveryReviewPrompt isAuthenticated={isCustomerAuthenticated} />
     </div>
   )
 }

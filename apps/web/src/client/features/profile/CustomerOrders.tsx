@@ -207,13 +207,25 @@ export function CustomerOrderDetails({ order, onBack, onReview }: {
   </main>
 }
 
-export function OrderReviewDialog({ orderNumber, review, busy, error, onClose, onSave }: {
+/** Shown as the customer picks a star, so the number has a meaning before they commit to it. */
+const ratingLabels: Record<number, string> = {
+  1: 'خیلی بد', 2: 'بد', 3: 'معمولی', 4: 'خوب', 5: 'عالی',
+}
+
+export function OrderReviewDialog({
+  orderNumber, review, busy, error, onClose, onSave, title, intro, onLater,
+}: {
   orderNumber: string
   review: OrderReviewDto | null
   busy: boolean
   error: string | null
   onClose: () => void
   onSave: (rating: number, comment: string) => void
+  /** The post-delivery prompt asks a warmer question than the order-history entry point. */
+  title?: string
+  intro?: string
+  /** Renders «بعداً». Only the automatic prompt offers it; the order-history dialog does not. */
+  onLater?: () => void
 }) {
   const [rating, setRating] = useState(review?.rating ?? 0)
   const [comment, setComment] = useState(review?.comment ?? '')
@@ -232,11 +244,13 @@ export function OrderReviewDialog({ orderNumber, review, busy, error, onClose, o
   }
   return <div ref={dialogRef} tabIndex={-1} className="review-dialog" role="dialog" aria-modal="true" aria-labelledby="review-title" onKeyDown={(event) => { if (event.key === 'Escape') onClose() }} onMouseDown={(event) => { if (event.currentTarget === event.target) onClose() }}>
     <div className="review-dialog-card">
-      <header><div><span>سفارش <bdi dir="ltr">#{orderNumber}</bdi></span><h2 id="review-title">امتیاز و نظر شما</h2></div><button className="icon-button" aria-label="بستن" onClick={onClose}><Icon name="cancel" size="md" /></button></header>
-      <fieldset className="star-rating"><legend>امتیاز شما</legend><div role="radiogroup" aria-label="امتیاز از یک تا پنج ستاره">{[1, 2, 3, 4, 5].map((star) => <button type="button" role="radio" aria-checked={rating === star} aria-label={`${formatNumber(star)} ستاره`} data-rating={star} tabIndex={rating === star || (rating === 0 && star === 1) ? 0 : -1} className={star <= rating ? 'selected' : ''} key={star} onClick={() => setRating(star)} onKeyDown={(event) => onStarKey(event, star)}><Icon name="rating" size="xl" /></button>)}</div></fieldset>
+      <header><div><span>سفارش <bdi dir="ltr">#{orderNumber}</bdi></span><h2 id="review-title">{title ?? 'امتیاز و نظر شما'}</h2>{intro && <p className="review-dialog-intro">{intro}</p>}</div><button className="icon-button" aria-label="بستن" onClick={onClose}><Icon name="cancel" size="md" /></button></header>
+      <fieldset className="star-rating"><legend>امتیاز شما</legend><div role="radiogroup" aria-label="امتیاز از یک تا پنج ستاره">{[1, 2, 3, 4, 5].map((star) => <button type="button" role="radio" aria-checked={rating === star} aria-label={`${formatNumber(star)} ستاره`} data-rating={star} tabIndex={rating === star || (rating === 0 && star === 1) ? 0 : -1} className={star <= rating ? 'selected' : ''} key={star} onClick={() => setRating(star)} onKeyDown={(event) => onStarKey(event, star)}><Icon name="rating" size="xl" /></button>)}</div>
+        <p className="star-rating-label" aria-live="polite">{rating > 0 ? ratingLabels[rating] : ' '}</p></fieldset>
       <label className="field">نظر شما <span className="optional-label">اختیاری</span><textarea maxLength={1000} rows={5} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="تجربه شما از این سفارش…" /><small>{formatNumber(comment.length)} از ۱۰۰۰ نویسه</small></label>
       {error && <div className="form-error" role="alert">{error}</div>}
       <button className="primary-button full-width" disabled={busy || rating === 0} onClick={() => onSave(rating, comment)}>{busy ? 'در حال ثبت…' : review ? 'ذخیره تغییرات' : 'ثبت امتیاز و نظر'}</button>
+      {onLater && <button className="secondary-button full-width" disabled={busy} onClick={onLater}>بعداً</button>}
     </div>
   </div>
 }

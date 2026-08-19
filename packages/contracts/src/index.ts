@@ -375,6 +375,16 @@ export const orderReviewSchema = orderReviewWriteSchema.extend({
   updatedAt: z.string().nullable(),
 })
 
+/**
+ * The one delivered-but-unrated order the customer is prompted about when they open the app.
+ * Carries only what the prompt renders; the full order is a separate fetch if they want it.
+ */
+export const pendingOrderReviewSchema = z.object({
+  orderId: z.number().int().positive(),
+  orderNumber: z.string(),
+  deliveredAt: z.string().nullable(),
+})
+
 export const customerPaymentDetailSchema = z.object({
   paymentMethod: z.nativeEnum(PaymentMethod),
   status: z.nativeEnum(PaymentStatus),
@@ -736,6 +746,7 @@ export type CustomerOrderSummaryDto = z.infer<typeof customerOrderSummarySchema>
 export type CustomerPaymentDetailDto = z.infer<typeof customerPaymentDetailSchema>
 export type OrderReviewDto = z.infer<typeof orderReviewSchema>
 export type OrderReviewWriteRequest = z.infer<typeof orderReviewWriteSchema>
+export type PendingOrderReviewDto = z.infer<typeof pendingOrderReviewSchema>
 export type CustomerProfileLookupRequest = z.infer<typeof customerProfileLookupSchema>
 export type CreateOrderRequest = z.infer<typeof createOrderSchema>
 export type OrderDto = z.infer<typeof orderSchema>

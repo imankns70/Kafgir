@@ -410,6 +410,9 @@ export const orders = pgTable('orders', {
   index('orders_status_created_at_idx').on(table.status, table.createdAt),
   // Serves both slot-capacity counting during checkout and the kitchen's dispatch-order listing.
   index('orders_delivery_date_slot_idx').on(table.deliveryDate, table.deliveryTimeSlotId),
+  // Serves the post-delivery rating lookup, which runs for every customer on every app open.
+  // Without it that query sequentially scans every order in the table.
+  index('orders_customer_status_idx').on(table.customerProfileId, table.status),
   index('orders_analytics_created_visitor_idx').on(table.createdAt, table.analyticsVisitorId)
     .where(sql`analytics_visitor_id IS NOT NULL`),
   check('orders_status_check', sql`${table.status} BETWEEN 1 AND 6`),

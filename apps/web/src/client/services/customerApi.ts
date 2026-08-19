@@ -10,6 +10,7 @@ import type {
   CustomerSupportConversationDto,
   OrderReviewDto,
   OrderReviewWriteRequest,
+  PendingOrderReviewDto,
   SupportConversationSummaryDto,
   SupportMessageWriteRequest,
   SupportSubjectDto,
@@ -85,6 +86,10 @@ export const confirmCustomerOrderDelivered = async (id: number) => {
 
 export const getCustomerOrder = (id: number) =>
   apiGet<CustomerOrderDetailDto>(`/api/customers/me/orders/${id}`)
+
+/** The delivered order the customer still owes a rating for, or null when there is none. */
+export const getPendingOrderReview = () =>
+  apiGet<PendingOrderReviewDto | null>("/api/customers/me/orders/pending-review")
 
 export const saveCustomerOrderReview = (id: number, value: OrderReviewWriteRequest) =>
   apiPut<OrderReviewDto>(`/api/customers/me/orders/${id}/review`, value)

@@ -1832,3 +1832,10 @@ select:disabled {
   .customer-orders-skeleton span,.review-dialog-card { animation:none }
 }
 .support-opening { color:var(--muted);font-size:11px;font-style:normal }
+
+/* Post-delivery rating prompt: the warmer question and the live star meaning. */
+.review-dialog-intro { margin:6px 0 0;color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
+.star-rating-label { min-height:1.4em;margin:0;color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption);font-weight:700;text-align:center }
+.review-thanks-card { justify-items:center;text-align:center }
+.review-thanks-card h2 { margin:0 }
+.review-thanks-card p { margin:0;color:var(--kafgir-color-text-muted) }

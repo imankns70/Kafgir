@@ -550,8 +550,14 @@ export const adminApi = {
     socialInvoke<AdminSupportConversationDto>('support.conversations.reply', { id, value: { message } }, true),
   setSupportConversationClosed: (id: number, closed: boolean) =>
     socialInvoke<AdminSupportConversationDto>('support.conversations.setClosed', { id, value: { closed } }, true),
-  orderReviews: (status?: OrderReviewHandlingStatus) =>
-    socialInvoke<AdminOrderReviewDto[]>('support.reviews.list', { status }),
+  orderReviews: (
+    filters: { status?: OrderReviewHandlingStatus | null; rating?: number | null
+      from?: string | null; to?: string | null; search?: string | null } = {},
+    paging?: PageRequest,
+  ) =>
+    socialInvoke<PagedResult<AdminOrderReviewDto>>('support.reviews.list', {
+      ...filters, page: paging?.page, pageSize: paging?.pageSize,
+    }),
   setOrderReviewStatus: (id: number, status: OrderReviewHandlingStatus) =>
     socialInvoke<void>('support.reviews.setStatus', { id, status }, true),
   replyToOrderReview: (id: number, message: string) =>

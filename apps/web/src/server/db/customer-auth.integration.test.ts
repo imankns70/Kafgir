@@ -5,8 +5,10 @@ import {
 } from '@kafgir/contracts'
 import postgres from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { listAdminOrderReviews } from '@kafgir/server-core'
 import {
   getCustomerOrderDetail,
+  getPendingOrderReview,
   listCustomerOrderCards,
   saveCustomerOrderReview,
 } from '../services/customer-order-service'
@@ -187,6 +189,75 @@ integration('customer authentication, order ownership and reviews', () => {
       .rejects.toMatchObject({ status: 400 })
     await expect(saveCustomerOrderReview(secondUserId, deliveredOrderId, { rating: 5 }))
       .rejects.toMatchObject({ status: 404 })
+  })
+
+  /**
+   * The lookup behind the post-delivery prompt. These run in order: the first asserts the
+   * delivered order is offered, the last asserts rating it clears the prompt.
+   */
+  it('offers a delivered unrated order as the pending rating', async () => {
+    await sql`DELETE FROM order_reviews WHERE order_id = ${deliveredOrderId}`
+    await expect(getPendingOrderReview(firstUserId)).resolves.toMatchObject({ orderId: deliveredOrderId })
+  })
+
+  it('does not offer pending or cancelled orders for rating', async () => {
+    await sql`DELETE FROM order_reviews WHERE order_id = ${deliveredOrderId}`
+    // Only the delivered order may be offered, never the pending or cancelled ones beside it.
+    const pending = await getPendingOrderReview(firstUserId)
+    expect(pending?.orderId).toBe(deliveredOrderId)
+    expect([pendingOrderId, cancelledOrderId]).not.toContain(pending?.orderId)
+  })
+
+  it('offers nothing to a customer with no delivered orders', async () => {
+    await expect(getPendingOrderReview(secondUserId)).resolves.toBeNull()
+  })
+
+  it('stops offering an order once it has been rated', async () => {
+    await saveCustomerOrderReview(firstUserId, deliveredOrderId, { rating: 5, comment: null })
+    await expect(getPendingOrderReview(firstUserId)).resolves.toBeNull()
+  })
+
+  it('does not create a review merely by looking up the pending rating', async () => {
+    await sql`DELETE FROM order_reviews WHERE order_id = ${deliveredOrderId}`
+    await getPendingOrderReview(firstUserId)
+    const count = await sql<{ count: number }[]>`
+      SELECT COUNT(*)::int AS count FROM order_reviews WHERE order_id = ${deliveredOrderId}
+    `
+    expect(count[0]?.count).toBe(0)
+  })
+
+  it('keeps a single review when the same rating is submitted concurrently', async () => {
+    await sql`DELETE FROM order_reviews WHERE order_id = ${deliveredOrderId}`
+    // Double-clicking submit, or a retried request, must not race two rows past the unique index.
+    await Promise.all([
+      saveCustomerOrderReview(firstUserId, deliveredOrderId, { rating: 4, comment: null }),
+      saveCustomerOrderReview(firstUserId, deliveredOrderId, { rating: 4, comment: null }),
+    ])
+    const count = await sql<{ count: number }[]>`
+      SELECT COUNT(*)::int AS count FROM order_reviews WHERE order_id = ${deliveredOrderId}
+    `
+    expect(count[0]?.count).toBe(1)
+  })
+
+  it('accepts a rating without a comment and rejects an out-of-range rating', async () => {
+    await sql`DELETE FROM order_reviews WHERE order_id = ${deliveredOrderId}`
+    await expect(saveCustomerOrderReview(firstUserId, deliveredOrderId, { rating: 3 }))
+      .resolves.toMatchObject({ rating: 3, comment: null })
+    // The database check constraint is the backstop behind the Zod schema.
+    await expect(sql`
+      INSERT INTO order_reviews (order_id, customer_profile_id, rating, created_at)
+      VALUES (${pendingOrderId}, ${firstProfileId}, 9, NOW())
+    `).rejects.toMatchObject({ code: '23514' })
+  })
+
+  it('surfaces a submitted review in the admin grid and narrows it by filter', async () => {
+    await sql`DELETE FROM order_reviews WHERE order_id = ${deliveredOrderId}`
+    await saveCustomerOrderReview(firstUserId, deliveredOrderId, { rating: 5, comment: 'عالی' })
+    const page = await listAdminOrderReviews({ page: 1, pageSize: 10 })
+    expect(page.items.some((review) => review.orderId === deliveredOrderId)).toBe(true)
+    // The filter must narrow the reported total, not merely the rows on screen.
+    const lowOnly = await listAdminOrderReviews({ rating: 1, page: 1, pageSize: 10 })
+    expect(lowOnly.totalItems).toBeLessThan(page.totalItems)
   })
 
   it('enforces one account per verified phone', async () => {

@@ -8,8 +8,19 @@ import {
   type AdminSupportConversationSummaryDto,
 } from '@kafgir/contracts'
 import { adminApi } from './api'
-import { useAsyncAction } from './admin-ui'
+import {
+  AdminControls, DateField, Pager, RowNumberCell, RowNumberHead, useAsyncAction, useServerPagedGrid,
+} from './admin-ui'
 import { formatPersianDateTime } from './number-format'
+
+/** Server-side filters for the review grid; every one narrows the total, not just the page. */
+type ReviewFilters = {
+  search?: string | null
+  status: OrderReviewHandlingStatus | null
+  rating: number | null
+  from: string | null
+  to: string | null
+}
 
 const conversationStatusLabels: Record<SupportConversationStatus, string> = {
   [SupportConversationStatus.AwaitingAdmin]: 'منتظر پاسخ مدیریت',
@@ -24,7 +35,13 @@ const reviewStatusLabels: Record<OrderReviewHandlingStatus, string> = {
 export function CustomerCommunicationPage() {
   const [tab, setTab] = useState<'chat' | 'reviews'>('chat')
   const [conversations, setConversations] = useState<AdminSupportConversationSummaryDto[]>([])
-  const [reviews, setReviews] = useState<AdminOrderReviewDto[]>([])
+  // Reviews page in the database; the grid holds only the page being shown.
+  const pagedReviews = useServerPagedGrid<AdminOrderReviewDto, ReviewFilters>(
+    ({ page, pageSize, search, status, rating, from, to }) =>
+      adminApi.orderReviews({ status, rating, from, to, search }, { page, pageSize }),
+    { status: null, rating: null, from: null, to: null },
+  )
+  const reviews = pagedReviews.items
   const [selected, setSelected] = useState<AdminSupportConversationDto | null>(null)
   const [reply, setReply] = useState('')
   const [reviewReplyId, setReviewReplyId] = useState<number | null>(null)
@@ -38,12 +55,12 @@ export function CustomerCommunicationPage() {
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const [chatItems, reviewItems] = await Promise.all([adminApi.supportConversations(), adminApi.orderReviews()])
-      setConversations(chatItems); setReviews(reviewItems)
+      const [chatItems] = await Promise.all([adminApi.supportConversations(), pagedReviews.refresh()])
+      setConversations(chatItems)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'دریافت ارتباطات مشتریان ممکن نشد.')
     } finally { setLoading(false) }
-  }, [])
+  }, [pagedReviews.refresh])
 
   useEffect(() => { void load() }, [load])
 
@@ -140,22 +157,63 @@ export function CustomerCommunicationPage() {
       </section>
     </div>}
 
-    {tab === 'reviews' && <section className="communication-review-list">
-      {loading && reviews.length === 0 ? <p className="panel communication-empty">در حال دریافت…</p> : reviews.length === 0 ? <p className="panel communication-empty">هنوز نظری ثبت نشده است.</p> : reviews.map((review) => <article className="panel communication-review" key={review.id}>
-        <header><div><h2>{review.customerName}</h2><bdi dir="ltr">{review.customerPhoneNumber}</bdi></div><span className={`review-status review-status-${review.handlingStatus}`}>{reviewStatusLabels[review.handlingStatus]}</span></header>
-        <div className="review-meta"><span>سفارش #{review.orderNumber}</span><span className="review-stars" aria-label={`${review.rating} از ۵`}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span><time>{formatPersianDateTime(review.updatedAt ?? review.createdAt)}</time></div>
-        <p>{review.comment || 'مشتری فقط امتیاز ثبت کرده است.'}</p>
-        <div className="review-actions">
-          {review.handlingStatus === OrderReviewHandlingStatus.New && <button onClick={() => void updateReviewStatus(review.id, OrderReviewHandlingStatus.Seen)} disabled={submitting}>{submitting ? "در حال ثبت…" : "بررسی شد"}</button>}
-          {review.handlingStatus !== OrderReviewHandlingStatus.Resolved && <button onClick={() => void updateReviewStatus(review.id, OrderReviewHandlingStatus.Resolved)} disabled={submitting}>{submitting ? "در حال ثبت…" : "رسیدگی شد"}</button>}
-          {review.conversationId && <button onClick={() => { setTab('chat'); void openConversation(review.conversationId!) }}>مشاهده گفتگو</button>}
+    {tab === 'reviews' && <>
+    <AdminControls>
+      <div className="toolbar">
+        <label>جست‌وجو<input type="search" value={pagedReviews.search}
+          onChange={(event) => pagedReviews.setSearch(event.target.value)}
+          placeholder="شماره سفارش، نام یا موبایل مشتری" /></label>
+        <label>امتیاز<select value={pagedReviews.filters.rating ?? ''}
+          onChange={(event) => pagedReviews.setFilters({ rating: event.target.value ? Number(event.target.value) : null })}>
+          <option value="">همه امتیازها</option>
+          {[1, 2, 3, 4, 5].map((star) => <option key={star} value={star}>{star} ستاره</option>)}
+        </select></label>
+        <label>وضعیت رسیدگی<select value={pagedReviews.filters.status ?? ''}
+          onChange={(event) => pagedReviews.setFilters({ status: event.target.value ? Number(event.target.value) as OrderReviewHandlingStatus : null })}>
+          <option value="">همه وضعیت‌ها</option>
+          {Object.entries(reviewStatusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select></label>
+        <DateField label="از" allowClear value={pagedReviews.filters.from ?? ''}
+          onChange={(value) => pagedReviews.setFilters({ from: value || null })} />
+        <DateField label="تا" allowClear value={pagedReviews.filters.to ?? ''}
+          onChange={(value) => pagedReviews.setFilters({ to: value || null })} />
+        <button type="button" onClick={() => pagedReviews.resetFilters()}>پاک کردن</button>
+      </div>
+    </AdminControls>
+    <section className="panel table-wrap">
+      <table><thead><tr>
+        <RowNumberHead /><th>سفارش</th><th>مشتری</th><th>امتیاز</th><th>نظر</th>
+        <th>زمان ثبت</th><th>وضعیت رسیدگی</th><th>عملیات</th>
+      </tr></thead>
+      <tbody>{reviews.map((review, index) => <tr key={review.id}>
+        <RowNumberCell offset={pagedReviews.rowOffset} index={index} />
+        <td><bdi dir="ltr">#{review.orderNumber}</bdi></td>
+        <td>{review.customerName}<br /><bdi dir="ltr">{review.customerPhoneNumber}</bdi></td>
+        <td><span className="review-stars" aria-label={`${review.rating} از ۵`}>{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</span></td>
+        <td className="review-comment-cell">{review.comment || '—'}</td>
+        <td>{formatPersianDateTime(review.createdAt)}</td>
+        <td><span className={`review-status review-status-${review.handlingStatus}`}>{reviewStatusLabels[review.handlingStatus]}</span></td>
+        <td className="actions">
+          {review.handlingStatus === OrderReviewHandlingStatus.New && <button disabled={submitting} onClick={() => void updateReviewStatus(review.id, OrderReviewHandlingStatus.Seen)}>بررسی شد</button>}
+          {review.handlingStatus !== OrderReviewHandlingStatus.Resolved && <button disabled={submitting} onClick={() => void updateReviewStatus(review.id, OrderReviewHandlingStatus.Resolved)}>رسیدگی شد</button>}
+          {review.conversationId && <button onClick={() => { setTab('chat'); void openConversation(review.conversationId!) }}>گفتگو</button>}
           <button className="primary" onClick={() => setReviewReplyId(reviewReplyId === review.id ? null : review.id)}>پاسخ خصوصی</button>
-        </div>
-        {reviewReplyId === review.id && <form className="review-reply-form" onSubmit={(event) => void answerReview(event, review.id)}>
-          <label>پیام خصوصی به مشتری<textarea value={reviewReply} onChange={(event) => setReviewReply(event.target.value)} maxLength={2000} required /></label>
-          <button className="primary" disabled={submitting || reviewReply.trim().length < 2}>{submitting ? "در حال ارسال…" : "ارسال و ایجاد گفتگو"}</button>
-        </form>}
-      </article>)}
-    </section>}
+        </td>
+      </tr>)}</tbody></table>
+      {reviews.length === 0 && <p className="communication-empty">{
+        pagedReviews.loading ? 'در حال دریافت…'
+          : pagedReviews.filtered ? 'نظری با این فیلترها پیدا نشد.'
+            : 'هنوز نظری ثبت نشده است.'
+      }</p>}
+    </section>
+    <Pager {...pagedReviews} />
+    {reviewReplyId !== null && <form className="panel review-reply-form" onSubmit={(event) => void answerReview(event, reviewReplyId)}>
+      <label>پیام خصوصی به مشتری<textarea value={reviewReply} onChange={(event) => setReviewReply(event.target.value)} maxLength={2000} required /></label>
+      <div className="actions">
+        <button className="primary" disabled={submitting || reviewReply.trim().length < 2}>{submitting ? 'در حال ارسال…' : 'ارسال و ایجاد گفتگو'}</button>
+        <button type="button" onClick={() => { setReviewReplyId(null); setReviewReply('') }}>انصراف</button>
+      </div>
+    </form>}
+    </>}
   </section>
 }

@@ -763,3 +763,20 @@
 - Small fixed lookups — categories, tags, units, delivery slots, payment/delivery methods, social
   templates, financial accounts, POS terminals — stay client-paged. They are bounded by the business,
   not by data growth, and a round trip per page would cost more than it saves.
+
+## Post-delivery rating uses the existing OrderReview model, prompted by lookup on app open
+
+- `order_reviews` is the single authoritative order-rating system. The audit found no competing
+  implementation to consolidate: one table, one contract, one service, one dialog. Food Like and
+  Food Favorite are unrelated product features and were left untouched.
+- The prompt is driven by `getPendingOrderReview`, a lookup that runs when an authenticated customer
+  opens the app — not by a delivery event. Orders are marked delivered while the customer is
+  elsewhere, so anything requiring them to be present at that moment would rarely fire.
+- Eligibility (ownership, Delivered status, no existing review) is decided in the service layer
+  against the database. The client sends only an order id; the customer comes from the session.
+- One review per order is guaranteed by `order_reviews_order_uidx` plus `ON CONFLICT (order_id)`,
+  not by disabling the button. Repeated or concurrent submits update the single row.
+- Dismissal («بعداً») is remembered in sessionStorage per order, so the prompt stops nagging within
+  a visit while the order stays eligible to rate later from order history.
+- Added `orders_customer_status_idx` (migration 0022). Measured at 200k orders the pending-rating
+  lookup went from a 25ms sequential scan to 0.16ms; it runs for every customer on every app open.

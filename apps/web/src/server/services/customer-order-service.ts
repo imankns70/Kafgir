@@ -5,6 +5,7 @@ import {
   type CustomerOrdersPageDto,
   type OrderReviewDto,
   type OrderReviewWriteRequest,
+  type PendingOrderReviewDto,
 } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
 import { AppError, NotFoundError } from '../errors'
@@ -197,6 +198,32 @@ export async function getCustomerOrderDetail(userId: number, orderId: number): P
       updatedAt: nullableIsoDate(review.updatedAt),
     } : null,
   }
+}
+
+/**
+ * The order the customer should be prompted to rate, or null when there is nothing to ask about.
+ *
+ * Eligibility is decided here, not by the caller: the order must belong to this authenticated
+ * customer, must have actually reached Delivered, and must not already carry a review. Oldest
+ * first, so a backlog drains in the order the customer experienced it rather than newest-first.
+ *
+ * `LIMIT 1` keeps this cheap enough to run on every app open — the prompt only ever needs one
+ * order, so there is no reason to read the customer's history to find it.
+ */
+export async function getPendingOrderReview(userId: number): Promise<PendingOrderReviewDto | null> {
+  const profileId = await profileIdForUser(userId)
+  const rows = await sqlClient<Array<{ orderId: number; orderNumber: string; deliveredAt: DbDate | null }>>`
+    SELECT o.id AS "orderId", o.order_number AS "orderNumber", o.delivered_at AS "deliveredAt"
+    FROM orders o
+    WHERE o.customer_profile_id = ${profileId}
+      AND o.status = ${OrderStatus.Delivered}
+      AND NOT EXISTS (SELECT 1 FROM order_reviews r WHERE r.order_id = o.id)
+    ORDER BY COALESCE(o.delivered_at, o.created_at) ASC, o.id ASC
+    LIMIT 1
+  `
+  const row = rows[0]
+  if (!row) return null
+  return { orderId: row.orderId, orderNumber: row.orderNumber, deliveredAt: nullableIsoDate(row.deliveredAt) }
 }
 
 export async function saveCustomerOrderReview(
