@@ -32,7 +32,14 @@ import type {
   StockCountRequest,
   SupplierWriteRequest,
   WasteWriteRequest,
+  CustomerReportDto,
+  CustomerDirectoryQuery,
+  CustomerDirectoryPageDto,
+  CustomerDetailDto,
+  PageRequest,
+  PagedResult,
   UnitDto,
+  UnitWriteRequest,
   IngredientDto,
   SupplierDto,
   FinancialAccountDto,
@@ -99,6 +106,22 @@ const notifyMutation = (kind: ToastKind, message: string) => {
 
 const isMutation = (method: string) => method.toUpperCase() !== 'GET'
 
+/** Serialises paging plus a grid's own filters, skipping anything unset. */
+const pageQuery = (paging?: PageRequest, extra: Record<string, unknown> = {}) => {
+  const params = new URLSearchParams()
+  if (paging) { params.set('page', String(paging.page)); params.set('pageSize', String(paging.pageSize)) }
+  for (const [key, value] of Object.entries(extra)) {
+    if (value !== undefined && value !== null && value !== '') params.set(key, String(value))
+  }
+  return params.toString()
+}
+
+/** Pulls the shared paging pair out of a query string, omitting absent values. */
+const pageParams = (params: URLSearchParams) => ({
+  page: params.has('page') ? Number(params.get('page')) : undefined,
+  pageSize: params.has('pageSize') ? Number(params.get('pageSize')) : undefined,
+})
+
 const directOperation = (
   path: string,
   method: string,
@@ -115,10 +138,8 @@ const directOperation = (
     'POST /api/admin/food-categories': 'foodCategories.create',
     'GET /api/admin/food-tags': 'foodTags.list',
     'POST /api/admin/food-tags': 'foodTags.create',
-    'GET /api/admin/foods': 'foods.list',
     'POST /api/admin/foods': 'foods.create',
     'GET /api/admin/units': 'units.list',
-    'GET /api/admin/suppliers': 'suppliers.list',
     'POST /api/admin/suppliers': 'suppliers.create',
     'GET /api/admin/purchases': 'purchases.list',
     'POST /api/admin/purchases': 'purchases.create',
@@ -131,7 +152,6 @@ const directOperation = (
     'POST /api/admin/financial-transactions/transfers': 'finance.transfer',
     'GET /api/admin/pos-terminals': 'finance.posTerminals',
     'POST /api/admin/pos-terminals': 'finance.createPosTerminal',
-    'GET /api/admin/shopping-lists': 'shopping.list',
     'POST /api/admin/shopping-lists': 'shopping.create',
     'GET /api/admin/payments': 'payments.list',
     'POST /api/admin/payments': 'payments.create',
@@ -150,6 +170,30 @@ const directOperation = (
     if (operation === 'finance.createEntry') {
       const value = body as { kind: string; entry: unknown }
       return { operation, payload: { kind: value.kind, value: value.entry } }
+    }
+    // Paginated reads carry their filters and paging in the query string; the generic branch below
+    // discards them, which would silently return page 1 forever.
+    if (operation === 'purchases.list') {
+      return {
+        operation,
+        payload: {
+          status: params.has('status') ? Number(params.get('status')) : undefined,
+          ...pageParams(params),
+        },
+      }
+    }
+    if (operation === 'payments.list') {
+      return { operation, payload: { bucket: params.get('bucket') || undefined, ...pageParams(params) } }
+    }
+    if (operation === 'finance.transactions') {
+      return {
+        operation,
+        payload: {
+          from: params.get('from') || undefined,
+          to: params.get('to') || undefined,
+          ...pageParams(params),
+        },
+      }
     }
     return { operation, payload: body === undefined ? undefined : { value: body } }
   }
@@ -178,6 +222,7 @@ const directOperation = (
           deliveryMethod: numeric('deliveryMethod'),
           paymentMethod: numeric('paymentMethod'),
           foodName: params.get('foodName') || undefined,
+          ...pageParams(params),
         },
       },
     }
@@ -189,7 +234,16 @@ const directOperation = (
     return { operation: 'orders.create', payload: { value: body } }
   }
   if (pathname === '/api/admin/ingredients' && method === 'GET') {
-    return { operation: 'ingredients.list', payload: { search: params.get('search') ?? '' } }
+    return { operation: 'ingredients.list', payload: { search: params.get('search') ?? '', ...pageParams(params) } }
+  }
+  if (pathname === '/api/admin/foods' && method === 'GET') {
+    return { operation: 'foods.list', payload: { search: params.get('search') ?? '', ...pageParams(params) } }
+  }
+  if (pathname === '/api/admin/suppliers' && method === 'GET') {
+    return { operation: 'suppliers.list', payload: { search: params.get('search') ?? '', ...pageParams(params) } }
+  }
+  if (pathname === '/api/admin/shopping-lists' && method === 'GET') {
+    return { operation: 'shopping.list', payload: { search: params.get('search') ?? '', ...pageParams(params) } }
   }
   if (pathname === '/api/admin/ingredients' && method === 'POST') {
     return { operation: 'ingredients.create', payload: { value: body } }
@@ -197,7 +251,10 @@ const directOperation = (
   if (pathname === '/api/admin/inventory' && method === 'GET') {
     return {
       operation: 'inventory.movements',
-      payload: { ingredientId: params.has('ingredientId') ? Number(params.get('ingredientId')) : undefined },
+      payload: {
+        ingredientId: params.has('ingredientId') ? Number(params.get('ingredientId')) : undefined,
+        ...pageParams(params),
+      },
     }
   }
   if (pathname === '/api/admin/inventory/adjustments' && method === 'POST') {
@@ -350,12 +407,10 @@ export const adminApi = {
     request<FoodTagDto>('/api/admin/food-tags', 'POST', tag),
   updateFoodTag: (id: number, tag: FoodTagWriteRequest) =>
     request<FoodTagDto>(`/api/admin/food-tags/${id}`, 'PUT', tag),
-  referenceData: () => socialInvoke<{
-    foodTagGroups: FoodTagGroupDto[]
-    supportSubjects: SupportSubjectDto[]
-    paymentMethods: PaymentMethodSettingDto[]
-    deliveryMethods: DeliveryMethodSettingDto[]
-  }>('referenceData.get'),
+  foodTagGroups: () => socialInvoke<FoodTagGroupDto[]>('foodTagGroups.list'),
+  supportSubjects: () => socialInvoke<SupportSubjectDto[]>('supportSubjects.list'),
+  paymentMethods: () => socialInvoke<PaymentMethodSettingDto[]>('paymentMethods.list'),
+  deliveryMethods: () => socialInvoke<DeliveryMethodSettingDto[]>('deliveryMethods.list'),
   createFoodTagGroup: (value: FoodTagGroupWriteRequest) =>
     socialInvoke<FoodTagGroupDto>('foodTagGroups.create', { value }, true),
   updateFoodTagGroup: (code: string, value: FoodTagGroupWriteRequest) =>
@@ -369,6 +424,8 @@ export const adminApi = {
   updateDeliveryMethod: (method: DeliveryMethod, value: DeliveryMethodSettingWriteRequest) =>
     socialInvoke<DeliveryMethodSettingDto>('deliveryMethods.update', { method, value }, true),
   foods: () => request<FoodDto[]>('/api/admin/foods'),
+  foodsPaged: (paging?: PageRequest, search?: string | null) =>
+    request<PagedResult<FoodDto>>(`/api/admin/foods?${pageQuery(paging, { search })}`),
   createFood: (food: FoodWriteRequest) => request<FoodDto>('/api/admin/foods', 'POST', food),
   updateFood: (id: number, food: FoodWriteRequest) => request<void>(`/api/admin/foods/${id}`, 'PUT', food),
   uploadFoodImage: (file: File) => file.arrayBuffer().then((bytes) =>
@@ -391,27 +448,35 @@ export const adminApi = {
     Object.entries(query).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') params.set(key, String(value))
     })
-    return request<OrderSummaryDto[]>(`/api/admin/orders?${params}`)
+    return request<PagedResult<OrderSummaryDto>>(`/api/admin/orders?${params}`)
   },
   order: (id: number) => request<OrderDto>(`/api/admin/orders/${id}`),
   createOrder: (order: CreateOrderRequest) => request<OrderDto>('/api/admin/orders', 'POST', order),
   updateOrderStatus: (id: number, update: UpdateOrderStatusRequest) =>
     request<void>(`/api/admin/orders/${id}/status`, 'PATCH', update),
   units: () => request<UnitDto[]>('/api/admin/units'),
+  saveUnit: (id: number | null, value: UnitWriteRequest) =>
+    socialInvoke<void>('units.save', { id, value }, true),
   ingredients: (search = '') => request<IngredientDto[]>(`/api/admin/ingredients?search=${encodeURIComponent(search)}`),
+  ingredientsPaged: (paging?: PageRequest, search?: string | null) =>
+    request<PagedResult<IngredientDto>>(`/api/admin/ingredients?${pageQuery(paging, { search })}`),
   createIngredient: (value: IngredientWriteRequest) => request<void>('/api/admin/ingredients', 'POST', value),
   updateIngredient: (id: number, value: IngredientWriteRequest) => request<void>(`/api/admin/ingredients/${id}`, 'PUT', value),
   suppliers: () => request<SupplierDto[]>('/api/admin/suppliers'),
+  suppliersPaged: (paging?: PageRequest, search?: string | null) =>
+    request<PagedResult<SupplierDto>>(`/api/admin/suppliers?${pageQuery(paging, { search })}`),
   createSupplier: (value: SupplierWriteRequest) => request<void>('/api/admin/suppliers', 'POST', value),
   updateSupplier: (id: number, value: SupplierWriteRequest) => request<void>(`/api/admin/suppliers/${id}`, 'PUT', value),
-  purchases: () => request<PurchaseSummaryDto[]>('/api/admin/purchases'),
+  purchases: (status?: number, paging?: PageRequest) =>
+    request<PagedResult<PurchaseSummaryDto>>(`/api/admin/purchases?${pageQuery(paging, { status })}`),
   createPurchase: (value: PurchaseWriteRequest) => request<{ id: number }>('/api/admin/purchases', 'POST', value),
   confirmPurchase: (id: number) => request<void>(`/api/admin/purchases/${id}/confirm`, 'POST'),
   cancelPurchase: (id: number) => request<void>(`/api/admin/purchases/${id}/cancel`, 'POST'),
   registerPurchasePayment: (value: PurchasePaymentWriteRequest) =>
     request<void>('/api/admin/purchase-payments', 'POST', value),
-  inventoryMovements: (ingredientId?: number) => request<InventoryMovementDto[]>(
-    `/api/admin/inventory${ingredientId ? `?ingredientId=${ingredientId}` : ''}`),
+  inventoryMovements: (ingredientId?: number, paging?: PageRequest) =>
+    request<PagedResult<InventoryMovementDto>>(
+      `/api/admin/inventory?${pageQuery(paging, { ingredientId })}`),
   adjustInventory: (value: InventoryAdjustmentRequest) =>
     request<void>('/api/admin/inventory/adjustments', 'POST', value),
   registerWaste: (value: WasteWriteRequest) => request<void>('/api/admin/waste', 'POST', value),
@@ -424,10 +489,10 @@ export const adminApi = {
     request<void>('/api/admin/financial-accounts', 'POST', value),
   updateFinancialAccount: (id: number, value: FinancialAccountWriteRequest) =>
     request<void>(`/api/admin/financial-accounts/${id}`, 'PUT', value),
-  financialTransactions: () => request<Array<{
+  financialTransactions: (paging?: PageRequest, range?: { from?: string; to?: string }) => request<PagedResult<{
     id: number; transactionType: number; financialAccountName: string; amount: number;
     transactionDate: string; categoryName: string | null; description: string;
-  }>>('/api/admin/financial-transactions'),
+  }>>(`/api/admin/financial-transactions?${pageQuery(paging, range ?? {})}`),
   createFinancialEntry: (kind: 'income' | 'expense', entry: {
     financialAccountId: number; amount: number; categoryId?: number | null; description: string
   }) => request<void>('/api/admin/financial-transactions', 'POST', { kind, entry }),
@@ -447,11 +512,18 @@ export const adminApi = {
     currentStock: string; shortageQuantity: string; estimatedUnitCost: number; estimatedPurchaseCost: number;
   }>>(`/api/admin/shopping-lists/requirements?from=${from}&to=${to}`),
   shoppingLists: () => request<ShoppingListSummaryDto[]>('/api/admin/shopping-lists'),
+  shoppingListsPaged: (paging?: PageRequest, search?: string | null) =>
+    request<PagedResult<ShoppingListSummaryDto>>(`/api/admin/shopping-lists?${pageQuery(paging, { search })}`),
   createShoppingList: (value: {
     title: string; targetDate: string; items: Array<{ ingredientId: number; requiredQuantity: string;
       currentStockSnapshot: string; suggestedPurchaseQuantity: string; estimatedUnitCost: number }>
   }) => request<{ id: number }>('/api/admin/shopping-lists', 'POST', value),
-  payments: () => request<CustomerPaymentDto[]>('/api/admin/payments'),
+  payments: (paging?: PageRequest, bucket?: string) =>
+    request<PagedResult<CustomerPaymentDto>>(`/api/admin/payments?${pageQuery(paging, { bucket })}`),
+  /** Totals across every payment, so the metric cards do not count only the visible page. */
+  paymentTotals: () => socialInvoke<Record<
+    'successful' | 'failed' | 'pending' | 'refunded', { count: number; amount: number }
+  >>('payments.totals'),
   createPayment: (value: PaymentWriteRequest) => request<{ id: number }>('/api/admin/payments', 'POST', value),
   changePaymentStatus: (id: number, status: number) =>
     request<void>(`/api/admin/payments/${id}/status`, 'PATCH', { status }),
@@ -463,6 +535,11 @@ export const adminApi = {
     usage: Array<{ name: string; unit: string; purchase: string | null; consumption: string | null; waste: string | null; closing: string }>;
     waste: Array<{ name: string; quantity: string; cost: number }>;
   }>(`/api/admin/reports/v15?from=${from}&to=${to}`),
+  searchCustomers: (query: CustomerDirectoryQuery) =>
+    socialInvoke<CustomerDirectoryPageDto>('customers.search', { value: query }),
+  customerDetail: (id: number) => socialInvoke<CustomerDetailDto>('customers.detail', { id }),
+  customerReport: (from: string, to: string) =>
+    socialInvoke<CustomerReportDto>('reports.customers', { value: { from, to } }),
   serverLogs: (limit = 500) => request<LogEntry[]>(`/api/admin/logs?limit=${limit}`),
   desktopLogs: (limit = 500) => window.kafgir.desktopLogs(limit) as Promise<LogEntry[]>,
   supportConversations: (status?: SupportConversationStatus) =>

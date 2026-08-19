@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { join, resolve } from 'node:path'
 import {
   authenticateAdmin,
+  assertReferenceDataSchemaReady,
   closeDatabase,
   configureDatabase,
   configureManagedImageDeleter,
@@ -58,6 +59,9 @@ async function configureRuntime(value: SecureConnectionConfiguration) {
   }
   runtimeConfigurationPromise = (async () => {
     await configureDatabase(value.databaseUrl, Number(process.env.ELECTRON_DATABASE_POOL_SIZE ?? 3))
+    // Catches "this DATABASE_URL was never migrated" once at connect time, before it surfaces as a
+    // raw PostgresError from whichever screen happens to query a missing table first.
+    await assertReferenceDataSchemaReady()
     configureFoodImageStorage(value.cloudinary, uploadRoot)
     configureManagedImageDeleter(value.cloudinary || uploadRoot ? deleteManagedFoodImage : null)
     await recoverInterruptedSocialPublications()

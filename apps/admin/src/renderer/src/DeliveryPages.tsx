@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { AdminDeliveryDayDto, AdminDeliveryTimeSlotDto } from '@kafgir/contracts'
 import { DeliverySlotUnavailableReason } from '@kafgir/contracts'
 import { adminApi } from './api'
-import { PersianDatePicker } from './PersianDatePicker'
+import { DateField, Pager, RowNumberCell, RowNumberHead, TimeField, useAsyncAction, usePagination } from './admin-ui'
 
 const adminReasonLabels: Record<DeliverySlotUnavailableReason, string> = {
   [DeliverySlotUnavailableReason.Inactive]: 'غیرفعال در تنظیمات پایه',
@@ -38,6 +38,9 @@ export function DeliverySlotsPage() {
   const [form, setForm] = useState<SlotForm>(emptySlotForm)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [togglingId, setTogglingId] = useState<number | null>(null)
+  const toggleAction = useAsyncAction()
+  const pagedSlots = usePagination(slots)
 
   const load = useCallback(async () => {
     try { setSlots(await adminApi.deliverySlots()) }
@@ -68,13 +71,16 @@ export function DeliverySlotsPage() {
     } finally { setBusy(false) }
   }
 
-  const toggleActive = async (slot: AdminDeliveryTimeSlotDto) => {
-    try {
-      await adminApi.setDeliverySlotActive(slot.id, !slot.isActive)
-      await load()
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'تغییر وضعیت ممکن نشد.')
-    }
+  const toggleActive = (slot: AdminDeliveryTimeSlotDto) => {
+    setTogglingId(slot.id)
+    void toggleAction.run(async () => {
+      try {
+        await adminApi.setDeliverySlotActive(slot.id, !slot.isActive)
+        await load()
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : 'تغییر وضعیت ممکن نشد.')
+      } finally { setTogglingId(null) }
+    })
   }
 
   return <section className="panel">
@@ -104,14 +110,10 @@ export function DeliverySlotsPage() {
         <input type="number" min={0} value={form.sortOrder}
           onChange={(e) => setForm({ ...form, sortOrder: e.target.value })} />
       </label>
-      <label className="field">ساعت شروع
-        <input type="time" dir="ltr" value={form.startTime} required
-          onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
-      </label>
-      <label className="field">ساعت پایان
-        <input type="time" dir="ltr" value={form.endTime} required
-          onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
-      </label>
+      <TimeField label="ساعت شروع" value={form.startTime}
+        onChange={(value) => setForm({ ...form, startTime: value })} />
+      <TimeField label="ساعت پایان" value={form.endTime}
+        onChange={(value) => setForm({ ...form, endTime: value })} />
       <label className="field">مهلت ثبت (دقیقه پیش از شروع)
         <input type="number" min={0} max={1440} value={form.orderCutoffMinutesBeforeStart}
           onChange={(e) => setForm({ ...form, orderCutoffMinutesBeforeStart: e.target.value })} />
@@ -123,7 +125,7 @@ export function DeliverySlotsPage() {
       </label>
       <div className="form-actions">
         <button className="primary-button" disabled={busy}>
-          {form.id == null ? 'افزودن بازه' : 'ذخیره تغییرات'}
+          {busy ? 'در حال ذخیره…' : form.id == null ? 'افزودن بازه' : 'ذخیره تغییرات'}
         </button>
         {form.id != null && <button type="button" className="outline-button"
           onClick={() => setForm(emptySlotForm)}>انصراف</button>}
@@ -134,12 +136,12 @@ export function DeliverySlotsPage() {
       <div className="table-panel-head"><h3>بازه‌های تعریف‌شده</h3><span>{slots.length} مورد</span></div>
       {slots.length === 0
         ? <p className="muted">هنوز بازه‌ای تعریف نشده است.</p>
-        : <table>
-            <thead><tr>
+        : <><table>
+            <thead><tr><RowNumberHead />
               <th>عنوان</th><th>بازه</th><th>مهلت ثبت</th><th>ترتیب</th><th>وضعیت</th><th>عملیات</th>
             </tr></thead>
             <tbody>
-              {slots.map((slot) => <tr key={slot.id}>
+              {pagedSlots.visible.map((slot, index) => <tr key={slot.id}><RowNumberCell offset={pagedSlots.rowOffset} index={index} />
                 <td>{slot.title}</td>
                 <td dir="ltr">{window_(slot.startTime, slot.endTime)}</td>
                 <td>{slot.orderCutoffMinutesBeforeStart} دقیقه</td>
@@ -155,13 +157,14 @@ export function DeliverySlotsPage() {
                     orderCutoffMinutesBeforeStart: String(slot.orderCutoffMinutesBeforeStart),
                     isActive: slot.isActive,
                   })}>ویرایش</button>
-                  <button type="button" className="outline-button" onClick={() => void toggleActive(slot)}>
-                    {slot.isActive ? 'غیرفعال کردن' : 'فعال کردن'}
+                  <button type="button" className="outline-button" disabled={toggleAction.busy}
+                    onClick={() => toggleActive(slot)}>
+                    {togglingId === slot.id ? 'در حال تغییر…' : slot.isActive ? 'غیرفعال کردن' : 'فعال کردن'}
                   </button>
                 </td>
               </tr>)}
             </tbody>
-          </table>}
+          </table><Pager {...pagedSlots} /></>}
     </div>
   </section>
 }
@@ -172,6 +175,9 @@ export function DeliveryDaysPage() {
   const [day, setDay] = useState<AdminDeliveryDayDto | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<number, string>>({})
+  const [pendingSlotId, setPendingSlotId] = useState<number | null>(null)
+  const saveAction = useAsyncAction()
+  const pagedDay = usePagination(day?.slots ?? [])
 
   const load = useCallback(async (value: string) => {
     try {
@@ -187,20 +193,25 @@ export function DeliveryDaysPage() {
 
   useEffect(() => { void load(date) }, [date, load])
 
-  const save = async (slotId: number, isAvailable: boolean) => {
+  const save = (slotId: number, isAvailable: boolean) => {
     setError(null)
+    setPendingSlotId(slotId)
     const raw = (drafts[slotId] ?? '').trim()
-    try {
-      await adminApi.setDeliveryDayOverride({
-        deliveryDate: date,
-        deliveryTimeSlotId: slotId,
-        isAvailable,
-        capacityOrders: raw === '' ? null : Number(raw),
-      })
-      await load(date)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'ذخیره تنظیمات روز ممکن نشد.')
-    }
+    void saveAction.run(async () => {
+      try {
+        await adminApi.setDeliveryDayOverride({
+          deliveryDate: date,
+          deliveryTimeSlotId: slotId,
+          isAvailable,
+          capacityOrders: raw === '' ? null : Number(raw),
+        })
+        await load(date)
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : 'ذخیره تنظیمات روز ممکن نشد.')
+      } finally {
+        setPendingSlotId(null)
+      }
+    })
   }
 
   return <section className="panel">
@@ -221,9 +232,7 @@ export function DeliveryDaysPage() {
 
     {error && <div className="form-error" role="alert">{error}</div>}
 
-    <label className="field">روز
-      <PersianDatePicker value={date} onChange={setDate} />
-    </label>
+    <DateField label="روز" value={date} onChange={setDate} />
 
     <div className="table-panel">
       <div className="table-panel-head">
@@ -231,12 +240,12 @@ export function DeliveryDaysPage() {
       </div>
       {!day || day.slots.length === 0
         ? <p className="muted">بازه‌ای تعریف نشده است. ابتدا از صفحه «بازه‌های ارسال» بازه بسازید.</p>
-        : <table>
-            <thead><tr>
+        : <><table>
+            <thead><tr><RowNumberHead />
               <th>عنوان</th><th>بازه</th><th>وضعیت این روز</th><th>ظرفیت</th><th>ثبت‌شده</th><th>عملیات</th>
             </tr></thead>
             <tbody>
-              {day.slots.map((slot) => <tr key={slot.slotId}>
+              {pagedDay.visible.map((slot, index) => <tr key={slot.slotId}><RowNumberCell offset={pagedDay.rowOffset} index={index} />
                 <td>{slot.title}</td>
                 <td dir="ltr">{window_(slot.startTime, slot.endTime)}</td>
                 <td>
@@ -254,14 +263,16 @@ export function DeliveryDaysPage() {
                 </td>
                 <td>{slot.usedOrders}</td>
                 <td>
-                  <button type="button" className="outline-button"
-                    onClick={() => void save(slot.slotId, true)}>ذخیره و فعال</button>
-                  <button type="button" className="outline-button"
-                    onClick={() => void save(slot.slotId, false)}>غیرفعال کردن</button>
+                  <button type="button" className="outline-button" disabled={saveAction.busy}
+                    onClick={() => save(slot.slotId, true)}>
+                    {pendingSlotId === slot.slotId ? 'در حال ذخیره…' : 'ذخیره و فعال'}</button>
+                  <button type="button" className="outline-button" disabled={saveAction.busy}
+                    onClick={() => save(slot.slotId, false)}>
+                    {pendingSlotId === slot.slotId ? 'در حال ذخیره…' : 'غیرفعال کردن'}</button>
                 </td>
               </tr>)}
             </tbody>
-          </table>}
+          </table><Pager {...pagedDay} /></>}
     </div>
   </section>
 }

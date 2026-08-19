@@ -26,13 +26,15 @@ import {
   type OrderSummaryDto,
 } from '@kafgir/contracts'
 import { adminApi } from './api'
-import { PersianDatePicker } from './PersianDatePicker'
 import { formatMoney as money, formatNumber, persianDateWithLatinDigitsLocale } from './number-format'
 import { FinancePage, IngredientsPage, InventoryPage, PaymentsPage, PurchasesPage, RecipesPage, ShoppingPage, SuppliersPage, V15ReportsPage } from './V15Pages'
 import { DeliveryDaysPage, DeliverySlotsPage } from './DeliveryPages'
 import { LogsPage } from './LogsPage'
 import { CustomerCommunicationPage } from './CustomerCommunicationPage'
-import { ReferenceDataPage } from './ReferenceDataPage'
+import { FoodTagGroupsPage, SupportSubjectsPage, UnitsPage } from './ReferenceDataPages'
+import { DeliveryMethodsPage, PaymentMethodsPage } from './SettingsPages'
+import { CustomerReportPage } from './CustomerReportPage'
+import { CustomersPage } from './CustomersPage'
 import {
   SocialChannelsPage,
   SocialComposerPage,
@@ -43,13 +45,21 @@ import {
   SocialTemplatesPage,
 } from './SocialPages'
 import {
+  firstAllowedPage,
+  isPageAllowed,
   navigationGroupForPage,
-  navigationGroups,
   navigationPage,
   toggleNavigationGroup,
+  visibleNavigationGroups,
   type NavigationGroupId,
   type Page,
 } from './admin-navigation'
+import { SidebarIcon } from './SidebarIcon'
+import {
+  AdminControls, DateField, Pager, RowNumberCell, RowNumberHead, defaultPageSize, rowOffsetOf,
+  useAsyncAction, usePagination, useServerPagedGrid,
+} from './admin-ui'
+import type { PagedResult } from '@kafgir/contracts'
 
 const localAdmin: Record<'username' | 'password', string> = {
   username: 'admin',
@@ -290,7 +300,10 @@ function InvoiceDialog({ order, onClose }: { order: OrderDto; onClose: () => voi
   </div>
 }
 
-function Login({ onLogin }: { onLogin: (name: string) => void }) {
+/** What the renderer keeps from a successful sign-in. Roles drive which destinations are offered. */
+type AdminSession = { fullName: string; roles: string[] }
+
+function Login({ onLogin }: { onLogin: (session: AdminSession) => void }) {
   const [username, setUsername] = useState(localAdmin.username)
   const [password, setPassword] = useState(localAdmin.password)
   const [error, setError] = useState<string | null>(null)
@@ -314,7 +327,7 @@ function Login({ onLogin }: { onLogin: (name: string) => void }) {
     setError(null)
     try {
       const response = await adminApi.login(username, password)
-      onLogin(response.fullName)
+      onLogin({ fullName: response.fullName, roles: response.roles })
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'ورود ناموفق بود.')
     } finally {
@@ -449,21 +462,6 @@ function StatusPill({ active }: { active: boolean }) {
   return <span className={`badge ${active ? 'open' : 'closed'}`}>{active ? 'فعال' : 'غیرفعال'}</span>
 }
 
-function Pagination({ totalItems, pageSize, currentPage, onChange }: {
-  totalItems: number
-  pageSize: number
-  currentPage: number
-  onChange: (page: number) => void
-}) {
-  const pageCount = Math.max(1, Math.ceil(totalItems / pageSize))
-  const safePage = Math.min(currentPage, pageCount)
-  if (totalItems <= pageSize) return null
-  return <nav className="pagination" aria-label="صفحه‌بندی">
-    <button type="button" disabled={safePage === 1} onClick={() => onChange(safePage - 1)}>صفحه قبل</button>
-    <span>صفحه {plainNumber(safePage)} از {plainNumber(pageCount)}</span>
-    <button type="button" disabled={safePage === pageCount} onClick={() => onChange(safePage + 1)}>صفحه بعد</button>
-  </nav>
-}
 
 const statusActions = (status: OrderStatus): Array<{ status: OrderStatus; label: string; className: string }> => {
   switch (status) {
@@ -570,13 +568,17 @@ function OrderDetails({ order }: { order: OrderDto }) {
 }
 
 function OrdersPage() {
-  const pageSize = 12
-  const [orders, setOrders] = useState<OrderSummaryDto[]>([])
+  const [result, setResult] = useState<PagedResult<OrderSummaryDto> | null>(null)
+  // Refs so the debounced/auto-refresh loader always reads the current page without re-creating itself.
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(defaultPageSize)
+  const pageRef = useRef(page); pageRef.current = page
+  const pageSizeRef = useRef(pageSize); pageSizeRef.current = pageSize
+  const orders = result?.items ?? []
   const [selected, setSelected] = useState<OrderDto | null>(null)
   const [status, setStatus] = useState<string>('')
   const [orderNumber, setOrderNumber] = useState('')
   const [auto, setAuto] = useState(true)
-  const [page, setPage] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -588,12 +590,14 @@ function OrdersPage() {
         date: today(),
         status: status ? Number(status) as OrderStatus : undefined,
         orderNumber: orderNumber.trim() || undefined,
+        page: pageRef.current,
+        pageSize: pageSizeRef.current,
       })
       const [rows, refreshedDetails] = await Promise.all([
         orderRequest,
         selectedId ? adminApi.order(selectedId).catch(() => null) : Promise.resolve(null),
       ])
-      setOrders(rows)
+      setResult(rows)
       if (selectedId) setSelected(refreshedDetails)
       setError(null)
     } catch (reason) {
@@ -633,10 +637,12 @@ function OrdersPage() {
           date: today(),
           status: status ? Number(status) as OrderStatus : undefined,
           orderNumber: orderNumber.trim() || undefined,
+          page: pageRef.current,
+          pageSize: pageSizeRef.current,
         }),
         adminApi.order(selected.id),
       ])
-      setOrders(rows)
+      setResult(rows)
       setSelected(refreshed)
       setMessage('وضعیت سفارش با موفقیت به‌روزرسانی شد.')
     } catch (reason) {
@@ -645,9 +651,19 @@ function OrdersPage() {
       setBusy(false)
     }
   }
-  const pageCount = Math.max(1, Math.ceil(orders.length / pageSize))
-  const safePage = Math.min(page, pageCount)
-  const visibleOrders = orders.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const paged = {
+    page: result?.page ?? page,
+    pageSize,
+    totalItems: result?.totalItems ?? 0,
+    totalPages: result?.totalPages ?? 1,
+    rowOffset: rowOffsetOf(result?.page ?? page, pageSize),
+    visible: orders,
+    setPage: (next: number) => { pageRef.current = next; setPage(next); void load() },
+    setPageSize: (size: number) => {
+      pageSizeRef.current = size; pageRef.current = 1
+      setPageSize(size); setPage(1); void load()
+    },
+  }
   return <PageFrame title="سفارش‌ها" actions={<>
     <label className="switch"><input type="checkbox" checked={auto} onChange={(event) => setAuto(event.target.checked)} />تازه‌سازی خودکار</label>
   </>}>
@@ -674,9 +690,9 @@ function OrdersPage() {
         <div className="panel table-panel orders-table-panel">
           <div className="table-summary"><span>{plainNumber(orders.length)} سفارش</span>{busy && <span>در حال دریافت…</span>}</div>
           <div className="table-wrap">
-            <OrderTable orders={visibleOrders} rowOffset={(safePage - 1) * pageSize} selectedId={selected?.id} onOpen={(id) => void open(id)} />
+            <OrderTable orders={paged.visible} rowOffset={paged.rowOffset} selectedId={selected?.id} onOpen={(id) => void open(id)} />
           </div>
-          <Pagination totalItems={orders.length} pageSize={pageSize} currentPage={safePage} onChange={setPage} />
+          <Pager {...paged} />
         </div>
       </section>
     </div>
@@ -689,9 +705,9 @@ function OrderTable({ orders, onOpen, rowOffset = 0, selectedId }: {
   rowOffset?: number
   selectedId?: number
 }) {
-  return <table><thead><tr><th>#</th><th>شماره سفارش</th><th>مشتری</th><th>زمان و تاریخ</th><th>وضعیت</th><th>مبلغ</th><th /></tr></thead>
+  return <table><thead><tr><RowNumberHead /><th>شماره سفارش</th><th>مشتری</th><th>زمان و تاریخ</th><th>وضعیت</th><th>مبلغ</th><th /></tr></thead>
     <tbody>{orders.map((order, index) => <tr key={order.id} className={order.id === selectedId ? 'selected-row' : undefined} onClick={() => onOpen(order.id)} onDoubleClick={() => onOpen(order.id)}>
-      <td>{plainNumber(rowOffset + index + 1)}</td><td dir="ltr">{order.orderNumber}</td><td>{order.customerFullName}</td>
+      <RowNumberCell offset={rowOffset} index={index} /><td dir="ltr">{order.orderNumber}</td><td>{order.customerFullName}</td>
       <td>{dateTime(order.createdAt)}</td><td><Status value={order.status} /></td><td>{money(order.totalAmount)}</td>
       <td><button type="button" className="secondary-outline" onClick={(event) => { event.stopPropagation(); onOpen(order.id) }}>نمایش</button></td>
     </tr>)}</tbody></table>
@@ -704,19 +720,23 @@ const emptyTag: FoodTagWriteRequest = {
 }
 
 function CategoriesPage() {
+  const { busy, run } = useAsyncAction()
   const [rows, setRows] = useState<FoodCategoryDto[]>([])
+  const pagedCategories = usePagination(rows)
   const [form, setForm] = useState<FoodCategoryWriteRequest>(emptyCategory)
   const [editId, setEditId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const load = async () => setRows(await adminApi.foodCategories())
   useEffect(() => { void load().catch((reason) => setError(String(reason))) }, [])
-  const save = async (event: FormEvent) => {
+  const save = (event: FormEvent) => {
     event.preventDefault()
-    try {
-      if (editId) await adminApi.updateFoodCategory(editId, form)
-      else await adminApi.createFoodCategory(form)
-      setForm(emptyCategory); setEditId(null); setError(null); await load()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    void run(async () => {
+      try {
+        if (editId) await adminApi.updateFoodCategory(editId, form)
+        else await adminApi.createFoodCategory(form)
+        setForm(emptyCategory); setEditId(null); setError(null); await load()
+      } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    })
   }
   const edit = (row: FoodCategoryDto) => {
     setEditId(row.id)
@@ -730,14 +750,16 @@ function CategoriesPage() {
       <label>آیکن<input value={form.icon ?? ''} onChange={(event) => setForm({ ...form, icon: event.target.value || null })} /></label>
       <label>ترتیب<input type="number" min="0" value={form.displayOrder} onChange={(event) => setForm({ ...form, displayOrder: Number(event.target.value) })} /></label>
       <label className="switch"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />فعال</label>
-      <button className="primary">{editId ? 'ذخیره' : 'افزودن'}</button>
+      <button className="primary" disabled={busy}>{busy ? 'در حال ذخیره…' : editId ? 'ذخیره' : 'افزودن'}</button>
     </form>
-    <div className="panel table-wrap"><table><thead><tr><th>ترتیب</th><th>آیکن</th><th>عنوان</th><th>عنوان انگلیسی</th><th>وضعیت</th><th /></tr></thead>
-      <tbody>{rows.map((row) => <tr key={row.id}><td>{plainNumber(row.displayOrder)}</td><td>{row.icon}</td><td>{row.title}</td><td dir="ltr">{row.slug}</td><td><StatusPill active={row.isActive} /></td><td><button onClick={() => edit(row)}>ویرایش</button></td></tr>)}</tbody></table></div>
+    <div className="panel table-wrap"><table><thead><tr><RowNumberHead /><th>ترتیب</th><th>آیکن</th><th>عنوان</th><th>عنوان انگلیسی</th><th>وضعیت</th><th /></tr></thead>
+      <tbody>{pagedCategories.visible.map((row, index) => <tr key={row.id}><RowNumberCell offset={pagedCategories.rowOffset} index={index} /><td>{plainNumber(row.displayOrder)}</td><td>{row.icon}</td><td>{row.title}</td><td dir="ltr">{row.slug}</td><td><StatusPill active={row.isActive} /></td><td><button onClick={() => edit(row)}>ویرایش</button></td></tr>)}</tbody></table></div>
+    <Pager {...pagedCategories} />
   </PageFrame>
 }
 
 function TagsPage() {
+  const { busy, run } = useAsyncAction()
   const [rows, setRows] = useState<FoodTagDto[]>([])
   const [groups, setGroups] = useState<FoodTagGroupDto[]>([])
   const [form, setForm] = useState<FoodTagWriteRequest>(emptyTag)
@@ -745,17 +767,19 @@ function TagsPage() {
   const [groupFilter, setGroupFilter] = useState('')
   const [error, setError] = useState<string | null>(null)
   const load = async () => {
-    const [tags, referenceData] = await Promise.all([adminApi.foodTags(), adminApi.referenceData()])
-    setRows(tags); setGroups(referenceData.foodTagGroups)
+    const [tags, tagGroups] = await Promise.all([adminApi.foodTags(), adminApi.foodTagGroups()])
+    setRows(tags); setGroups(tagGroups)
   }
   useEffect(() => { void load().catch((reason) => setError(String(reason))) }, [])
-  const save = async (event: FormEvent) => {
+  const save = (event: FormEvent) => {
     event.preventDefault()
-    try {
-      if (editId) await adminApi.updateFoodTag(editId, form)
-      else await adminApi.createFoodTag(form)
-      setForm(emptyTag); setEditId(null); setError(null); await load()
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    void run(async () => {
+      try {
+        if (editId) await adminApi.updateFoodTag(editId, form)
+        else await adminApi.createFoodTag(form)
+        setForm(emptyTag); setEditId(null); setError(null); await load()
+      } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    })
   }
   const edit = (row: FoodTagDto) => {
     setEditId(row.id)
@@ -766,23 +790,27 @@ function TagsPage() {
     })
   }
   const visible = groupFilter ? rows.filter((row) => row.group === groupFilter) : rows
+  const pagedTags = usePagination(visible)
   return <PageFrame title="برچسب‌های غذا" actions={<button onClick={() => { setEditId(null); setForm(emptyTag) }}>برچسب جدید</button>}>
     <Message error={error} />
-    <form className="panel form-grid tag-form" onSubmit={save}>
-      <label>عنوان<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label>
-      <label>عنوان انگلیسی<input dir="ltr" value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value.toLowerCase() })} required /></label>
-      <label>گروه<select value={form.group} onChange={(event) => setForm({ ...form, group: event.target.value as FoodTagWriteRequest['group'] })}>
-        {groups.filter((item) => item.isActive || item.code === form.group).map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}</select></label>
-      <label>آیکن<input value={form.icon ?? ''} onChange={(event) => setForm({ ...form, icon: event.target.value || null })} /></label>
-      <label>ترتیب<input type="number" min="0" value={form.displayOrder} onChange={(event) => setForm({ ...form, displayOrder: Number(event.target.value) })} /></label>
-      <label className="switch"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />فعال</label>
-      <label className="switch"><input type="checkbox" checked={form.isCustomerVisible} onChange={(event) => setForm({ ...form, isCustomerVisible: event.target.checked })} />نمایش به مشتری</label>
-      <button className="primary">{editId ? 'ذخیره' : 'افزودن'}</button>
-    </form>
-    <div className="toolbar"><label>گروه<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">همه گروه‌ها</option>
-      {groups.map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}</select></label></div>
-    <div className="panel table-wrap"><table><thead><tr><th>عنوان</th><th>گروه</th><th>عنوان انگلیسی</th><th>نمایش مشتری</th><th>وضعیت</th><th /></tr></thead>
-      <tbody>{visible.map((row) => <tr key={row.id}><td>{row.icon} {row.title}</td><td>{groups.find((item) => item.code === row.group)?.title ?? row.group}</td><td dir="ltr">{row.slug}</td><td>{row.isCustomerVisible ? 'بله' : 'خیر'}</td><td><StatusPill active={row.isActive} /></td><td><button onClick={() => edit(row)}>ویرایش</button></td></tr>)}</tbody></table></div>
+    <AdminControls>
+      <form className="form-grid tag-form" onSubmit={save}>
+        <label>عنوان<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label>
+        <label>عنوان انگلیسی<input dir="ltr" value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value.toLowerCase() })} required /></label>
+        <label>گروه<select value={form.group} onChange={(event) => setForm({ ...form, group: event.target.value as FoodTagWriteRequest['group'] })}>
+          {groups.filter((item) => item.isActive || item.code === form.group).map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}</select></label>
+        <label>آیکن<input value={form.icon ?? ''} onChange={(event) => setForm({ ...form, icon: event.target.value || null })} /></label>
+        <label>ترتیب<input type="number" min="0" value={form.displayOrder} onChange={(event) => setForm({ ...form, displayOrder: Number(event.target.value) })} /></label>
+        <label className="switch"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />فعال</label>
+        <label className="switch"><input type="checkbox" checked={form.isCustomerVisible} onChange={(event) => setForm({ ...form, isCustomerVisible: event.target.checked })} />نمایش به مشتری</label>
+        <button className="primary" disabled={busy}>{busy ? 'در حال ذخیره…' : editId ? 'ذخیره' : 'افزودن'}</button>
+      </form>
+      <div className="toolbar"><label>گروه<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">همه گروه‌ها</option>
+        {groups.map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}</select></label></div>
+    </AdminControls>
+    <div className="panel table-wrap"><table><thead><tr><RowNumberHead /><th>عنوان</th><th>گروه</th><th>عنوان انگلیسی</th><th>نمایش مشتری</th><th>وضعیت</th><th /></tr></thead>
+      <tbody>{pagedTags.visible.map((row, index) => <tr key={row.id}><RowNumberCell offset={pagedTags.rowOffset} index={index} /><td>{row.icon} {row.title}</td><td>{groups.find((item) => item.code === row.group)?.title ?? row.group}</td><td dir="ltr">{row.slug}</td><td>{row.isCustomerVisible ? 'بله' : 'خیر'}</td><td><StatusPill active={row.isActive} /></td><td><button onClick={() => edit(row)}>ویرایش</button></td></tr>)}</tbody></table></div>
+    <Pager {...pagedTags} />
   </PageFrame>
 }
 
@@ -825,31 +853,33 @@ function FoodsPage({ onCreate, onEdit, onPhotos, onTags }: {
   onPhotos: (foodId: number) => void
   onTags: (foodId: number) => void
 }) {
-  const [foods, setFoods] = useState<FoodDto[]>([])
   const [categories, setCategories] = useState<FoodCategoryDto[]>([])
-  const [search, setSearch] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const load = async () => {
-    try {
-      const [foodRows, categoryRows] = await Promise.all([adminApi.foods(), adminApi.foodCategories()])
-      setFoods(foodRows)
-      setCategories(categoryRows)
-      setError(null)
-    } catch (reason) { setError(String(reason)) }
-  }
-  useEffect(() => { void load() }, [])
-  const visible = foods.filter((food) => food.name.includes(search))
+  // Categories label each row and are a small fixed lookup, so they load once rather than per page.
+  useEffect(() => {
+    adminApi.foodCategories().then(setCategories).catch((reason) => setError(String(reason)))
+  }, [])
+  const pagedFoods = useServerPagedGrid<FoodDto, { search?: string | null }>(
+    ({ page, pageSize, search }) => adminApi.foodsPaged({ page, pageSize }, search), {})
   return <PageFrame title="غذاها" actions={<button className="primary" onClick={onCreate}>غذای جدید</button>}>
-    <Message error={error} />
-    <div className="toolbar"><label>جستجوی نام غذا<input value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
-    <div className="panel table-wrap"><table><thead><tr><th>نام</th><th>دسته</th><th>توضیحات</th><th>عکس</th><th>نقش برنج</th><th>وضعیت</th><th /></tr></thead>
-      <tbody>{visible.map((food) => {
+    <Message error={error ?? pagedFoods.error} />
+    <div className="toolbar"><label>جستجوی نام غذا<input value={pagedFoods.search}
+      onChange={(event) => pagedFoods.setSearch(event.target.value)} /></label></div>
+    <div className="panel table-wrap"><table><thead><tr><RowNumberHead /><th>نام</th><th>دسته</th><th>توضیحات</th><th>عکس</th><th>نقش برنج</th><th>وضعیت</th><th /></tr></thead>
+      <tbody>{pagedFoods.visible.map((food, index) => {
         const hasPhoto = food.images.length > 0 || Boolean(food.imageUrl)
         const riceRole = food.isPersianRice
           ? 'ارتقای مخفی برنج ایرانی'
           : food.allowsPersianRice ? 'قابل ارتقا به برنج ایرانی' : '—'
-        return <tr key={food.id}><td>{food.name}</td><td>{categories.find((category) => category.id === food.categoryId)?.title}</td><td>{food.description}</td><td><span className={`badge ${hasPhoto ? 'open' : 'closed'}`}>{hasPhoto ? 'دارد' : 'ندارد'}</span></td><td><span className={`badge ${food.isPersianRice || food.allowsPersianRice ? 'open' : 'closed'}`}>{riceRole}</span></td><td><StatusPill active={food.isActive} /></td><td className="actions"><button onClick={() => onEdit(food.id)}>ویرایش</button><button onClick={() => onTags(food.id)}>تگ‌ها</button><button onClick={() => onPhotos(food.id)}>عکس‌ها</button></td></tr>
-      })}</tbody></table></div>
+        return <tr key={food.id}><RowNumberCell offset={pagedFoods.rowOffset} index={index} /><td>{food.name}</td><td>{categories.find((category) => category.id === food.categoryId)?.title}</td><td>{food.description}</td><td><span className={`badge ${hasPhoto ? 'open' : 'closed'}`}>{hasPhoto ? 'دارد' : 'ندارد'}</span></td><td><span className={`badge ${food.isPersianRice || food.allowsPersianRice ? 'open' : 'closed'}`}>{riceRole}</span></td><td><StatusPill active={food.isActive} /></td><td className="actions"><button onClick={() => onEdit(food.id)}>ویرایش</button><button onClick={() => onTags(food.id)}>تگ‌ها</button><button onClick={() => onPhotos(food.id)}>عکس‌ها</button></td></tr>
+      })}</tbody></table>
+      {pagedFoods.totalItems === 0 && <div className="v15-empty-state">{
+        pagedFoods.loading ? 'در حال بارگذاری…'
+          : pagedFoods.filtered ? 'غذایی با این جستجو پیدا نشد.'
+            : 'هنوز غذایی ثبت نشده است.'
+      }</div>}
+    </div>
+    <Pager {...pagedFoods} />
   </PageFrame>
 }
 
@@ -1190,6 +1220,10 @@ function FoodPhotosPage({ foodId, onBack }: { foodId: number | null; onBack: () 
 }
 
 function DailyMenuPage() {
+  const saveAction = useAsyncAction()
+  const toggleAction = useAsyncAction()
+  const removeAction = useAsyncAction()
+  const [removingId, setRemovingId] = useState<number | null>(null)
   const date = today()
   const [menu, setMenu] = useState<DailyMenuDto | null>(null)
   const [foods, setFoods] = useState<FoodDto[]>([])
@@ -1209,21 +1243,24 @@ function DailyMenuPage() {
     setMenu(menuRow)
   }
   useEffect(() => { void load() }, [])
+  const pagedMenu = usePagination(menu?.items ?? [])
   const persianRice = menu?.persianRice ?? null
   const selectedFood = foods.find((food) => food.id === Number(foodId))
-  const saveItem = async (event: FormEvent) => {
+  const saveItem = (event: FormEvent) => {
     event.preventDefault()
     if (discountEnabled && (discountPrice <= 0 || discountPrice >= price)) {
       setError('قیمت تخفیف باید بیشتر از صفر و کمتر از قیمت اصلی باشد.')
       return
     }
-    try {
-      const item = { price, discountPrice: discountEnabled ? discountPrice : null, capacityPortions: capacity, isAvailable: true }
-      const updated = editing
-        ? await adminApi.updateMenuItem(editing, item)
-        : await adminApi.addMenuItem(date, { foodId: Number(foodId), ...item })
-      setMenu(updated); setEditing(null); setFoodId(''); setPrice(0); setDiscountEnabled(false); setDiscountPrice(0); setCapacity(1); setError(null)
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    void saveAction.run(async () => {
+      try {
+        const item = { price, discountPrice: discountEnabled ? discountPrice : null, capacityPortions: capacity, isAvailable: true }
+        const updated = editing
+          ? await adminApi.updateMenuItem(editing, item)
+          : await adminApi.addMenuItem(date, { foodId: Number(foodId), ...item })
+        setMenu(updated); setEditing(null); setFoodId(''); setPrice(0); setDiscountEnabled(false); setDiscountPrice(0); setCapacity(1); setError(null)
+      } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    })
   }
   const edit = (item: DailyMenuDto['items'][number], startDiscount = false) => {
     const regularPrice = item.originalPrice ?? item.price
@@ -1239,9 +1276,24 @@ function DailyMenuPage() {
   const discountPercentage = discountEnabled && price > 0 && discountPrice > 0 && discountPrice < price
     ? Math.round((1 - discountPrice / price) * 100)
     : 0
-  const toggle = async () => setMenu(await adminApi.menuSettings(date, !(menu?.isOpen ?? false), menu?.note))
-  return <PageFrame title="منوی امروز" actions={<button className={menu?.isOpen ? 'secondary' : 'primary'} onClick={() => void toggle()}>
-    سفارش‌گیری {menu?.isOpen ? 'باز است' : 'بسته است'}
+  // Opening or closing today's ordering is a single switch the whole kitchen reacts to; without a
+  // pending state a slow round-trip invites a second click that flips it straight back.
+  const toggle = () => void toggleAction.run(async () => {
+    try {
+      setMenu(await adminApi.menuSettings(date, !(menu?.isOpen ?? false), menu?.note))
+      setError(null)
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+  })
+  const removeItem = (id: number) => {
+    setRemovingId(id)
+    void removeAction.run(async () => {
+      try { setMenu(await adminApi.removeMenuItem(id)); setError(null) }
+      catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+      finally { setRemovingId(null) }
+    })
+  }
+  return <PageFrame title="منوی امروز" actions={<button className={menu?.isOpen ? 'secondary' : 'primary'} disabled={toggleAction.busy} onClick={toggle}>
+    {toggleAction.busy ? 'در حال تغییر…' : <>سفارش‌گیری {menu?.isOpen ? 'باز است' : 'بسته است'}</>}
   </button>}>
     <Message error={error} />
     <form className="panel form-grid menu-form" onSubmit={saveItem}>
@@ -1259,10 +1311,13 @@ function DailyMenuPage() {
       {selectedFood?.allowsPersianRice && !persianRice && <p className="menu-rice-warning">
         «ارتقا به برنج ایرانی» هنوز به منوی امروز اضافه نشده است؛ تا وقتی اضافه نشود گزینه ارتقا به مشتری نمایش داده نمی‌شود.
       </p>}
-      <button className="primary">{editing ? 'ذخیره' : 'افزودن به منو'}</button>
+      <button className="primary" disabled={saveAction.busy}>
+        {saveAction.busy ? (editing ? 'در حال ذخیره…' : 'در حال افزودن…') : editing ? 'ذخیره' : 'افزودن به منو'}
+      </button>
     </form>
-    <div className="panel table-wrap"><table><thead><tr><th>غذا</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
-      <tbody>{menu?.items.map((item) => <tr key={item.id}><td>{item.foodName}</td><td>{item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{plainNumber(item.capacityPortions)}</td><td>{plainNumber(item.soldPortions)}</td><td>{plainNumber(item.remainingPortions)}</td><td className="actions"><button onClick={() => edit(item)}>ویرایش</button><button className="discount-action" onClick={() => edit(item, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button><button className="danger" onClick={() => void adminApi.removeMenuItem(item.id).then(setMenu)}>حذف</button></td></tr>)}</tbody></table></div>
+    <div className="panel table-wrap"><table><thead><tr><RowNumberHead /><th>غذا</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
+      <tbody>{pagedMenu.visible.map((item, index) => <tr key={item.id}><RowNumberCell offset={pagedMenu.rowOffset} index={index} /><td>{item.foodName}</td><td>{item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{plainNumber(item.capacityPortions)}</td><td>{plainNumber(item.soldPortions)}</td><td>{plainNumber(item.remainingPortions)}</td><td className="actions"><button onClick={() => edit(item)}>ویرایش</button><button className="discount-action" onClick={() => edit(item, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button><button className="danger" disabled={removeAction.busy} onClick={() => removeItem(item.id)}>{removingId === item.id ? 'در حال حذف…' : 'حذف'}</button></td></tr>)}</tbody></table></div>
+    <Pager {...pagedMenu} />
   </PageFrame>
 }
 
@@ -1290,12 +1345,15 @@ function ManualOrderPage() {
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false)
   useEffect(() => {
     const date = today()
-    void Promise.all([adminApi.menu(date), adminApi.deliveryDay(date), adminApi.referenceData()])
-      .then(([dailyMenu, day, referenceData]) => {
+    void Promise.all([
+      adminApi.menu(date), adminApi.deliveryDay(date),
+      adminApi.deliveryMethods(), adminApi.paymentMethods(),
+    ])
+      .then(([dailyMenu, day, deliveryOptions, paymentOptions]) => {
         setMenu(dailyMenu)
         setDeliveryDay(day)
-        const availableDeliveryMethods = referenceData.deliveryMethods.filter((item) => item.isManualEnabled)
-        const availablePaymentMethods = referenceData.paymentMethods.filter((item) => item.isManualEnabled)
+        const availableDeliveryMethods = deliveryOptions.filter((item) => item.isManualEnabled)
+        const availablePaymentMethods = paymentOptions.filter((item) => item.isManualEnabled)
         setDeliveryMethods(availableDeliveryMethods)
         setPaymentMethods(availablePaymentMethods)
         if (availableDeliveryMethods[0]) setDelivery(availableDeliveryMethods[0].method)
@@ -1528,9 +1586,10 @@ function ManualOrderPage() {
 }
 
 function ReportPage() {
-  const pageSize = 14
   const [query, setQuery] = useState<OrderReportQuery>({ date: today() })
-  const [orders, setOrders] = useState<OrderSummaryDto[]>([])
+  const [result, setResult] = useState<PagedResult<OrderSummaryDto> | null>(null)
+  const [pageSize, setPageSize] = useState(defaultPageSize)
+  const orders = result?.items ?? []
   const [foods, setFoods] = useState<FoodDto[]>([])
   const [details, setDetails] = useState<OrderDto | null>(null)
   const [page, setPage] = useState(1)
@@ -1541,12 +1600,14 @@ function ReportPage() {
       .then(setFoods)
       .catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
   }, [])
-  const search = async (event?: FormEvent) => {
+  // Any filter change starts again at page 1: staying on page 7 of the previous result would show
+  // an empty grid under a page count that no longer applies.
+  const search = async (event?: FormEvent, targetPage = 1, size = pageSize) => {
     event?.preventDefault()
     setBusy(true)
-    setPage(1)
+    setPage(targetPage)
     try {
-      setOrders(await adminApi.orders(query))
+      setResult(await adminApi.orders({ ...query, page: targetPage, pageSize: size }))
       setError(null)
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -1570,12 +1631,20 @@ function ReportPage() {
   if (details) return <PageFrame title="جزئیات سفارش" actions={<button onClick={() => setDetails(null)}>بازگشت به گزارش</button>}>
     <div className="panel order-detail-panel"><OrderDetails order={details} /></div>
   </PageFrame>
-  const pageCount = Math.max(1, Math.ceil(orders.length / pageSize))
-  const safePage = Math.min(page, pageCount)
-  const visibleOrders = orders.slice((safePage - 1) * pageSize, safePage * pageSize)
+  const paged = {
+    page: result?.page ?? page,
+    pageSize,
+    totalItems: result?.totalItems ?? 0,
+    totalPages: result?.totalPages ?? 1,
+    rowOffset: rowOffsetOf(result?.page ?? page, pageSize),
+    visible: orders,
+    setPage: (next: number) => { void search(undefined, next) },
+    setPageSize: (size: number) => { setPageSize(size); void search(undefined, 1, size) },
+  }
   return <PageFrame title="گزارش کل" actions={<span className="result-summary">{plainNumber(orders.length)} سفارش</span>}>
     <form className="toolbar report-filters" onSubmit={search}>
-      <label>تاریخ<PersianDatePicker value={query.date} onChange={(date) => setQuery({ ...query, date })} /></label>
+      <DateField label="تاریخ" value={query.date}
+        onChange={(date) => setQuery({ ...query, date })} />
       <label>وضعیت<select value={query.status ?? ''} onChange={(event) => setQuery({ ...query, status: event.target.value ? Number(event.target.value) as OrderStatus : undefined })}><option value="">همه وضعیت‌ها</option>{Object.entries(statusLabel).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
       <label>شماره سفارش<input value={query.orderNumber ?? ''} onChange={(event) => setQuery({ ...query, orderNumber: event.target.value })} /></label>
       <label>نام مشتری<input value={query.customerName ?? ''} onChange={(event) => setQuery({ ...query, customerName: event.target.value })} /></label>
@@ -1592,9 +1661,9 @@ function ReportPage() {
     <div className="panel table-panel report-table-panel">
       <div className="table-summary"><span>{plainNumber(orders.length)} سفارش</span>{busy && <span>در حال دریافت گزارش…</span>}</div>
       <div className="table-wrap">
-        <ReportOrderTable orders={visibleOrders} rowOffset={(safePage - 1) * pageSize} onOpen={(id) => void openDetails(id)} />
+        <ReportOrderTable orders={paged.visible} rowOffset={paged.rowOffset} onOpen={(id) => void openDetails(id)} />
       </div>
-      <Pagination totalItems={orders.length} pageSize={pageSize} currentPage={safePage} onChange={setPage} />
+      <Pager {...paged} />
     </div>
   </PageFrame>
 }
@@ -1605,10 +1674,10 @@ function ReportOrderTable({ orders, onOpen, rowOffset }: {
   rowOffset: number
 }) {
   return <table className="report-table"><thead><tr>
-    <th>#</th><th>شماره سفارش</th><th>نام مشتری</th><th>شماره تماس</th><th>وضعیت</th>
+    <RowNumberHead /><th>شماره سفارش</th><th>نام مشتری</th><th>شماره تماس</th><th>وضعیت</th>
     <th>نوع دریافت</th><th>زمان تحویل</th><th>نوع فروش</th><th>غذاها</th><th>تعداد</th><th>مبلغ</th><th>زمان و تاریخ</th><th>جزئیات</th>
   </tr></thead><tbody>{orders.map((order, index) => <tr key={order.id} onDoubleClick={() => onOpen(order.id)}>
-    <td>{plainNumber(rowOffset + index + 1)}</td>
+    <RowNumberCell offset={rowOffset} index={index} />
     <td dir="ltr">{order.orderNumber}</td>
     <td>{order.customerFullName}</td>
     <td dir="ltr">{order.customerPhoneNumber}</td>
@@ -1624,20 +1693,29 @@ function ReportOrderTable({ orders, onOpen, rowOffset }: {
 }
 
 export function App() {
-  const [user, setUser] = useState<string | null>(null)
+  const [session, setSession] = useState<AdminSession | null>(null)
   const [page, setPage] = useState<Page>('dashboard')
   const [expandedGroup, setExpandedGroup] = useState<NavigationGroupId | null>(
     navigationGroupForPage('dashboard'),
   )
+  const logoutAction = useAsyncAction()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [foodEditorId, setFoodEditorId] = useState<number | null>(null)
   const [foodPhotoId, setFoodPhotoId] = useState<number | null>(null)
   const [foodTagsId, setFoodTagsId] = useState<number | null>(null)
+  const roles = session?.roles ?? []
+  const groups = useMemo(() => visibleNavigationGroups(roles), [roles.join(',')])
   useEffect(() => {
     const pageGroup = navigationGroupForPage(page)
     if (pageGroup) setExpandedGroup(pageGroup)
   }, [page])
-  if (!user) return <Login onLogin={setUser} />
+  // A role change (or a sign-in that lacks the default destination) must not leave the operator on a
+  // screen their roles cannot load.
+  useEffect(() => {
+    if (!session || isPageAllowed(page, session.roles)) return
+    setPage(firstAllowedPage(session.roles) ?? 'dashboard')
+  }, [session, page])
+  if (!session) return <Login onLogin={setSession} />
   const openFoodEditor = (foodId: number | null) => {
     setFoodEditorId(foodId)
     setPage('food-editor')
@@ -1687,7 +1765,13 @@ export function App() {
     payments: <PaymentsPage />,
     'v15-reports': <V15ReportsPage />,
     logs: <LogsPage />,
-    'reference-data': <ReferenceDataPage />,
+    'food-tag-groups': <FoodTagGroupsPage />,
+    'support-subjects': <SupportSubjectsPage />,
+    units: <UnitsPage />,
+    customers: <CustomersPage />,
+    'customer-report': <CustomerReportPage />,
+    'payment-methods': <PaymentMethodsPage />,
+    'delivery-methods': <DeliveryMethodsPage />,
     'social-dashboard': <SocialDashboardPage />,
     'social-channels': <SocialChannelsPage />,
     'social-publish': <SocialComposerPage />,
@@ -1714,29 +1798,38 @@ export function App() {
           type="button"
           className={`nav-dashboard ${page === 'dashboard' ? 'active' : ''}`}
           aria-current={page === 'dashboard' ? 'page' : undefined}
+          title={sidebarCollapsed ? 'داشبورد' : undefined}
           onClick={() => {
             setPage('dashboard')
             setExpandedGroup(null)
           }}
         >
-          داشبورد
+          <SidebarIcon name="dashboard" />
+          <span>داشبورد</span>
         </button>
-        {navigationGroups.map((group) => {
+        {groups.map((group) => {
           const isExpanded = expandedGroup === group.id
           const regionId = `navigation-group-${group.id}`
-          return <section className="nav-group" key={group.id}>
+          // Collapsing hides the labels, so the group that owns the current page has to stay
+          // identifiable from its icon alone.
+          const holdsCurrentPage = navigationGroupForPage(page) === group.id
+          return <section className={`nav-group ${holdsCurrentPage ? 'has-active' : ''}`} key={group.id}>
             <button
               type="button"
               className="nav-group-header"
               aria-expanded={isExpanded}
               aria-controls={regionId}
-              onClick={() => setExpandedGroup((currentGroup) =>
-                toggleNavigationGroup(currentGroup, group.id))}
+              title={sidebarCollapsed ? group.label : group.hint}
+              onClick={() => {
+                if (sidebarCollapsed) setSidebarCollapsed(false)
+                setExpandedGroup((currentGroup) => toggleNavigationGroup(currentGroup, group.id))
+              }}
             >
-              <span>{group.label}</span>
+              <SidebarIcon name={group.icon} />
+              <span className="nav-group-label">{group.label}</span>
               <span className="nav-chevron" aria-hidden="true" />
             </button>
-            <div className="nav-group-items" id={regionId} hidden={!isExpanded}>
+            <div className="nav-group-items" id={regionId} hidden={!isExpanded || sidebarCollapsed}>
               {group.items.map((item) => {
                 const isActive = navigationPage(page) === item.page
                 return <button
@@ -1753,7 +1846,11 @@ export function App() {
           </section>
         })}
       </nav>
-      <div className="sidebar-user"><span>{user}</span><button onClick={() => void adminApi.logout().then(() => setUser(null))}>خروج</button></div>
+      <div className="sidebar-user"><span>{session.fullName}</span><button disabled={logoutAction.busy} onClick={() => void logoutAction.run(async () => {
+        // Signing out always ends the session locally, even if the main process call fails; leaving
+        // the operator logged in after they asked to leave is the worse outcome.
+        try { await adminApi.logout() } finally { setSession(null) }
+      })}>{logoutAction.busy ? 'در حال خروج…' : 'خروج'}</button></div>
     </aside>
     <main>{pages[page]}</main>
   </div>

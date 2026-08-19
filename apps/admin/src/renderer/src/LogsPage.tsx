@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { adminApi, type LogEntry } from './api'
+import { Pager, RowNumberCell, RowNumberHead, usePagination } from './admin-ui'
 import { formatNumber, persianDateWithLatinDigitsLocale } from './number-format'
 
 const levels: Record<number, { label: string; className: string }> = {
@@ -44,6 +45,7 @@ export function LogsPage() {
       .filter((entry) => !needle || JSON.stringify(entry).toLocaleLowerCase('fa-IR').includes(needle))
       .sort((a, b) => (b.time ?? 0) - (a.time ?? 0))
   }, [desktop, minimumLevel, search, server, source])
+  const paged = usePagination(entries)
   return <section className="page logs-page">
     <header className="page-header"><h1>گزارش رویدادها</h1><button onClick={() => void load()} disabled={busy}>{busy ? 'در حال دریافت…' : 'تازه‌سازی'}</button></header>
     {error && <div className="message error">{error}</div>}
@@ -58,13 +60,14 @@ export function LogsPage() {
       <label>جستجو<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="رویداد، سفارش، پیام…" /></label>
       <span className="logs-count">{formatNumber(entries.length)} رویداد</span>
     </div>
-    <div className="panel table-wrap logs-table"><table><thead><tr><th>زمان</th><th>منبع</th><th>سطح</th><th>رویداد</th><th>پیام</th><th>شناسه مرتبط</th></tr></thead>
-      <tbody>{entries.map((entry, index) => {
+    <div className="panel table-wrap logs-table"><table><thead><tr><RowNumberHead /><th>زمان</th><th>منبع</th><th>سطح</th><th>رویداد</th><th>پیام</th><th>شناسه مرتبط</th></tr></thead>
+      <tbody>{paged.visible.map((entry, index) => {
         const level = levels[entry.level ?? 30] ?? levels[30]!
         const related = entry.orderId ? `سفارش ${entry.orderId}` : entry.purchaseId ? `خرید ${entry.purchaseId}` : entry.userId ? `کاربر ${entry.userId}` : entry.requestId ?? '—'
-        return <tr key={`${entry.source}-${entry.time}-${index}`}><td>{time(entry.time)}</td><td>{entry.source === 'server' ? 'سرور' : 'دسکتاپ'}</td>
+        return <tr key={`${entry.source}-${entry.time}-${index}`}><RowNumberCell offset={paged.rowOffset} index={index} /><td>{time(entry.time)}</td><td>{entry.source === 'server' ? 'سرور' : 'دسکتاپ'}</td>
           <td><span className={`badge ${level.className}`}>{level.label}</span></td><td dir="ltr">{entry.event ?? '—'}</td>
           <td className="log-message">{entry.msg ?? entry.errorMessage ?? '—'}</td><td dir="ltr">{related}</td></tr>
       })}</tbody></table></div>
+    <Pager {...paged} />
   </section>
 }

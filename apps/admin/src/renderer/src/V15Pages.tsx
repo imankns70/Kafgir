@@ -10,14 +10,31 @@ import {
   type FinancialAccountDto,
   type ExpenseCategoryDto,
   type IngredientDto,
+  type ShoppingListSummaryDto,
   type InventoryMovementDto,
   type PurchaseSummaryDto,
+  type CustomerPaymentDto,
+  type OrderSummaryDto,
   type PosTerminalDto,
   type SupplierDto,
   type UnitDto,
 } from '@kafgir/contracts'
 import { adminApi } from './api'
-import { formatMoney as money, formatNumber, persianDateWithLatinDigitsLocale } from './number-format'
+import {
+  DateField, Pager, RowNumberCell, RowNumberHead, useAsyncAction, usePagination, useServerPagedGrid,
+} from './admin-ui'
+
+/** These grids page on the server and carry no filters of their own yet. */
+type EmptyFilters = { search?: string | null }
+type PaymentFilters = { search?: string | null; bucket: 'all'|'pending'|'successful'|'failed'|'refunded' }
+type PaymentTotals = Awaited<ReturnType<typeof adminApi.paymentTotals>>
+type FinancialTransactionRow = Awaited<ReturnType<typeof adminApi.financialTransactions>>['items'][number]
+import {
+  formatMoney as money,
+  formatNumber,
+  formatPersianDate,
+  persianDateWithLatinDigitsLocale,
+} from './number-format'
 
 const number = (value: string | number) => formatNumber(value, 6)
 const date = (value: string) => new Intl.DateTimeFormat(persianDateWithLatinDigitsLocale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
@@ -31,9 +48,9 @@ const normalizeDecimalInput = (value: FormDataEntryValue | null) => String(value
   .replace(/[٬،,\s]/g, '')
   .replace(/٫/g, '.')
 const moneyInput = (value: FormDataEntryValue | string | null) => Number(normalizeDecimalInput(value)) || 0
-const dateOnly = (value: string | Date) => typeof value === 'string' ? value : new Intl.DateTimeFormat('en-CA-u-nu-latn', {
-  timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit',
-}).format(value)
+// Was `typeof value === 'string' ? value : …`, which printed the raw ISO date straight into the
+// purchases table beside Jalali columns. Display is always the Persian calendar; see `number-format`.
+const dateOnly = (value: string | Date) => formatPersianDate(value)
 
 type PurchaseLineDraft = {
   key: string; ingredientId: string; unitId: string; quantity: string; factor: string;
@@ -69,15 +86,40 @@ function PageGuide({ content }: { content: PageGuideContent }) {
     </div>
   </details>
 }
-function DataPanel({ title, description, count, emptyText, children }: {
+function DataPanel({
+  title, description, count, emptyText, children, pager,
+  loading = false, error = null, search, onSearch, searchPlaceholder = 'جستجو',
+}: {
   title: string; description: string; count: number; emptyText: string; children: ReactNode
+  /** Rendered outside `.table-wrap`, which scrolls — a pager inside it would scroll away. */
+  pager?: ReactNode
+  loading?: boolean
+  error?: string | null
+  /** Supplying both turns on the server-side search box. */
+  search?: string
+  onSearch?: (value: string) => void
+  searchPlaceholder?: string
 }) {
-  return <section className="panel v15-table-panel">
+  const searchable = search !== undefined && onSearch !== undefined
+  // An empty grid means four different things to the user, and only one of them is "add a record".
+  const body = error
+    ? <div className="v15-empty-state v15-empty-error" role="alert">{error}</div>
+    : count > 0
+      ? <div className="table-wrap">{children}</div>
+      : loading
+        ? <div className="v15-empty-state">در حال بارگذاری…</div>
+        : <div className="v15-empty-state">{emptyText}</div>
+  return <section className="panel v15-table-panel" aria-busy={loading}>
     <header className="v15-table-heading">
       <div><h2>{title}</h2><p>{description}</p></div>
-      <span>{number(count)} مورد</span>
+      <div className="v15-table-heading-actions">
+        {searchable && <input type="search" className="v15-table-search" value={search}
+          onChange={(event) => onSearch(event.target.value)} placeholder={searchPlaceholder} aria-label={searchPlaceholder} />}
+        <span>{number(count)} مورد</span>
+      </div>
     </header>
-    {count > 0 ? <div className="table-wrap">{children}</div> : <div className="v15-empty-state">{emptyText}</div>}
+    {body}
+    {count > 0 && !error && pager}
   </section>
 }
 function Feedback({ value }: { value: string | null }) {
@@ -201,20 +243,25 @@ function submitError(reason: unknown) {
 }
 
 export function IngredientsPage() {
-  const [items, setItems] = useState<IngredientDto[]>([])
+  const { busy, run } = useAsyncAction()
+  const pagedIngredients = useServerPagedGrid<IngredientDto, EmptyFilters>(
+    ({ page, pageSize, search }) => adminApi.ingredientsPaged({ page, pageSize }, search), {})
   const [units, setUnits] = useState<UnitDto[]>([])
   const [editing, setEditing] = useState<IngredientDto | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  // Units feed the form's select and are a small fixed lookup, so they load once alongside the grid.
   const load = useCallback(async () => {
     try {
-      const [ingredientRows, unitRows] = await Promise.all([adminApi.ingredients(), adminApi.units()])
-      setItems(ingredientRows); setUnits(unitRows)
+      const [unitRows] = await Promise.all([adminApi.units(), pagedIngredients.refresh()])
+      setUnits(unitRows)
     } catch (e) { setMessage(submitError(e)) }
-  }, [])
-  useEffect(() => { void load() }, [load])
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
+  }, [pagedIngredients.refresh])
+  useEffect(() => { void adminApi.units().then(setUnits).catch((e) => setMessage(submitError(e))) }, [])
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setMessage(null)
-    const form = new FormData(event.currentTarget)
+    // Captured before the first await: React clears `currentTarget` once the handler returns.
+    const formElement = event.currentTarget
+    const form = new FormData(formElement)
     const request = {
       name: String(form.get('name') ?? ''), code: String(form.get('code') ?? '') || null,
       categoryId: null, baseUnitId: Number(form.get('baseUnitId')),
@@ -223,11 +270,13 @@ export function IngredientsPage() {
       isInventoryTracked: form.get('isInventoryTracked') === 'on',
       isActive: form.get('isActive') === 'on', notes: String(form.get('notes') ?? '') || null,
     }
-    try {
-      if (editing) await adminApi.updateIngredient(editing.id, request)
-      else await adminApi.createIngredient(request)
-      setEditing(null); event.currentTarget.reset(); setMessage('ماده اولیه ذخیره شد.'); await load()
-    } catch (e) { setMessage(submitError(e)) }
+    void run(async () => {
+      try {
+        if (editing) await adminApi.updateIngredient(editing.id, request)
+        else await adminApi.createIngredient(request)
+        setEditing(null); formElement.reset(); setMessage('ماده اولیه ذخیره شد.'); await load()
+      } catch (e) { setMessage(submitError(e)) }
+    })
   }
   return <Frame title="مواد اولیه">
     <PageGuide content={ingredientGuide} />
@@ -255,14 +304,18 @@ export function IngredientsPage() {
         </label>
       </div>
       <div className="ingredient-form-actions">
-        <button className="primary">{editing ? 'ذخیره تغییرات' : 'افزودن ماده'}</button>
-        {editing && <button type="button" onClick={() => setEditing(null)}>انصراف</button>}
+        <button className="primary" disabled={busy}>{busy ? 'در حال ذخیره…' : editing ? 'ذخیره تغییرات' : 'افزودن ماده'}</button>
+        {editing && <button type="button" disabled={busy} onClick={() => setEditing(null)}>انصراف</button>}
       </div>
     </form>
     <Feedback value={message} />
-    <DataPanel title="فهرست مواد اولیه" description="موجودی، نقطه هشدار و میانگین بهای هر ماده" count={items.length} emptyText="هنوز ماده اولیه‌ای تعریف نشده است.">
-      <table><thead><tr><th>ماده</th><th>واحد</th><th>موجودی</th><th>حداقل</th><th>سطح هدف</th><th>میانگین موزون</th><th>وضعیت</th><th>عملیات</th></tr></thead>
-      <tbody>{items.map((item) => <tr key={item.id} className={Number(item.currentStock) <= Number(item.minimumStockLevel) ? 'low-stock-row' : ''}>
+    <DataPanel pager={<Pager {...pagedIngredients} />} title="فهرست مواد اولیه" description="موجودی، نقطه هشدار و میانگین بهای هر ماده"
+      count={pagedIngredients.totalItems} loading={pagedIngredients.loading} error={pagedIngredients.error}
+      emptyText={pagedIngredients.filtered ? 'ماده‌ای با این جستجو پیدا نشد.' : 'هنوز ماده اولیه‌ای تعریف نشده است.'}
+      search={pagedIngredients.search} onSearch={pagedIngredients.setSearch} searchPlaceholder="جستجوی نام یا کد ماده">
+      <table><thead><tr><RowNumberHead /><th>ماده</th><th>واحد</th><th>موجودی</th><th>حداقل</th><th>سطح هدف</th><th>میانگین موزون</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+      <tbody>{pagedIngredients.visible.map((item, index) => <tr key={item.id} className={Number(item.currentStock) <= Number(item.minimumStockLevel) ? 'low-stock-row' : ''}>
+        <RowNumberCell offset={pagedIngredients.rowOffset} index={index} />
         <td>{item.name}</td><td>{item.baseUnitName}</td><td>{number(item.currentStock)}</td><td>{number(item.minimumStockLevel)}</td>
         <td>{item.preferredStockLevel ? number(item.preferredStockLevel) : '—'}</td><td>{money(item.weightedAverageCost)}</td><td>{item.isActive ? 'فعال' : 'غیرفعال'}</td>
         <td><button type="button" onClick={() => setEditing(item)}>ویرایش</button></td>
@@ -272,19 +325,24 @@ export function IngredientsPage() {
 }
 
 export function SuppliersPage() {
-  const [items, setItems] = useState<SupplierDto[]>([])
+  const { busy, run } = useAsyncAction()
+  const pagedSuppliers = useServerPagedGrid<SupplierDto, EmptyFilters>(
+    ({ page, pageSize, search }) => adminApi.suppliersPaged({ page, pageSize }, search), {})
   const [editing, setEditing] = useState<SupplierDto | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const load = useCallback(async () => { try { setItems(await adminApi.suppliers()) } catch (e) { setMessage(submitError(e)) } }, [])
-  useEffect(() => { void load() }, [load])
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); const data = new FormData(event.currentTarget)
+  const load = pagedSuppliers.refresh
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formElement = event.currentTarget
+    const data = new FormData(formElement)
     const value = { name: String(data.get('name') ?? ''), contactName: String(data.get('contactName') ?? '') || null,
       mobile: String(data.get('mobile') ?? '') || null, phone: null, address: String(data.get('address') ?? '') || null,
       notes: null, isActive: true }
-    try { editing ? await adminApi.updateSupplier(editing.id, value) : await adminApi.createSupplier(value)
-      setEditing(null); event.currentTarget.reset(); setMessage('تأمین‌کننده ذخیره شد.'); await load()
-    } catch (e) { setMessage(submitError(e)) }
+    void run(async () => {
+      try { editing ? await adminApi.updateSupplier(editing.id, value) : await adminApi.createSupplier(value)
+        setEditing(null); formElement.reset(); setMessage('تأمین‌کننده ذخیره شد.'); await load()
+      } catch (e) { setMessage(submitError(e)) }
+    })
   }
   return <Frame title="تأمین‌کنندگان"><PageGuide content={supplierGuide} /><form className="panel v15-form" onSubmit={submit}>
     <h2>{editing ? 'ویرایش تأمین‌کننده' : 'تعریف تأمین‌کننده'}</h2>
@@ -292,40 +350,50 @@ export function SuppliersPage() {
     <label>شخص تماس<input name="contactName" defaultValue={editing?.contactName ?? ''} key={`sc-${editing?.id ?? 0}`} /></label>
     <label>موبایل<input name="mobile" dir="ltr" defaultValue={editing?.mobile ?? ''} key={`sm-${editing?.id ?? 0}`} /></label>
     <label>آدرس<input name="address" defaultValue={editing?.address ?? ''} key={`sa-${editing?.id ?? 0}`} /></label>
-    <button className="primary">{editing ? 'ذخیره' : 'افزودن'}</button></form><Feedback value={message} />
-    <DataPanel title="تأمین‌کنندگان ثبت‌شده" description="اطلاعات تماس مورد استفاده در فاکتورهای خرید" count={items.length} emptyText="هنوز تأمین‌کننده‌ای ثبت نشده است.">
-      <table><thead><tr><th>نام</th><th>شخص تماس</th><th>موبایل</th><th>آدرس</th><th>عملیات</th></tr></thead>
-      <tbody>{items.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.contactName ?? '—'}</td><td dir="ltr">{item.mobile ?? '—'}</td><td>{item.address ?? '—'}</td><td><button onClick={() => setEditing(item)}>ویرایش</button></td></tr>)}</tbody>
+    <button className="primary" disabled={busy}>{busy ? 'در حال ذخیره…' : editing ? 'ذخیره' : 'افزودن'}</button></form><Feedback value={message} />
+    <DataPanel pager={<Pager {...pagedSuppliers} />} title="تأمین‌کنندگان ثبت‌شده" description="اطلاعات تماس مورد استفاده در فاکتورهای خرید"
+      count={pagedSuppliers.totalItems} loading={pagedSuppliers.loading} error={pagedSuppliers.error}
+      emptyText={pagedSuppliers.filtered ? 'تأمین‌کننده‌ای با این جستجو پیدا نشد.' : 'هنوز تأمین‌کننده‌ای ثبت نشده است.'}
+      search={pagedSuppliers.search} onSearch={pagedSuppliers.setSearch} searchPlaceholder="جستجوی نام، شخص تماس یا موبایل">
+      <table><thead><tr><RowNumberHead /><th>نام</th><th>شخص تماس</th><th>موبایل</th><th>آدرس</th><th>عملیات</th></tr></thead>
+      <tbody>{pagedSuppliers.visible.map((item, index) => <tr key={item.id}><RowNumberCell offset={pagedSuppliers.rowOffset} index={index} /><td>{item.name}</td><td>{item.contactName ?? '—'}</td><td dir="ltr">{item.mobile ?? '—'}</td><td>{item.address ?? '—'}</td><td><button onClick={() => setEditing(item)}>ویرایش</button></td></tr>)}</tbody>
     </table></DataPanel></Frame>
 }
 
 export function InventoryPage() {
+  const { busy, run } = useAsyncAction()
   const [ingredients, setIngredients] = useState<IngredientDto[]>([])
-  const [movements, setMovements] = useState<InventoryMovementDto[]>([])
+  const pagedMovements = useServerPagedGrid<InventoryMovementDto, EmptyFilters>(
+    ({ page, pageSize }) => adminApi.inventoryMovements(undefined, { page, pageSize }), {})
+  const movements = pagedMovements.items
   const [message, setMessage] = useState<string | null>(null)
   const [operation, setOperation] = useState<'increase' | 'decrease' | 'waste' | 'count'>('increase')
   const load = useCallback(async () => {
-    try { const [i, m] = await Promise.all([adminApi.ingredients(), adminApi.inventoryMovements()]); setIngredients(i); setMovements(m) }
+    try { setIngredients(await adminApi.ingredients()) }
     catch (e) { setMessage(submitError(e)) }
   }, [])
   useEffect(() => { void load() }, [load])
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); const data = new FormData(event.currentTarget)
-    try {
-      const kind = String(data.get('operation') ?? operation) as typeof operation
-      const quantity = normalizeDecimalInput(data.get('quantity'))
-      const reason = String(data.get('reason') ?? '').trim()
-      if (kind === 'waste') await adminApi.registerWaste({ ingredientId: Number(data.get('ingredientId')),
-        quantity, reason: reason as 'سایر', notes: null })
-      else if (kind === 'count') await adminApi.confirmStockCount({
-        items: [{ ingredientId: Number(data.get('ingredientId')), countedQuantity: quantity }],
-        notes: reason || null,
-      })
-      else await adminApi.adjustInventory({ ingredientId: Number(data.get('ingredientId')),
-        quantity, type: kind as 'increase' | 'decrease',
-        reason, notes: null })
-      setMessage('گردش انبار ثبت شد.'); event.currentTarget.reset(); setOperation('increase'); await load()
-    } catch (e) { setMessage(submitError(e)) }
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formElement = event.currentTarget
+    const data = new FormData(formElement)
+    void run(async () => {
+      try {
+        const kind = String(data.get('operation') ?? operation) as typeof operation
+        const quantity = normalizeDecimalInput(data.get('quantity'))
+        const reason = String(data.get('reason') ?? '').trim()
+        if (kind === 'waste') await adminApi.registerWaste({ ingredientId: Number(data.get('ingredientId')),
+          quantity, reason: reason as 'سایر', notes: null })
+        else if (kind === 'count') await adminApi.confirmStockCount({
+          items: [{ ingredientId: Number(data.get('ingredientId')), countedQuantity: quantity }],
+          notes: reason || null,
+        })
+        else await adminApi.adjustInventory({ ingredientId: Number(data.get('ingredientId')),
+          quantity, type: kind as 'increase' | 'decrease',
+          reason, notes: null })
+        setMessage('گردش انبار ثبت شد.'); formElement.reset(); setOperation('increase'); await Promise.all([load(), pagedMovements.refresh()])
+      } catch (e) { setMessage(submitError(e)) }
+    })
   }
   const typeLabel: Record<number, string> = {
     [InventoryTransactionType.PurchaseIn]:'ورود از خرید',[InventoryTransactionType.ProductionConsumption]:'مصرف تولید',
@@ -347,17 +415,23 @@ export function InventoryPage() {
     <label>{operation === 'count' ? 'موجودی شمارش‌شده' : 'مقدار'}<input name="quantity" inputMode="decimal" required /></label>
     {operation === 'waste' ? <label>دلیل<select name="reason" required><option value="">انتخاب کنید</option>{['فساد','سوختگی','ریزش','اشتباه در پخت','مصرف شخصی','بسته‌بندی آسیب‌دیده','سایر'].map((reason) => <option key={reason}>{reason}</option>)}</select></label>
       : <label>{operation === 'count' ? 'یادداشت' : 'دلیل'}<input name="reason" required={operation !== 'count'} /></label>}
-    <button className="primary">ثبت گردش</button></form><Feedback value={message} />
-    <DataPanel title="دفتر گردش انبار" description="نوع ثبت، جهت اثر روی موجودی و مقدار هر گردش" count={movements.length} emptyText="هنوز گردش انباری ثبت نشده است.">
-      <table><thead><tr><th>زمان</th><th>ماده</th><th>نوع ثبت</th><th>نوع گردش</th><th>مقدار</th><th>هزینه واحد</th><th>یادداشت</th></tr></thead>
-      <tbody>{movements.map((item) => <tr key={item.id}><td>{date(item.transactionDate)}</td><td>{item.ingredientName}</td>
+    <button className="primary" disabled={busy}>{busy ? 'در حال ثبت…' : 'ثبت گردش'}</button></form><Feedback value={message} />
+    <DataPanel pager={<Pager {...pagedMovements} />} title="دفتر گردش انبار" description="نوع ثبت، جهت اثر روی موجودی و مقدار هر گردش" count={movements.length} emptyText="هنوز گردش انباری ثبت نشده است.">
+      <table><thead><tr><RowNumberHead /><th>زمان</th><th>ماده</th><th>نوع ثبت</th><th>نوع گردش</th><th>مقدار</th><th>هزینه واحد</th><th>یادداشت</th></tr></thead>
+      <tbody>{pagedMovements.visible.map((item, index) => <tr key={item.id}><RowNumberCell offset={pagedMovements.rowOffset} index={index} /><td>{date(item.transactionDate)}</td><td>{item.ingredientName}</td>
         <td>{typeLabel[item.transactionType] ?? 'نامشخص'}</td><td>{movementDirectionLabel(item)}</td><td dir="ltr">{number(item.quantityInBaseUnit)}</td><td>{money(item.unitCost)}</td><td>{item.notes ?? '—'}</td></tr>)}</tbody></table>
     </DataPanel>
   </Frame>
 }
 
 export function PurchasesPage() {
-  const [purchases, setPurchases] = useState<PurchaseSummaryDto[]>([])
+  const draftAction = useAsyncAction()
+  const payAction = useAsyncAction()
+  const rowAction = useAsyncAction()
+  const [rowBusyId, setRowBusyId] = useState<number | null>(null)
+  const pagedPurchases = useServerPagedGrid<PurchaseSummaryDto, EmptyFilters>(
+    ({ page, pageSize }) => adminApi.purchases(undefined, { page, pageSize }), {})
+  const purchases = pagedPurchases.items
   const [ingredients, setIngredients] = useState<IngredientDto[]>([])
   const [units, setUnits] = useState<UnitDto[]>([])
   const [suppliers, setSuppliers] = useState<SupplierDto[]>([])
@@ -365,34 +439,50 @@ export function PurchasesPage() {
   const [lines, setLines] = useState<PurchaseLineDraft[]>([emptyPurchaseLine()])
   const [message, setMessage] = useState<string | null>(null)
   const load = useCallback(async () => {
-    try { const [p,i,u,s,a]=await Promise.all([adminApi.purchases(),adminApi.ingredients(),adminApi.units(),adminApi.suppliers(),adminApi.financialAccounts()])
-      setPurchases(p);setIngredients(i);setUnits(u);setSuppliers(s);setAccounts(a) } catch(e){setMessage(submitError(e))}
+    try { const [i,u,s,a]=await Promise.all([adminApi.ingredients(),adminApi.units(),adminApi.suppliers(),adminApi.financialAccounts()])
+      setIngredients(i);setUnits(u);setSuppliers(s);setAccounts(a) } catch(e){setMessage(submitError(e))}
   },[])
   useEffect(()=>{void load()},[load])
+  const [purchaseDate,setPurchaseDate]=useState(today())
   const updateLine = (key:string, field:keyof Omit<PurchaseLineDraft,'key'>, value:string) =>
     setLines((current)=>current.map((line)=>line.key===key?{...line,[field]:value}:line))
-  const submit=async(event:FormEvent<HTMLFormElement>)=>{
-    event.preventDefault();const d=new FormData(event.currentTarget)
+  const submit=(event:FormEvent<HTMLFormElement>)=>{
+    event.preventDefault()
+    const formElement=event.currentTarget
+    const d=new FormData(formElement)
+    void draftAction.run(async()=>{
     try{await adminApi.createPurchase({supplierId:Number(d.get('supplierId'))||null,invoiceNumber:String(d.get('invoiceNumber')??'')||null,
-      purchaseDate:String(d.get('purchaseDate')),discountAmount:moneyInput(d.get('discountAmount')),
+      purchaseDate,discountAmount:moneyInput(d.get('discountAmount')),
       additionalCostAmount:moneyInput(d.get('additionalCostAmount')),notes:String(d.get('notes')??'')||null,attachmentUrl:null,
       items:lines.map((line)=>({ingredientId:Number(line.ingredientId),purchaseUnitId:Number(line.unitId),quantity:normalizeDecimalInput(line.quantity),
         conversionFactorToBaseUnit:normalizeDecimalInput(line.factor),unitPrice:moneyInput(line.unitPrice),lineDiscountAmount:moneyInput(line.discount),
         expirationDate:line.expirationDate||null,batchNumber:line.batchNumber||null,notes:null}))});
-      setMessage('پیش‌نویس خرید ثبت شد.');event.currentTarget.reset();setLines([emptyPurchaseLine()]);await load()}
+      setMessage('پیش‌نویس خرید ثبت شد.');formElement.reset();setPurchaseDate(today());setLines([emptyPurchaseLine()]);await Promise.all([load(), pagedPurchases.refresh()])}
     catch(e){setMessage(submitError(e))}
+    })
   }
-  const pay=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const d=new FormData(event.currentTarget)
+  const pay=(event:FormEvent<HTMLFormElement>)=>{
+    event.preventDefault()
+    const formElement=event.currentTarget
+    const d=new FormData(formElement)
+    void payAction.run(async()=>{
     try{await adminApi.registerPurchasePayment({purchaseId:Number(d.get('purchaseId')),financialAccountId:Number(d.get('accountId')),
       amount:moneyInput(d.get('amount')),paymentMethod:Number(d.get('paymentMethod')) as PurchasePaymentMethod,
-      trackingNumber:String(d.get('trackingNumber')??'')||null,notes:null});event.currentTarget.reset();setMessage('پرداخت خرید ثبت شد.');await load()}
-    catch(e){setMessage(submitError(e))}}
-  const action=async(id:number,kind:'confirm'|'cancel')=>{if(!confirm(kind==='confirm'?'خرید تأیید و وارد انبار شود؟':'خرید لغو یا برگشت داده شود؟'))return
-    try{kind==='confirm'?await adminApi.confirmPurchase(id):await adminApi.cancelPurchase(id);setMessage('وضعیت خرید به‌روزرسانی شد.');await load()}catch(e){setMessage(submitError(e))}}
+      trackingNumber:String(d.get('trackingNumber')??'')||null,notes:null});formElement.reset();setMessage('پرداخت خرید ثبت شد.');await Promise.all([load(), pagedPurchases.refresh()])}
+    catch(e){setMessage(submitError(e))}
+    })}
+  const action=(id:number,kind:'confirm'|'cancel')=>{
+    if(!confirm(kind==='confirm'?'خرید تأیید و وارد انبار شود؟':'خرید لغو یا برگشت داده شود؟'))return
+    setRowBusyId(id)
+    void rowAction.run(async()=>{
+      try{kind==='confirm'?await adminApi.confirmPurchase(id):await adminApi.cancelPurchase(id);setMessage('وضعیت خرید به‌روزرسانی شد.');await Promise.all([load(), pagedPurchases.refresh()])}
+      catch(e){setMessage(submitError(e))}
+      finally{setRowBusyId(null)}
+    })}
   const status:Record<number,string>={[PurchaseStatus.Draft]:'پیش‌نویس',[PurchaseStatus.Confirmed]:'تأییدشده',[PurchaseStatus.Cancelled]:'لغوشده'}
   return <Frame title="خریدها"><PageGuide content={purchaseGuide} /><form className="panel v15-form purchase-form" onSubmit={submit}><h2>پیش‌نویس خرید</h2>
     <label>تأمین‌کننده<select name="supplierId"><option value="">خرید متفرقه</option>{suppliers.filter(x=>x.isActive).map(x=><option value={x.id} key={x.id}>{x.name}</option>)}</select></label>
-    <label>تاریخ<input name="purchaseDate" type="date" defaultValue={today()} required /></label>
+    <DateField label="تاریخ" value={purchaseDate} onChange={setPurchaseDate} />
     <label>شماره فاکتور<input name="invoiceNumber" /></label>
     <label>تخفیف کل<input name="discountAmount" inputMode="numeric" defaultValue="0" /></label>
     <label>هزینه جانبی<input name="additionalCostAmount" inputMode="numeric" defaultValue="0" /></label>
@@ -404,28 +494,29 @@ export function PurchasesPage() {
       <label>ضریب به پایه<input required inputMode="decimal" value={line.factor} onChange={(e)=>updateLine(line.key,'factor',e.target.value)}/></label>
       <label>قیمت واحد<input required inputMode="numeric" value={line.unitPrice} onChange={(e)=>updateLine(line.key,'unitPrice',e.target.value)}/></label>
       <label>تخفیف ردیف<input inputMode="numeric" value={line.discount} onChange={(e)=>updateLine(line.key,'discount',e.target.value)}/></label>
-      <label>انقضا<input type="date" value={line.expirationDate} onChange={(e)=>updateLine(line.key,'expirationDate',e.target.value)}/></label>
+      <DateField label="انقضا" allowClear value={line.expirationDate} onChange={(v)=>updateLine(line.key,'expirationDate',v)} />
       <label>بچ/سری<input value={line.batchNumber} onChange={(e)=>updateLine(line.key,'batchNumber',e.target.value)}/></label>
       <button type="button" className="danger" disabled={lines.length===1} onClick={()=>setLines((current)=>current.filter((item)=>item.key!==line.key))}>حذف ردیف {index+1}</button>
     </div>)}</div>
     <button type="button" onClick={()=>setLines((current)=>[...current,emptyPurchaseLine()])}>افزودن ردیف</button>
-    <button className="primary">ثبت پیش‌نویس</button>
-  </form><Feedback value={message}/><DataPanel title="فاکتورهای خرید" description="پیش‌نویس‌ها، خریدهای واردشده به انبار و خریدهای لغوشده" count={purchases.length} emptyText="هنوز فاکتور خریدی ثبت نشده است.">
-    <table><thead><tr><th>شماره خرید</th><th>تاریخ</th><th>تأمین‌کننده</th><th>مبلغ کل</th><th>پرداخت‌شده</th><th>وضعیت</th><th>عملیات</th></tr></thead>
-    <tbody>{purchases.map(x=><tr key={x.id}><td dir="ltr">{x.purchaseNumber}</td><td>{dateOnly(x.purchaseDate)}</td><td>{x.supplierName??'متفرقه'}</td><td>{money(x.totalAmount)}</td><td>{money(x.paidAmount)}</td><td>{status[x.status]}</td>
-      <td className="actions">{x.status===PurchaseStatus.Draft&&<button type="button" className="primary" onClick={()=>void action(x.id,'confirm')}>تأیید</button>}
-        {x.status!==PurchaseStatus.Cancelled&&<button type="button" className="danger" onClick={()=>void action(x.id,'cancel')}>لغو/برگشت</button>}</td></tr>)}</tbody></table>
+    <button className="primary" disabled={draftAction.busy}>{draftAction.busy ? 'در حال ثبت…' : 'ثبت پیش‌نویس'}</button>
+  </form><Feedback value={message}/><DataPanel pager={<Pager {...pagedPurchases} />} title="فاکتورهای خرید" description="پیش‌نویس‌ها، خریدهای واردشده به انبار و خریدهای لغوشده" count={purchases.length} emptyText="هنوز فاکتور خریدی ثبت نشده است.">
+    <table><thead><tr><RowNumberHead /><th>شماره خرید</th><th>تاریخ</th><th>تأمین‌کننده</th><th>مبلغ کل</th><th>پرداخت‌شده</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+    <tbody>{pagedPurchases.visible.map((x,index)=><tr key={x.id}><RowNumberCell offset={pagedPurchases.rowOffset} index={index} /><td dir="ltr">{x.purchaseNumber}</td><td>{dateOnly(x.purchaseDate)}</td><td>{x.supplierName??'متفرقه'}</td><td>{money(x.totalAmount)}</td><td>{money(x.paidAmount)}</td><td>{status[x.status]}</td>
+      <td className="actions">{x.status===PurchaseStatus.Draft&&<button type="button" className="primary" disabled={rowAction.busy} onClick={()=>action(x.id,'confirm')}>{rowBusyId===x.id?'…':'تأیید'}</button>}
+        {x.status!==PurchaseStatus.Cancelled&&<button type="button" className="danger" disabled={rowAction.busy} onClick={()=>action(x.id,'cancel')}>{rowBusyId===x.id?'…':'لغو/برگشت'}</button>}</td></tr>)}</tbody></table>
     </DataPanel>
     <form className="panel v15-form" onSubmit={pay}><h2>پرداخت خرید</h2>
       <label>خرید<select name="purchaseId" required><option value="">انتخاب</option>{purchases.filter(x=>x.status===PurchaseStatus.Confirmed&&x.paidAmount<x.totalAmount).map(x=><option key={x.id} value={x.id}>{x.purchaseNumber} — {money(x.totalAmount-x.paidAmount)}</option>)}</select></label>
       <label>حساب<select name="accountId" required><option value="">انتخاب</option>{accounts.filter(x=>x.isActive).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
       <label>روش<select name="paymentMethod"><option value={PurchasePaymentMethod.Cash}>نقدی</option><option value={PurchasePaymentMethod.Bank}>بانکی</option><option value={PurchasePaymentMethod.Card}>کارت</option><option value={PurchasePaymentMethod.Other}>سایر</option></select></label>
       <label>مبلغ<input name="amount" inputMode="numeric" required /></label><label>شماره پیگیری<input name="trackingNumber" /></label>
-      <button className="primary">ثبت پرداخت خرید</button>
+      <button className="primary" disabled={payAction.busy}>{payAction.busy ? 'در حال ثبت…' : 'ثبت پرداخت خرید'}</button>
     </form></Frame>
 }
 
 export function RecipesPage() {
+  const { busy, run } = useAsyncAction()
   const [foods,setFoods]=useState<Array<{id:number;name:string}>>([])
   const [ingredients,setIngredients]=useState<IngredientDto[]>([])
   const [foodId,setFoodId]=useState(0)
@@ -442,10 +533,13 @@ export function RecipesPage() {
       setLines(value?.items.length?value.items.map((item)=>({key:crypto.randomUUID(),ingredientId:String(item.ingredientId),quantity:item.quantityInBaseUnit,waste:item.wastePercent===null?'':String(item.wastePercent)})):[emptyRecipeLine()])
     }).catch(e=>setMessage(submitError(e)))},[foodId])
   const updateLine=(key:string,field:keyof Omit<RecipeLineDraft,'key'>,value:string)=>setLines((current)=>current.map((line)=>line.key===key?{...line,[field]:value}:line))
-  const submit=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault()
+  const submit=(event:FormEvent<HTMLFormElement>)=>{
+    event.preventDefault()
+    void run(async()=>{
     try{await adminApi.saveRecipe(foodId,{yieldQuantity:Number(yieldQuantity),preparationLossPercent:preparationLoss?Number(preparationLoss):null,overheadPerPortion:Number(overhead)||0,notes:recipeNotes||null,isActive:true,
       items:lines.map((line)=>({ingredientId:Number(line.ingredientId),quantityInBaseUnit:line.quantity,wastePercent:line.waste?Number(line.waste):null,notes:null}))})
-      setMessage('دستور پخت ذخیره شد.');setRecipe(await adminApi.recipe(foodId))}catch(e){setMessage(submitError(e))}}
+      setMessage('دستور پخت ذخیره شد.');setRecipe(await adminApi.recipe(foodId))}catch(e){setMessage(submitError(e))}
+    })}
   return <Frame title="دستور پخت"><div className="panel"><label>غذا<select value={foodId} onChange={e=>setFoodId(Number(e.target.value))}><option value="0">انتخاب غذا</option>{foods.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label></div>
     {foodId>0&&<form className="panel v15-form" onSubmit={submit}><label>بازده (پرس)<input type="number" min="1" value={yieldQuantity} onChange={(e)=>setYieldQuantity(e.target.value)}/></label>
       <label>افت آماده‌سازی درصد<input type="number" min="0" max="99.99" step="0.01" value={preparationLoss} onChange={(e)=>setPreparationLoss(e.target.value)}/></label>
@@ -457,7 +551,7 @@ export function RecipesPage() {
         <label>ضایعات درصد<input type="number" min="0" max="99.99" step="0.01" value={line.waste} onChange={(e)=>updateLine(line.key,'waste',e.target.value)}/></label>
         <button type="button" className="danger" disabled={lines.length===1} onClick={()=>setLines((current)=>current.filter((item)=>item.key!==line.key))}>حذف ردیف {index+1}</button>
       </div>)}</div>
-      <button type="button" onClick={()=>setLines((current)=>[...current,emptyRecipeLine()])}>افزودن ماده</button><button className="primary">ذخیره دستور</button></form>}
+      <button type="button" onClick={()=>setLines((current)=>[...current,emptyRecipeLine()])}>افزودن ماده</button><button className="primary" disabled={busy}>{busy ? 'در حال ذخیره…' : 'ذخیره دستور'}</button></form>}
     <Feedback value={message}/>{recipe&&<div className="metric-grid"><article className="metric"><span>هزینه کل دستور</span><strong>{money(recipe.totalRecipeCost)}</strong></article>
       <article className="metric"><span>بهای هر پرس</span><strong>{money(recipe.costPerPortion)}</strong></article><article className="metric"><span>سود ناخالص تقریبی</span><strong>{recipe.estimatedGrossProfit===null?'—':money(recipe.estimatedGrossProfit)}</strong></article></div>}
     {recipe&&<div className="panel table-wrap"><table><thead><tr><th>ماده</th><th>مقدار کل</th><th>هر پرس</th><th>هزینه</th></tr></thead><tbody>{recipe.items.map(x=><tr key={x.id}><td>{x.ingredientName}</td><td>{number(x.quantityInBaseUnit)} {x.unitName}</td><td>{number(x.quantityPerPortion)}</td><td>{money(x.ingredientCost)}</td></tr>)}</tbody></table></div>}
@@ -465,27 +559,38 @@ export function RecipesPage() {
 }
 
 export function FinancePage() {
+  // One tracker per form: saving an account must not disable the transfer form, but a second click
+  // on the same form — which would post a duplicate transaction — has to be impossible.
+  const accountAction = useAsyncAction()
+  const entryAction = useAsyncAction()
+  const moveAction = useAsyncAction()
+  const terminalAction = useAsyncAction()
   const [accounts, setAccounts] = useState<FinancialAccountDto[]>([])
   const [categories, setCategories] = useState<ExpenseCategoryDto[]>([])
   const [terminals, setTerminals] = useState<PosTerminalDto[]>([])
-  const [transactions, setTransactions] = useState<Awaited<ReturnType<typeof adminApi.financialTransactions>>>([])
+  const pagedTransactions = useServerPagedGrid<FinancialTransactionRow, EmptyFilters>(
+    ({ page, pageSize }) => adminApi.financialTransactions({ page, pageSize }), {})
+  const transactions = pagedTransactions.items
+  const pagedAccounts = usePagination(accounts)
+  const pagedTerminals = usePagination(terminals)
   const [editingAccount, setEditingAccount] = useState<FinancialAccountDto | null>(null)
   const [editingTerminal, setEditingTerminal] = useState<PosTerminalDto | null>(null)
   const [entryKind, setEntryKind] = useState<'income' | 'expense'>('expense')
   const [message, setMessage] = useState<string | null>(null)
   const load = useCallback(async () => {
     try {
-      const [accountRows, transactionRows, terminalRows, categoryRows] = await Promise.all([
-        adminApi.financialAccounts(), adminApi.financialTransactions(),
-        adminApi.posTerminals(), adminApi.expenseCategories(),
+      // Transactions are no longer fetched here; that grid pages itself through `pagedTransactions`.
+      const [accountRows, terminalRows, categoryRows] = await Promise.all([
+        adminApi.financialAccounts(), adminApi.posTerminals(), adminApi.expenseCategories(),
       ])
-      setAccounts(accountRows); setTransactions(transactionRows)
-      setTerminals(terminalRows); setCategories(categoryRows)
+      setAccounts(accountRows); setTerminals(terminalRows); setCategories(categoryRows)
     } catch (error) { setMessage(submitError(error)) }
   }, [])
   useEffect(() => { void load() }, [load])
-  const account = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); const data = new FormData(event.currentTarget)
+  const account = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formElement = event.currentTarget
+    const data = new FormData(formElement)
     const value = {
       name: String(data.get('name')), type: Number(data.get('type')) as FinancialAccountType,
       bankName: String(data.get('bankName') ?? '') || null,
@@ -495,46 +600,60 @@ export function FinancePage() {
       openingBalance: Number(data.get('opening')) || 0,
       isActive: data.get('isActive') === 'on', notes: String(data.get('notes') ?? '') || null,
     }
-    try {
-      if (editingAccount) await adminApi.updateFinancialAccount(editingAccount.id, value)
-      else await adminApi.createFinancialAccount(value)
-      event.currentTarget.reset(); setEditingAccount(null); setMessage('حساب ذخیره شد.'); await load()
-    } catch (error) { setMessage(submitError(error)) }
+    void accountAction.run(async () => {
+      try {
+        if (editingAccount) await adminApi.updateFinancialAccount(editingAccount.id, value)
+        else await adminApi.createFinancialAccount(value)
+        formElement.reset(); setEditingAccount(null); setMessage('حساب ذخیره شد.'); await load()
+      } catch (error) { setMessage(submitError(error)) }
+    })
   }
-  const entry = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); const data = new FormData(event.currentTarget)
-    try {
-      await adminApi.createFinancialEntry(entryKind, {
-        financialAccountId: Number(data.get('accountId')), amount: Number(data.get('amount')),
-        categoryId: entryKind === 'expense' ? Number(data.get('categoryId')) || null : null,
-        description: String(data.get('description')),
-      })
-      event.currentTarget.reset(); setMessage('تراکنش ثبت شد.'); await load()
-    } catch (error) { setMessage(submitError(error)) }
+  const entry = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formElement = event.currentTarget
+    const data = new FormData(formElement)
+    void entryAction.run(async () => {
+      try {
+        await adminApi.createFinancialEntry(entryKind, {
+          financialAccountId: Number(data.get('accountId')), amount: Number(data.get('amount')),
+          categoryId: entryKind === 'expense' ? Number(data.get('categoryId')) || null : null,
+          description: String(data.get('description')),
+        })
+        formElement.reset(); setMessage('تراکنش ثبت شد.'); await Promise.all([load(), pagedTransactions.refresh()])
+      } catch (error) { setMessage(submitError(error)) }
+    })
   }
-  const move = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); const data = new FormData(event.currentTarget)
-    try {
-      await adminApi.transferFinancialAmount({
-        fromAccountId: Number(data.get('fromAccountId')), toAccountId: Number(data.get('toAccountId')),
-        amount: Number(data.get('amount')), description: String(data.get('description')),
-      })
-      event.currentTarget.reset(); setMessage('انتقال بین حساب‌ها ثبت شد.'); await load()
-    } catch (error) { setMessage(submitError(error)) }
+  const move = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formElement = event.currentTarget
+    const data = new FormData(formElement)
+    void moveAction.run(async () => {
+      try {
+        await adminApi.transferFinancialAmount({
+          fromAccountId: Number(data.get('fromAccountId')), toAccountId: Number(data.get('toAccountId')),
+          amount: Number(data.get('amount')), description: String(data.get('description')),
+        })
+        formElement.reset(); setMessage('انتقال بین حساب‌ها ثبت شد.'); await Promise.all([load(), pagedTransactions.refresh()])
+      } catch (error) { setMessage(submitError(error)) }
+    })
   }
-  const terminal = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault(); const data = new FormData(event.currentTarget)
+  const terminal = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const formElement = event.currentTarget
+    const data = new FormData(formElement)
     const value = {
       title: String(data.get('title')), terminalNumber: String(data.get('terminalNumber')),
       merchantNumber: String(data.get('merchantNumber') ?? '') || null,
       financialAccountId: Number(data.get('accountId')), isActive: data.get('isActive') === 'on',
       notes: String(data.get('notes') ?? '') || null,
     }
-    try {
-      if (editingTerminal) await adminApi.updatePosTerminal(editingTerminal.id, value)
-      else await adminApi.createPosTerminal(value)
-      event.currentTarget.reset(); setEditingTerminal(null); setMessage('دستگاه پوز ذخیره شد.'); await load()
-    } catch (error) { setMessage(submitError(error)) }
+    void terminalAction.run(async () => {
+      try {
+        if (editingTerminal) await adminApi.updatePosTerminal(editingTerminal.id, value)
+        else await adminApi.createPosTerminal(value)
+        formElement.reset(); setEditingTerminal(null); setMessage('دستگاه پوز ذخیره شد.'); await load()
+      } catch (error) { setMessage(submitError(error)) }
+    })
   }
   const activeAccounts = accounts.filter((item) => item.isActive)
   const accountType: Record<number, string> = {
@@ -560,7 +679,7 @@ export function FinancePage() {
         <label>مانده افتتاحیه<input name="opening" inputMode="numeric" defaultValue={editingAccount?.openingBalance ?? 0} /></label>
         <label>یادداشت<input name="notes" defaultValue={editingAccount?.notes ?? ''} /></label>
         <label className="switch"><input name="isActive" type="checkbox" defaultChecked={editingAccount?.isActive ?? true} />فعال</label>
-        <button className="primary">{editingAccount ? 'ذخیره تغییرات' : 'ثبت حساب'}</button>
+        <button className="primary" disabled={accountAction.busy}>{accountAction.busy ? 'در حال ذخیره…' : editingAccount ? 'ذخیره تغییرات' : 'ثبت حساب'}</button>
         {editingAccount && <button type="button" onClick={() => setEditingAccount(null)}>انصراف</button>}
       </form>
       <form className="panel v15-form" onSubmit={entry}>
@@ -571,7 +690,7 @@ export function FinancePage() {
         <label>حساب<select name="accountId" required><option value="">انتخاب</option>{activeAccounts.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>
         {entryKind === 'expense' && <label>دسته هزینه<select name="categoryId"><option value="">بدون دسته</option>{categories.map((item) => <option value={item.id} key={item.id}>{item.name}</option>)}</select></label>}
         <label>مبلغ<input name="amount" inputMode="numeric" required /></label>
-        <label>شرح<input name="description" required /></label><button className="primary">ثبت تراکنش</button>
+        <label>شرح<input name="description" required /></label><button className="primary" disabled={entryAction.busy}>{entryAction.busy ? 'در حال ثبت…' : 'ثبت تراکنش'}</button>
       </form>
     </div>
     <div className="v15-two-column">
@@ -579,7 +698,7 @@ export function FinancePage() {
         <label>از حساب<select name="fromAccountId" required><option value="">انتخاب</option>{activeAccounts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label>به حساب<select name="toAccountId" required><option value="">انتخاب</option>{activeAccounts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label>مبلغ<input name="amount" inputMode="numeric" required /></label><label>شرح<input name="description" required /></label>
-        <button className="primary">ثبت انتقال</button>
+        <button className="primary" disabled={moveAction.busy}>{moveAction.busy ? 'در حال ثبت…' : 'ثبت انتقال'}</button>
       </form>
       <form className="panel v15-form" key={`terminal-${editingTerminal?.id ?? 0}`} onSubmit={terminal}>
         <h2>{editingTerminal ? 'ویرایش دستگاه پوز' : 'دستگاه پوز'}</h2>
@@ -589,114 +708,159 @@ export function FinancePage() {
         <label>حساب واریز<select name="accountId" required defaultValue={editingTerminal?.financialAccountId}><option value="">انتخاب</option>{activeAccounts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
         <label>یادداشت<input name="notes" defaultValue={editingTerminal?.notes ?? ''} /></label>
         <label className="switch"><input name="isActive" type="checkbox" defaultChecked={editingTerminal?.isActive ?? true} />فعال</label>
-        <button className="primary">{editingTerminal ? 'ذخیره تغییرات' : 'ثبت دستگاه'}</button>
+        <button className="primary" disabled={terminalAction.busy}>{terminalAction.busy ? 'در حال ذخیره…' : editingTerminal ? 'ذخیره تغییرات' : 'ثبت دستگاه'}</button>
         {editingTerminal && <button type="button" onClick={() => setEditingTerminal(null)}>انصراف</button>}
       </form>
     </div>
     <Feedback value={message} />
-    <DataPanel title="حساب‌های مالی" description="مانده جاری صندوق‌ها، بانک‌ها و تنخواه" count={accounts.length} emptyText="هنوز حساب مالی‌ای تعریف نشده است.">
-      <table><thead><tr><th>حساب</th><th>نوع</th><th>مانده</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>
-      {accounts.map((item) => <tr key={item.id}><td>{item.name}</td><td>{accountType[item.type]}</td><td>{money(item.currentBalance)}</td><td>{item.isActive ? 'فعال' : 'غیرفعال'}</td><td><button type="button" onClick={() => setEditingAccount(item)}>ویرایش</button></td></tr>)}
+    <DataPanel pager={<Pager {...pagedAccounts} />} title="حساب‌های مالی" description="مانده جاری صندوق‌ها، بانک‌ها و تنخواه" count={accounts.length} emptyText="هنوز حساب مالی‌ای تعریف نشده است.">
+      <table><thead><tr><RowNumberHead /><th>حساب</th><th>نوع</th><th>مانده</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>
+      {pagedAccounts.visible.map((item, index) => <tr key={item.id}><RowNumberCell offset={pagedAccounts.rowOffset} index={index} /><td>{item.name}</td><td>{accountType[item.type]}</td><td>{money(item.currentBalance)}</td><td>{item.isActive ? 'فعال' : 'غیرفعال'}</td><td><button type="button" onClick={() => setEditingAccount(item)}>ویرایش</button></td></tr>)}
     </tbody></table>
     </DataPanel>
-    <DataPanel title="دستگاه‌های پوز" description="ارتباط هر پایانه با حساب دریافت‌کننده" count={terminals.length} emptyText="هنوز دستگاه پوزی تعریف نشده است.">
-      <table><thead><tr><th>دستگاه پوز</th><th>شماره پایانه</th><th>حساب</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>
-      {terminals.map((item) => <tr key={item.id}><td>{item.title}</td><td dir="ltr">{item.terminalNumber}</td><td>{item.financialAccountName}</td><td>{item.isActive ? 'فعال' : 'غیرفعال'}</td><td><button type="button" onClick={() => setEditingTerminal(item)}>ویرایش</button></td></tr>)}
+    <DataPanel pager={<Pager {...pagedTerminals} />} title="دستگاه‌های پوز" description="ارتباط هر پایانه با حساب دریافت‌کننده" count={terminals.length} emptyText="هنوز دستگاه پوزی تعریف نشده است.">
+      <table><thead><tr><RowNumberHead /><th>دستگاه پوز</th><th>شماره پایانه</th><th>حساب</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody>
+      {pagedTerminals.visible.map((item, index) => <tr key={item.id}><RowNumberCell offset={pagedTerminals.rowOffset} index={index} /><td>{item.title}</td><td dir="ltr">{item.terminalNumber}</td><td>{item.financialAccountName}</td><td>{item.isActive ? 'فعال' : 'غیرفعال'}</td><td><button type="button" onClick={() => setEditingTerminal(item)}>ویرایش</button></td></tr>)}
     </tbody></table>
     </DataPanel>
-    <DataPanel title="گردش مالی" description="آخرین درآمدها، هزینه‌ها، انتقال‌ها، دریافت‌ها و استردادها" count={transactions.length} emptyText="هنوز گردش مالی‌ای ثبت نشده است.">
-      <table><thead><tr><th>زمان</th><th>حساب</th><th>دسته</th><th>شرح</th><th>مبلغ</th></tr></thead><tbody>
-      {transactions.map((item) => <tr key={item.id}><td>{date(item.transactionDate)}</td><td>{item.financialAccountName}</td><td>{item.categoryName ?? '—'}</td><td>{item.description}</td><td className={item.amount < 0 ? 'negative-amount' : 'positive-amount'}>{money(item.amount)}</td></tr>)}
+    <DataPanel pager={<Pager {...pagedTransactions} />} title="گردش مالی" description="آخرین درآمدها، هزینه‌ها، انتقال‌ها، دریافت‌ها و استردادها" count={transactions.length} emptyText="هنوز گردش مالی‌ای ثبت نشده است.">
+      <table><thead><tr><RowNumberHead /><th>زمان</th><th>حساب</th><th>دسته</th><th>شرح</th><th>مبلغ</th></tr></thead><tbody>
+      {pagedTransactions.visible.map((item, index) => <tr key={item.id}><RowNumberCell offset={pagedTransactions.rowOffset} index={index} /><td>{date(item.transactionDate)}</td><td>{item.financialAccountName}</td><td>{item.categoryName ?? '—'}</td><td>{item.description}</td><td className={item.amount < 0 ? 'negative-amount' : 'positive-amount'}>{money(item.amount)}</td></tr>)}
     </tbody></table>
     </DataPanel>
   </Frame>
 }
 
 export function ShoppingPage() {
+  const calculateAction = useAsyncAction()
+  const createAction = useAsyncAction()
   const [target,setTarget]=useState(today());const [items,setItems]=useState<Awaited<ReturnType<typeof adminApi.shoppingRequirements>>>([])
-  const [lists,setLists]=useState<Awaited<ReturnType<typeof adminApi.shoppingLists>>>([])
+  const pagedRequirements=usePagination(items)
+  const pagedLists=useServerPagedGrid<ShoppingListSummaryDto, EmptyFilters>(
+    ({ page, pageSize, search }) => adminApi.shoppingListsPaged({ page, pageSize }, search), {})
   const [message,setMessage]=useState<string|null>(null)
-  const loadLists=useCallback(async()=>{try{setLists(await adminApi.shoppingLists())}catch(e){setMessage(submitError(e))}},[])
-  useEffect(()=>{void loadLists()},[loadLists])
+  const loadLists=pagedLists.refresh
   const calculate=async()=>{try{setItems(await adminApi.shoppingRequirements(target,target));setMessage(null)}catch(e){setMessage(submitError(e))}}
   const create=async()=>{try{const result=await adminApi.createShoppingList({title:`لیست خرید ${target}`,targetDate:target,
     items:items.filter(x=>Number(x.shortageQuantity)>0).map(x=>({ingredientId:x.ingredientId,requiredQuantity:x.requiredQuantity,
       currentStockSnapshot:x.currentStock,suggestedPurchaseQuantity:x.shortageQuantity,estimatedUnitCost:x.estimatedUnitCost}))})
     setMessage(`لیست خرید شماره ${number(result.id)} ساخته شد.`);await loadLists()}catch(e){setMessage(submitError(e))}}
   const status:Record<number,string>={[ShoppingListStatus.Draft]:'پیش‌نویس',[ShoppingListStatus.InProgress]:'در حال خرید',[ShoppingListStatus.Completed]:'تکمیل‌شده',[ShoppingListStatus.Cancelled]:'لغوشده'}
-  return <Frame title="لیست خرید"><PageGuide content={shoppingGuide} /><div className="panel v15-form"><h2>محاسبه کسری مواد</h2><label>تاریخ هدف<input type="date" value={target} onChange={e=>setTarget(e.target.value)}/></label>
-    <button className="primary" onClick={()=>void calculate()}>محاسبه نیاز خرید</button><button disabled={!items.some(x=>Number(x.shortageQuantity)>0)} onClick={()=>void create()}>تبدیل به لیست خرید</button></div>
-    <Feedback value={message}/><DataPanel title="نیاز و کسری مواد" description="نتیجه محاسبه بر پایه سفارش‌ها، دستور پخت و موجودی فعلی" count={items.length} emptyText="برای مشاهده نیازها، تاریخ را انتخاب و محاسبه را اجرا کنید.">
-      <table><thead><tr><th>ماده</th><th>نیاز</th><th>موجودی</th><th>کسری</th><th>هزینه برآوردی</th></tr></thead>
-      <tbody>{items.map(x=><tr key={x.ingredientId}><td>{x.ingredientName}</td><td>{number(x.requiredQuantity)} {x.unitName}</td><td>{number(x.currentStock)}</td><td className={Number(x.shortageQuantity)>0?'negative-amount':undefined}>{number(x.shortageQuantity)}</td><td>{money(x.estimatedPurchaseCost)}</td></tr>)}</tbody></table>
+  return <Frame title="لیست خرید"><PageGuide content={shoppingGuide} /><div className="panel v15-form"><h2>محاسبه کسری مواد</h2><DateField label="تاریخ هدف" value={target} onChange={setTarget} />
+    <button className="primary" disabled={calculateAction.busy} onClick={()=>void calculateAction.run(calculate)}>{calculateAction.busy?'در حال محاسبه…':'محاسبه نیاز خرید'}</button><button disabled={createAction.busy||!items.some(x=>Number(x.shortageQuantity)>0)} onClick={()=>void createAction.run(create)}>{createAction.busy?'در حال ساخت…':'تبدیل به لیست خرید'}</button></div>
+    <Feedback value={message}/><DataPanel pager={<Pager {...pagedRequirements} />} title="نیاز و کسری مواد" description="نتیجه محاسبه بر پایه سفارش‌ها، دستور پخت و موجودی فعلی" count={items.length} emptyText="برای مشاهده نیازها، تاریخ را انتخاب و محاسبه را اجرا کنید.">
+      <table><thead><tr><RowNumberHead /><th>ماده</th><th>نیاز</th><th>موجودی</th><th>کسری</th><th>هزینه برآوردی</th></tr></thead>
+      <tbody>{pagedRequirements.visible.map((x,index)=><tr key={x.ingredientId}><RowNumberCell offset={pagedRequirements.rowOffset} index={index} /><td>{x.ingredientName}</td><td>{number(x.requiredQuantity)} {x.unitName}</td><td>{number(x.currentStock)}</td><td className={Number(x.shortageQuantity)>0?'negative-amount':undefined}>{number(x.shortageQuantity)}</td><td>{money(x.estimatedPurchaseCost)}</td></tr>)}</tbody></table>
     </DataPanel>
-    <DataPanel title="لیست‌های ذخیره‌شده" description="خروجی‌های ثبت‌شده برای پیگیری خرید آشپزخانه" count={lists.length} emptyText="هنوز لیست خریدی ذخیره نشده است.">
-      <table><thead><tr><th>شماره</th><th>عنوان</th><th>تاریخ هدف</th><th>وضعیت</th><th>تعداد اقلام</th><th>برآورد خرید</th><th>مواد</th></tr></thead>
-      <tbody>{lists.map(x=><tr key={x.id}><td>{number(x.id)}</td><td>{x.title}</td><td dir="ltr">{x.targetDate}</td><td>{status[x.status]}</td><td>{number(x.itemCount)}</td><td>{money(x.estimatedTotal)}</td><td title={x.itemSummary}>{x.itemSummary||'—'}</td></tr>)}</tbody></table>
+    <DataPanel pager={<Pager {...pagedLists} />} title="لیست‌های ذخیره‌شده" description="خروجی‌های ثبت‌شده برای پیگیری خرید آشپزخانه"
+      count={pagedLists.totalItems} loading={pagedLists.loading} error={pagedLists.error}
+      emptyText={pagedLists.filtered ? 'لیستی با این جستجو پیدا نشد.' : 'هنوز لیست خریدی ذخیره نشده است.'}
+      search={pagedLists.search} onSearch={pagedLists.setSearch} searchPlaceholder="جستجوی عنوان لیست">
+      <table><thead><tr><RowNumberHead /><th>شماره</th><th>عنوان</th><th>تاریخ هدف</th><th>وضعیت</th><th>تعداد اقلام</th><th>برآورد خرید</th><th>مواد</th></tr></thead>
+      <tbody>{pagedLists.visible.map((x,index)=><tr key={x.id}><RowNumberCell offset={pagedLists.rowOffset} index={index} /><td>{number(x.id)}</td><td>{x.title}</td><td>{formatPersianDate(x.targetDate)}</td><td>{status[x.status]}</td><td>{number(x.itemCount)}</td><td>{money(x.estimatedTotal)}</td><td title={x.itemSummary}>{x.itemSummary||'—'}</td></tr>)}</tbody></table>
     </DataPanel></Frame>
 }
 
 export function PaymentsPage() {
-  const [items,setItems]=useState<Awaited<ReturnType<typeof adminApi.payments>>>([]);const[message,setMessage]=useState<string|null>(null)
+  const createAction=useAsyncAction()
+  const rowAction=useAsyncAction()
+  const [rowBusyId,setRowBusyId]=useState<number|null>(null)
+  const [paymentFilter,setPaymentFilter]=useState<'all'|'pending'|'successful'|'failed'|'refunded'>('all')
+  // The bucket filter runs in SQL. Filtering the loaded page instead would hide matching rows that
+  // happen to sit on another page.
+  const pagedPayments = useServerPagedGrid<CustomerPaymentDto, PaymentFilters>(
+    ({ page, pageSize, bucket }) => adminApi.payments({ page, pageSize }, bucket === 'all' ? undefined : bucket),
+    { bucket: 'all' })
+  const items = pagedPayments.items
+  const [totals,setTotals]=useState<PaymentTotals|null>(null)
+  const[message,setMessage]=useState<string|null>(null)
   const [accounts,setAccounts]=useState<FinancialAccountDto[]>([])
   const [terminals,setTerminals]=useState<PosTerminalDto[]>([])
-  const [orders,setOrders]=useState<Awaited<ReturnType<typeof adminApi.orders>>>([])
+  const [orders,setOrders]=useState<OrderSummaryDto[]>([])
   const [orderDate,setOrderDate]=useState(today())
   const [methodValue,setMethodValue]=useState<PaymentMethod>(PaymentMethod.Cash)
   const [paymentAccountId,setPaymentAccountId]=useState(0)
-  const [paymentFilter,setPaymentFilter]=useState<'all'|'pending'|'successful'|'failed'|'refunded'>('all')
-  const load=useCallback(async()=>{try{const[p,a,t,o]=await Promise.all([adminApi.payments(),adminApi.financialAccounts(),adminApi.posTerminals(),adminApi.orders({date:orderDate})]);setItems(p);setAccounts(a);setTerminals(t);setOrders(o)}catch(e){setMessage(submitError(e))}},[orderDate])
+  const load=useCallback(async()=>{try{const[tot,a,t,o]=await Promise.all([adminApi.paymentTotals(),adminApi.financialAccounts(),adminApi.posTerminals(),adminApi.orders({date:orderDate})]);setTotals(tot);setAccounts(a);setTerminals(t);setOrders(o.items)}catch(e){setMessage(submitError(e))}},[orderDate])
   useEffect(()=>{void load()},[load])
   const status:Record<number,string>={[PaymentStatus.Pending]:'در انتظار',[PaymentStatus.AwaitingVerification]:'در انتظار تأیید',[PaymentStatus.Paid]:'پرداخت‌شده',[PaymentStatus.Failed]:'ناموفق',[PaymentStatus.Rejected]:'ردشده',[PaymentStatus.Cancelled]:'لغوشده',[PaymentStatus.Refunded]:'مستردشده'}
   const method:Record<number,string>={[PaymentMethod.Cash]:'نقدی',[PaymentMethod.CardToCard]:'کارت‌به‌کارت',[PaymentMethod.Online]:'آنلاین',[PaymentMethod.Pos]:'پوز'}
-  const successful=items.filter(x=>x.status===PaymentStatus.Paid)
-  const failed=items.filter(x=>[PaymentStatus.Failed,PaymentStatus.Rejected,PaymentStatus.Cancelled].includes(x.status))
-  const pending=items.filter(x=>[PaymentStatus.Pending,PaymentStatus.AwaitingVerification].includes(x.status))
-  const refunded=items.filter(x=>x.status===PaymentStatus.Refunded)
-  const visiblePayments=paymentFilter==='successful'?successful:paymentFilter==='failed'?failed:paymentFilter==='pending'?pending:paymentFilter==='refunded'?refunded:items
-  const create=async(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();const d=new FormData(event.currentTarget);try{await adminApi.createPayment({orderId:Number(d.get('orderId')),paymentMethod:methodValue,financialAccountId:Number(d.get('accountId')),posTerminalId:methodValue===PaymentMethod.Pos?Number(d.get('posTerminalId')):null,amount:Number(d.get('amount')),trackingNumber:String(d.get('trackingNumber')??'')||null,referenceNumber:null,receiptImageUrl:null,description:String(d.get('description')??'')||null});event.currentTarget.reset();setMessage('پرداخت سفارش ثبت شد.');await load()}catch(e){setMessage(submitError(e))}}
-  const change=async(id:number,next:number)=>{try{await adminApi.changePaymentStatus(id,next);setMessage('وضعیت پرداخت ثبت شد.');await load()}catch(e){setMessage(submitError(e))}}
+  const bucketOf=(key:'successful'|'failed'|'pending'|'refunded')=>totals?.[key]??{count:0,amount:0}
+  const successful=bucketOf('successful'), failed=bucketOf('failed')
+  const pending=bucketOf('pending'), refunded=bucketOf('refunded')
+  const applyFilter=(next:typeof paymentFilter)=>{setPaymentFilter(next);pagedPayments.setFilters({bucket:next})}
+  const create=(event:FormEvent<HTMLFormElement>)=>{
+    event.preventDefault()
+    const formElement=event.currentTarget
+    const d=new FormData(formElement)
+    void createAction.run(async()=>{
+      try{await adminApi.createPayment({orderId:Number(d.get('orderId')),paymentMethod:methodValue,financialAccountId:Number(d.get('accountId')),posTerminalId:methodValue===PaymentMethod.Pos?Number(d.get('posTerminalId')):null,amount:Number(d.get('amount')),trackingNumber:String(d.get('trackingNumber')??'')||null,referenceNumber:null,receiptImageUrl:null,description:String(d.get('description')??'')||null});formElement.reset();setMessage('پرداخت سفارش ثبت شد.');await Promise.all([load(), pagedPayments.refresh()])}catch(e){setMessage(submitError(e))}
+    })
+  }
+  // `rowBusyId` marks which row shows progress; `rowAction.busy` disables every row action, because
+  // approving one payment while refunding another leaves the operator unsure which result they saw.
+  const change=(id:number,next:number)=>{
+    setRowBusyId(id)
+    void rowAction.run(async()=>{
+      try{await adminApi.changePaymentStatus(id,next);setMessage('وضعیت پرداخت ثبت شد.');await Promise.all([load(), pagedPayments.refresh()])}
+      catch(e){setMessage(submitError(e))}
+      finally{setRowBusyId(null)}
+    })
+  }
+  const refund=(id:number)=>{
+    if(!confirm('وجه مسترد شود؟'))return
+    setRowBusyId(id)
+    void rowAction.run(async()=>{
+      try{await adminApi.refundPayment(id);setMessage('وجه مسترد شد.');await Promise.all([load(), pagedPayments.refresh()])}
+      catch(e){setMessage(submitError(e))}
+      finally{setRowBusyId(null)}
+    })
+  }
   return <Frame title="پرداخت‌ها"><PageGuide content={paymentGuide} /><form className="panel v15-form" onSubmit={create}><h2>پرداخت جدید</h2>
-    <label>تاریخ سفارش<input type="date" value={orderDate} onChange={(e)=>setOrderDate(e.target.value)}/></label>
+    <DateField label="تاریخ سفارش" value={orderDate} onChange={setOrderDate} />
     <label>سفارش<select name="orderId" required><option value="">انتخاب</option>{orders.map(x=><option key={x.id} value={x.id}>{x.orderNumber} — {x.customerFullName} — {money(x.totalAmount)}</option>)}</select></label>
     <label>روش<select value={methodValue} onChange={(e)=>setMethodValue(Number(e.target.value) as PaymentMethod)}><option value={PaymentMethod.Cash}>نقدی</option><option value={PaymentMethod.CardToCard}>کارت‌به‌کارت</option><option value={PaymentMethod.Online}>آنلاین</option><option value={PaymentMethod.Pos}>پوز</option></select></label>
     <label>حساب<select name="accountId" required value={paymentAccountId||''} onChange={(event)=>setPaymentAccountId(Number(event.target.value))}><option value="">انتخاب</option>{accounts.filter(x=>x.isActive).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
     {methodValue===PaymentMethod.Pos&&<label>دستگاه پوز<select name="posTerminalId" required><option value="">انتخاب</option>{terminals.filter(x=>x.isActive&&x.financialAccountId===paymentAccountId).map(x=><option key={x.id} value={x.id}>{x.title}</option>)}</select></label>}
-    <label>مبلغ<input name="amount" inputMode="numeric" required/></label><label>شماره پیگیری<input name="trackingNumber" dir="ltr"/></label><label>شرح<input name="description"/></label><button className="primary">ثبت پرداخت</button>
+    <label>مبلغ<input name="amount" inputMode="numeric" required/></label><label>شماره پیگیری<input name="trackingNumber" dir="ltr"/></label><label>شرح<input name="description"/></label><button className="primary" disabled={createAction.busy}>{createAction.busy?'در حال ثبت…':'ثبت پرداخت'}</button>
   </form><Feedback value={message}/>
   <section className="payment-status-overview" aria-label="خلاصه پرداخت مشتریان">
-    <button type="button" className={paymentFilter==='successful'?'payment-metric success active':'payment-metric success'} onClick={()=>setPaymentFilter('successful')}><span>پرداخت موفق</span><strong>{number(successful.length)}</strong><small>{money(successful.reduce((sum,item)=>sum+item.amount,0))}</small></button>
-    <button type="button" className={paymentFilter==='failed'?'payment-metric failed active':'payment-metric failed'} onClick={()=>setPaymentFilter('failed')}><span>پرداخت ناموفق</span><strong>{number(failed.length)}</strong><small>{money(failed.reduce((sum,item)=>sum+item.amount,0))}</small></button>
-    <button type="button" className={paymentFilter==='pending'?'payment-metric pending active':'payment-metric pending'} onClick={()=>setPaymentFilter('pending')}><span>نیازمند بررسی</span><strong>{number(pending.length)}</strong><small>{money(pending.reduce((sum,item)=>sum+item.amount,0))}</small></button>
-    <button type="button" className={paymentFilter==='refunded'?'payment-metric refunded active':'payment-metric refunded'} onClick={()=>setPaymentFilter('refunded')}><span>برگشت وجه</span><strong>{number(refunded.length)}</strong><small>{money(refunded.reduce((sum,item)=>sum+item.amount,0))}</small></button>
+    <button type="button" className={paymentFilter==='successful'?'payment-metric success active':'payment-metric success'} onClick={()=>applyFilter('successful')}><span>پرداخت موفق</span><strong>{number(successful.count)}</strong><small>{money(successful.amount)}</small></button>
+    <button type="button" className={paymentFilter==='failed'?'payment-metric failed active':'payment-metric failed'} onClick={()=>applyFilter('failed')}><span>پرداخت ناموفق</span><strong>{number(failed.count)}</strong><small>{money(failed.amount)}</small></button>
+    <button type="button" className={paymentFilter==='pending'?'payment-metric pending active':'payment-metric pending'} onClick={()=>applyFilter('pending')}><span>نیازمند بررسی</span><strong>{number(pending.count)}</strong><small>{money(pending.amount)}</small></button>
+    <button type="button" className={paymentFilter==='refunded'?'payment-metric refunded active':'payment-metric refunded'} onClick={()=>applyFilter('refunded')}><span>برگشت وجه</span><strong>{number(refunded.count)}</strong><small>{money(refunded.amount)}</small></button>
   </section>
   <div className="payment-filter-bar" role="group" aria-label="فیلتر وضعیت پرداخت">
-    <button type="button" className={paymentFilter==='all'?'active':''} onClick={()=>setPaymentFilter('all')}>همه</button>
-    <button type="button" className={paymentFilter==='successful'?'active':''} onClick={()=>setPaymentFilter('successful')}>موفق</button>
-    <button type="button" className={paymentFilter==='failed'?'active':''} onClick={()=>setPaymentFilter('failed')}>ناموفق</button>
-    <button type="button" className={paymentFilter==='pending'?'active':''} onClick={()=>setPaymentFilter('pending')}>در انتظار بررسی</button>
-    <button type="button" className={paymentFilter==='refunded'?'active':''} onClick={()=>setPaymentFilter('refunded')}>مستردشده</button>
+    <button type="button" className={paymentFilter==='all'?'active':''} onClick={()=>applyFilter('all')}>همه</button>
+    <button type="button" className={paymentFilter==='successful'?'active':''} onClick={()=>applyFilter('successful')}>موفق</button>
+    <button type="button" className={paymentFilter==='failed'?'active':''} onClick={()=>applyFilter('failed')}>ناموفق</button>
+    <button type="button" className={paymentFilter==='pending'?'active':''} onClick={()=>applyFilter('pending')}>در انتظار بررسی</button>
+    <button type="button" className={paymentFilter==='refunded'?'active':''} onClick={()=>applyFilter('refunded')}>مستردشده</button>
   </div>
-  <DataPanel title="پرداخت‌های مشتریان" description="پرداخت‌های موفق، ناموفق و نیازمند بررسی به همراه سفارش و مشخصات مشتری" count={visiblePayments.length} emptyText="در این وضعیت پرداختی وجود ندارد.">
-    <table><thead><tr><th>سفارش</th><th>مشتری</th><th>موبایل</th><th>روش</th><th>حساب</th><th>مبلغ</th><th>پیگیری</th><th>زمان ثبت</th><th>وضعیت</th><th>عملیات</th></tr></thead>
-    <tbody>{visiblePayments.map(x=><tr key={x.id}><td dir="ltr">{x.orderNumber}</td><td>{x.customerFullName}</td><td dir="ltr">{x.customerPhoneNumber}</td><td>{method[x.paymentMethod]}</td><td>{x.financialAccountName}</td><td>{money(x.amount)}</td><td dir="ltr">{x.trackingNumber||x.referenceNumber||'—'}</td><td>{date(x.createdAt)}</td><td><span className={`payment-status payment-status-${x.status}`}>{status[x.status]}</span></td><td className="actions">
-      {[PaymentStatus.Pending,PaymentStatus.AwaitingVerification].includes(x.status)&&<><button className="primary" onClick={()=>void change(x.id,PaymentStatus.Paid)}>تأیید</button><button className="danger" onClick={()=>void change(x.id,PaymentStatus.Rejected)}>رد</button></>}
-      {x.status===PaymentStatus.Paid&&<button className="danger" onClick={()=>confirm('وجه مسترد شود؟')&&void adminApi.refundPayment(x.id).then(()=>{setMessage('وجه مسترد شد.');return load()}).catch(e=>setMessage(submitError(e)))}>استرداد</button>}</td></tr>)}</tbody></table>
+  <DataPanel pager={<Pager {...pagedPayments} />} title="پرداخت‌های مشتریان" description="پرداخت‌های موفق، ناموفق و نیازمند بررسی به همراه سفارش و مشخصات مشتری" count={pagedPayments.totalItems} emptyText="در این وضعیت پرداختی وجود ندارد.">
+    <table><thead><tr><RowNumberHead /><th>سفارش</th><th>مشتری</th><th>موبایل</th><th>روش</th><th>حساب</th><th>مبلغ</th><th>پیگیری</th><th>زمان ثبت</th><th>وضعیت</th><th>عملیات</th></tr></thead>
+    <tbody>{pagedPayments.visible.map((x,index)=><tr key={x.id}><RowNumberCell offset={pagedPayments.rowOffset} index={index} /><td dir="ltr">{x.orderNumber}</td><td>{x.customerFullName}</td><td dir="ltr">{x.customerPhoneNumber}</td><td>{method[x.paymentMethod]}</td><td>{x.financialAccountName}</td><td>{money(x.amount)}</td><td dir="ltr">{x.trackingNumber||x.referenceNumber||'—'}</td><td>{date(x.createdAt)}</td><td><span className={`payment-status payment-status-${x.status}`}>{status[x.status]}</span></td><td className="actions">
+      {[PaymentStatus.Pending,PaymentStatus.AwaitingVerification].includes(x.status)&&<><button className="primary" disabled={rowAction.busy} onClick={()=>change(x.id,PaymentStatus.Paid)}>{rowBusyId===x.id?'…':'تأیید'}</button><button className="danger" disabled={rowAction.busy} onClick={()=>change(x.id,PaymentStatus.Rejected)}>{rowBusyId===x.id?'…':'رد'}</button></>}
+      {x.status===PaymentStatus.Paid&&<button className="danger" disabled={rowAction.busy} onClick={()=>refund(x.id)}>{rowBusyId===x.id?'در حال استرداد…':'استرداد'}</button>}</td></tr>)}</tbody></table>
     </DataPanel></Frame>
 }
 
 export function V15ReportsPage() {
+  const { busy, run } = useAsyncAction()
   const [from,setFrom]=useState(today()),[to,setTo]=useState(today());const[data,setData]=useState<Awaited<ReturnType<typeof adminApi.v15Reports>>|null>(null)
   const[message,setMessage]=useState<string|null>(null)
   const load=async()=>{try{setData(await adminApi.v15Reports(from,to));setMessage(null)}catch(e){setMessage(submitError(e))}}
+  const pagedSales=usePagination(data?.sales??[])
+  const pagedExpenses=usePagination(data?.expenses??[])
+  const pagedUsage=usePagination(data?.usage??[])
+  const pagedWaste=usePagination(data?.waste??[])
   const paymentMethod: Record<number, string> = {
     [PaymentMethod.Cash]: 'نقدی', [PaymentMethod.CardToCard]: 'کارت‌به‌کارت', [PaymentMethod.Online]: 'آنلاین',
     [PaymentMethod.Pos]: 'پوز',
   }
-  return <Frame title="گزارش‌های مدیریتی"><div className="panel v15-form"><label>از<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>تا<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label><button className="primary" onClick={()=>void load()}>نمایش گزارش</button></div><Feedback value={message}/>
+  return <Frame title="گزارش‌های مدیریتی"><div className="panel v15-form"><DateField label="از" value={from} onChange={setFrom} /><DateField label="تا" value={to} onChange={setTo} /><button className="primary" disabled={busy} onClick={()=>void run(load)}>{busy?'در حال دریافت…':'نمایش گزارش'}</button></div><Feedback value={message}/>
     {data&&<><div className="metric-grid"><article className="metric"><span>دریافتی خالص</span><strong>{money(data.profit.income)}</strong></article><article className="metric"><span>هزینه</span><strong>{money(data.profit.expense)}</strong></article><article className="metric"><span>سود مدیریتی برآوردی</span><strong>{money(data.profit.income-data.profit.expense)}</strong></article></div>
-    <div className="v15-two-column"><div className="panel table-wrap"><h2>دریافت و استرداد</h2><table><thead><tr><th>روش</th><th>تعداد</th><th>دریافتی</th><th>استرداد</th><th>خالص</th></tr></thead><tbody>{data.sales.map((item)=><tr key={item.paymentMethod}><td>{paymentMethod[item.paymentMethod]??'سایر'}</td><td>{number(item.count)}</td><td>{money(item.paidAmount)}</td><td>{money(item.refundedAmount)}</td><td>{money(item.paidAmount-item.refundedAmount)}</td></tr>)}</tbody></table></div>
-      <div className="panel table-wrap"><h2>هزینه‌ها</h2><table><thead><tr><th>دسته</th><th>مبلغ</th></tr></thead><tbody>{data.expenses.map((item)=><tr key={item.category}><td>{item.category}</td><td>{money(item.amount)}</td></tr>)}</tbody></table></div></div>
-    <div className="panel table-wrap"><h2>گردش مواد اولیه</h2><table><thead><tr><th>ماده</th><th>خرید</th><th>مصرف تولید</th><th>ضایعات</th><th>مانده</th></tr></thead><tbody>{data.usage.map(x=><tr key={x.name}><td>{x.name}</td><td>{number(x.purchase??0)}</td><td>{number(x.consumption??0)}</td><td>{number(x.waste??0)}</td><td>{number(x.closing)} {x.unit}</td></tr>)}</tbody></table></div>
-    <div className="panel table-wrap"><h2>جزئیات ضایعات</h2><table><thead><tr><th>ماده</th><th>مقدار</th><th>بهای ضایعات</th></tr></thead><tbody>{data.waste.map((item)=><tr key={item.name}><td>{item.name}</td><td>{number(item.quantity)}</td><td>{money(item.cost)}</td></tr>)}</tbody></table></div></>}</Frame>
+    <div className="v15-two-column"><div className="panel table-wrap"><h2>دریافت و استرداد</h2><table><thead><tr><RowNumberHead /><th>روش</th><th>تعداد</th><th>دریافتی</th><th>استرداد</th><th>خالص</th></tr></thead><tbody>{pagedSales.visible.map((item,index)=><tr key={item.paymentMethod}><RowNumberCell offset={pagedSales.rowOffset} index={index} /><td>{paymentMethod[item.paymentMethod]??'سایر'}</td><td>{number(item.count)}</td><td>{money(item.paidAmount)}</td><td>{money(item.refundedAmount)}</td><td>{money(item.paidAmount-item.refundedAmount)}</td></tr>)}</tbody></table><Pager {...pagedSales} /></div>
+      <div className="panel table-wrap"><h2>هزینه‌ها</h2><table><thead><tr><RowNumberHead /><th>دسته</th><th>مبلغ</th></tr></thead><tbody>{pagedExpenses.visible.map((item,index)=><tr key={item.category}><RowNumberCell offset={pagedExpenses.rowOffset} index={index} /><td>{item.category}</td><td>{money(item.amount)}</td></tr>)}</tbody></table><Pager {...pagedExpenses} /></div></div>
+    <div className="panel table-wrap"><h2>گردش مواد اولیه</h2><table><thead><tr><RowNumberHead /><th>ماده</th><th>خرید</th><th>مصرف تولید</th><th>ضایعات</th><th>مانده</th></tr></thead><tbody>{pagedUsage.visible.map((x,index)=><tr key={x.name}><RowNumberCell offset={pagedUsage.rowOffset} index={index} /><td>{x.name}</td><td>{number(x.purchase??0)}</td><td>{number(x.consumption??0)}</td><td>{number(x.waste??0)}</td><td>{number(x.closing)} {x.unit}</td></tr>)}</tbody></table><Pager {...pagedUsage} /></div>
+    <div className="panel table-wrap"><h2>جزئیات ضایعات</h2><table><thead><tr><RowNumberHead /><th>ماده</th><th>مقدار</th><th>بهای ضایعات</th></tr></thead><tbody>{pagedWaste.visible.map((item,index)=><tr key={item.name}><RowNumberCell offset={pagedWaste.rowOffset} index={index} /><td>{item.name}</td><td>{number(item.quantity)}</td><td>{money(item.cost)}</td></tr>)}</tbody></table><Pager {...pagedWaste} /></div></>}</Frame>
 }

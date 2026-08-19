@@ -4,7 +4,10 @@ const kitchenOperations = new Set<AdminOperation>([
   'dashboard.today', 'dashboard.v15', 'dashboard.analytics',
   'foodCategories.list', 'foodCategories.create', 'foodCategories.update',
   'foodTags.list', 'foodTags.create', 'foodTags.update',
-  'referenceData.get', 'foodTagGroups.create', 'foodTagGroups.update',
+  // The kitchen owns catalog reference data: tag groups and measurement units back the food and
+  // ingredient records it maintains. Checkout configuration is deliberately not included.
+  'foodTagGroups.list', 'foodTagGroups.create', 'foodTagGroups.update',
+  'units.save', 'supportSubjects.list',
   'foods.list', 'foods.create', 'foods.update', 'foods.setActive',
   'menus.get', 'menus.settings', 'menus.addItem', 'menus.updateItem', 'menus.removeItem',
   'customers.lookup', 'orders.search', 'orders.get', 'orders.create', 'orders.updateStatus',
@@ -23,12 +26,14 @@ const kitchenOperations = new Set<AdminOperation>([
 ])
 
 const orderOperations = new Set<AdminOperation>([
-  'dashboard.today', 'dashboard.v15', 'dashboard.analytics', 'menus.get', 'referenceData.get',
+  'dashboard.today', 'dashboard.v15', 'dashboard.analytics', 'menus.get',
+  // Manual order taking needs to know which methods are open to it, but not to change their terms.
+  'paymentMethods.list', 'deliveryMethods.list', 'supportSubjects.list',
   'customers.lookup', 'orders.search', 'orders.get', 'orders.create', 'orders.updateStatus',
   'support.conversations.list', 'support.conversations.get', 'support.conversations.reply',
   'support.conversations.setClosed', 'support.reviews.list', 'support.reviews.setStatus', 'support.reviews.reply',
   'finance.accounts', 'finance.posTerminals',
-  'payments.list', 'payments.create', 'payments.changeStatus', 'logs.server',
+  'payments.list', 'payments.totals', 'payments.create', 'payments.changeStatus', 'logs.server', 'reports.customers', 'customers.search', 'customers.detail',
   'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',
 ])
 
