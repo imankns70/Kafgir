@@ -92,7 +92,7 @@ function PaymentState({ status }: { status: PaymentStatus | null }) {
   return <span className={`payment-state ${tone}`}>{paymentStatusLabel[status]}</span>
 }
 
-export function CustomerOrdersList({ orders, onOpen, onReview, onPage, onBrowse, error, onRetry }: {
+export function CustomerOrdersList({ orders, onOpen, onReview, onPage, onBrowse, error, onRetry, openingOrderId }: {
   orders: CustomerOrdersPageDto | null
   onOpen: (id: number) => void
   onReview: (order: CustomerOrderSummaryDto) => void
@@ -100,6 +100,8 @@ export function CustomerOrdersList({ orders, onOpen, onReview, onPage, onBrowse,
   onBrowse: () => void
   error?: string | null
   onRetry?: () => void
+  /** Order whose details are being fetched, so its button can report the wait. */
+  openingOrderId?: number | null
 }) {
   if (error && !orders) return <div className="customer-orders-error" role="alert">
     <span className="empty-icon"><Icon name="info" size="xl" /></span>
@@ -136,7 +138,7 @@ export function CustomerOrdersList({ orders, onOpen, onReview, onPage, onBrowse,
           </div>
           {order.review && <div className="order-review-summary"><span>امتیاز شما</span><ReviewStars value={order.review.rating} />{order.review.comment && <p>{order.review.comment}</p>}</div>}
           <footer className="order-card-actions">
-            <button className="outline-button order-detail-button" onClick={() => onOpen(order.id)}>جزئیات سفارش <Icon name="forward" size="sm" /></button>
+            <button className="outline-button order-detail-button" disabled={openingOrderId != null} onClick={() => onOpen(order.id)}>{openingOrderId === order.id ? 'در حال باز کردن…' : <>جزئیات سفارش <Icon name="forward" size="sm" /></>}</button>
             {order.status === OrderStatus.Delivered && <button className="primary-button review-action" onClick={() => onReview(order)}><Icon name="rating" size="sm" />{order.review ? 'ویرایش امتیاز و نظر' : 'ثبت امتیاز و نظر'}</button>}
           </footer>
         </article>

@@ -1,6 +1,8 @@
 import type { FoodDto, FoodImageDto, FoodWriteRequest } from '@kafgir/contracts'
 import type { TransactionSql } from 'postgres'
+import type { PagedResult } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
+import { pagedResult, resolvePaging, type ResolvedPaging } from '../db/paginate'
 import { AppError, NotFoundError } from '../errors'
 import { safelyDeleteManagedFoodImage } from '../storage/image-lifecycle'
 
@@ -49,8 +51,12 @@ async function hydrateFoods(rows: FoodRecord[]): Promise<FoodDto[]> {
   }))
 }
 
-export async function listFoods(): Promise<FoodDto[]> {
-  const rows = await sqlClient<FoodRecord[]>`
+type FoodListRow = FoodRecord & { totalCount: number }
+
+/** One WHERE clause and one ORDER BY, shared by the paged and unpaged callers. */
+function foodRows(search: string, paging: ResolvedPaging | null) {
+  const value = search.trim() || null
+  return sqlClient<FoodListRow[]>`
     SELECT id, name, slug, description, full_description AS "fullDescription",
            ingredients, portion_description AS "portionDescription",
            allergy_information AS "allergyInformation",
@@ -58,11 +64,28 @@ export async function listFoods(): Promise<FoodDto[]> {
            category_id AS "categoryId", primary_badge_tag_id AS "primaryBadgeTagId",
            default_price::float8 AS "defaultPrice", image_url AS "imageUrl",
            allows_persian_rice AS "allowsPersianRice", is_persian_rice AS "isPersianRice",
-           is_active AS "isActive"
+           is_active AS "isActive",
+           COUNT(*) OVER ()::int AS "totalCount"
     FROM foods
-    ORDER BY name
+    WHERE (${value}::text IS NULL OR name ILIKE '%'||${value}||'%' OR slug ILIKE '%'||${value}||'%')
+    ORDER BY name ASC, id ASC
+    ${paging ? sqlClient`LIMIT ${paging.limit} OFFSET ${paging.offset}` : sqlClient``}
   `
-  return hydrateFoods(rows)
+}
+
+/** Unpaged. The customer menu needs the whole catalogue; only the admin grid pages. */
+export async function listFoods(search = ''): Promise<FoodDto[]> {
+  return hydrateFoods(await foodRows(search, null))
+}
+
+export async function listFoodsPaged(
+  search = '',
+  page?: number,
+  pageSize?: number,
+): Promise<PagedResult<FoodDto>> {
+  const paging = resolvePaging(page, pageSize)
+  const rows = await foodRows(search, paging)
+  return pagedResult(await hydrateFoods(rows), rows[0]?.totalCount ?? 0, paging)
 }
 
 export async function getFood(id: number): Promise<FoodDto> {

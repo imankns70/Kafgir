@@ -7,11 +7,13 @@ import {
   type CreateOrderRequest,
   type OrderDto,
   type OrderReportQuery,
+  type PagedResult,
   type OrderSummaryDto,
   type UpdateOrderStatusRequest,
 } from '@kafgir/contracts'
 import type { TransactionSql } from 'postgres'
 import { sqlClient } from '../db/client'
+import { pagedResult, resolvePaging, type ResolvedPaging } from '../db/paginate'
 import { AppError, NotFoundError, UnauthorizedError } from '../errors'
 import { persianBusinessYear } from '../time'
 import type { TelegramIdentity } from '../telegram/validation'
@@ -524,7 +526,14 @@ export async function getOrder(id: number): Promise<OrderDto> {
   }
 }
 
-export async function searchOrders(query: OrderReportQuery): Promise<OrderSummaryDto[]> {
+/**
+ * The one order query. Both the unpaged list and the paged grid go through it, so the filters and
+ * the row count can never drift apart.
+ */
+async function searchOrderRows(
+  query: OrderReportQuery,
+  paging: ResolvedPaging | null,
+): Promise<Array<OrderSummaryDto & { totalCount: number }>> {
   const status = query.status ?? null
   const deliveryMethod = query.deliveryMethod ?? null
   const paymentMethod = query.paymentMethod ?? null
@@ -548,6 +557,7 @@ export async function searchOrders(query: OrderReportQuery): Promise<OrderSummar
     deliveryTimeSlotTitle: string | null
     deliveryStartTime: string | null
     deliveryEndTime: string | null
+    totalCount: number
   }>>`
     SELECT o.id, o.order_number AS "orderNumber", o.delivery_full_name AS "customerFullName",
            o.delivery_phone_number AS "customerPhoneNumber", o.status,
@@ -558,7 +568,8 @@ export async function searchOrders(query: OrderReportQuery): Promise<OrderSummar
            to_char(o.delivery_start_time, 'HH24:MI') AS "deliveryStartTime",
            to_char(o.delivery_end_time, 'HH24:MI') AS "deliveryEndTime",
            COALESCE(SUM(oi.quantity), 0)::int AS "totalQuantity",
-           COALESCE(string_agg(oi.food_name || ' × ' || oi.quantity, '، ' ORDER BY oi.id), '') AS "foodSummary"
+           COALESCE(string_agg(oi.food_name || ' × ' || oi.quantity, '، ' ORDER BY oi.id), '') AS "foodSummary",
+           COUNT(*) OVER ()::int AS "totalCount"
     FROM orders o
     LEFT JOIN order_items oi ON oi.order_id = o.id
     WHERE o.created_at >= (${query.date}::date AT TIME ZONE 'Asia/Tehran')
@@ -575,10 +586,36 @@ export async function searchOrders(query: OrderReportQuery): Promise<OrderSummar
       ))
     GROUP BY o.id
     -- Dispatch order for the kitchen: earliest delivery window first, with orders that carry no
-    -- window (manual/legacy) last rather than sorted among today's runs.
-    ORDER BY o.delivery_date NULLS LAST, o.delivery_start_time NULLS LAST, o.created_at DESC
+    -- window (manual/legacy) last rather than sorted among today's runs. The id breaks ties so a row
+    -- cannot swap pages between requests and appear twice while another is never shown.
+    ORDER BY o.delivery_date NULLS LAST, o.delivery_start_time NULLS LAST, o.created_at DESC, o.id DESC
+    ${paging ? sqlClient`LIMIT ${paging.limit} OFFSET ${paging.offset}` : sqlClient``}
   `
   return rows.map((row) => ({ ...row, createdAt: isoTimestamp(row.createdAt) }))
+}
+
+/** Every matching order for the day, unpaged. For callers that genuinely need the whole set. */
+export async function searchOrders(query: OrderReportQuery): Promise<OrderSummaryDto[]> {
+  const rows = await searchOrderRows(query, null)
+  return rows.map(({ totalCount: _ignored, ...row }) => row)
+}
+
+/**
+ * The same search, one page at a time.
+ *
+ * The total comes from `COUNT(*) OVER ()` inside the very same query, evaluated after `GROUP BY` and
+ * before `LIMIT`. That makes it structurally impossible for the count to apply different filters
+ * from the rows — the classic bug where a filtered grid still reports the whole table's total.
+ */
+export async function searchOrdersPaged(query: OrderReportQuery): Promise<PagedResult<OrderSummaryDto>> {
+  const paging = resolvePaging(query.page, query.pageSize)
+  const rows = await searchOrderRows({ ...query, page: paging.page, pageSize: paging.pageSize }, paging)
+  const totalItems = rows[0]?.totalCount ?? 0
+  return pagedResult(
+    rows.map(({ totalCount: _ignored, ...row }) => row),
+    totalItems,
+    paging,
+  )
 }
 
 export async function updateOrderStatus(id: number, request: UpdateOrderStatusRequest, userId = 1): Promise<void> {

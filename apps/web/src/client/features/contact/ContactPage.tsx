@@ -49,6 +49,7 @@ export function ContactPage({ onBack, onAccount }: Props) {
   const [reply, setReply] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [openingId, setOpeningId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const loadInbox = useCallback(async () => {
@@ -92,7 +93,8 @@ export function ContactPage({ onBack, onAccount }: Props) {
   }, [])
 
   const openConversation = async (id: number) => {
-    setIsLoading(true); setError(null)
+    if (openingId != null) return
+    setOpeningId(id); setError(null)
     try {
       const detail = await getCustomerSupportConversation(id)
       setSelected(detail)
@@ -189,11 +191,11 @@ export function ContactPage({ onBack, onAccount }: Props) {
         <div className="panel support-inbox-card">
           <div className="support-section-heading">
             <div><h2>گفتگوهای من</h2><p className="muted">پاسخ‌ها برای مراجعات بعدی ذخیره می‌شوند.</p></div>
-            <button type="button" className="outline-button support-refresh" onClick={() => void loadInbox()} disabled={isLoading}><Icon name="refresh" size="sm" /> بروزرسانی</button>
+            <button type="button" className="outline-button support-refresh" onClick={() => void loadInbox()} disabled={isLoading}>{isLoading ? <ButtonLoading label="در حال بروزرسانی…" /> : <><Icon name="refresh" size="sm" /> بروزرسانی</>}</button>
           </div>
           {conversations.length === 0 ? <p className="support-empty">هنوز گفتگویی ندارید.</p> : <div className="support-conversation-list">
-            {conversations.map((item) => <button type="button" className={`support-conversation-row${selected?.id === item.id ? ' active' : ''}`} onClick={() => void openConversation(item.id)} key={item.id}>
-              <span className="support-row-title"><strong>{item.subjectTitle}</strong>{item.unreadCount > 0 && <b className="support-unread">{item.unreadCount}</b>}</span>
+            {conversations.map((item) => <button type="button" className={`support-conversation-row${selected?.id === item.id ? ' active' : ''}`} disabled={openingId != null} onClick={() => void openConversation(item.id)} key={item.id}>
+              <span className="support-row-title"><strong>{item.subjectTitle}</strong>{openingId === item.id && <em className="support-opening">در حال باز کردن…</em>}{item.unreadCount > 0 && <b className="support-unread">{item.unreadCount}</b>}</span>
               <span>{item.lastMessage}</span><small>{statusLabels[item.status]} · {formatPersianDateTime(item.lastMessageAt)}</small>
             </button>)}
           </div>}
@@ -210,12 +212,12 @@ export function ContactPage({ onBack, onAccount }: Props) {
             </article>)}
           </div>
           {selected.status === SupportConversationStatus.Closed
-            ? <button type="button" className="outline-button" onClick={() => void toggleClosed()} disabled={isSubmitting}>باز کردن دوباره گفتگو</button>
+            ? <button type="button" className="outline-button" onClick={() => void toggleClosed()} disabled={isSubmitting}>{isSubmitting ? <ButtonLoading label="در حال ثبت…" /> : 'باز کردن دوباره گفتگو'}</button>
             : <form className="support-reply-form" onSubmit={sendReply}>
               <label className="field">پاسخ شما<textarea value={reply} onChange={(event) => setReply(event.target.value)} maxLength={2000} required /></label>
               <div className="support-reply-actions">
                 <button className="primary-button" disabled={isSubmitting || reply.trim().length < 2}>{isSubmitting ? <ButtonLoading label="در حال ارسال" /> : 'ارسال پاسخ'}</button>
-                <button type="button" className="outline-button" onClick={() => void toggleClosed()} disabled={isSubmitting}>بستن گفتگو</button>
+                <button type="button" className="outline-button" onClick={() => void toggleClosed()} disabled={isSubmitting}>{isSubmitting ? <ButtonLoading label="در حال ثبت…" /> : 'بستن گفتگو'}</button>
               </div>
             </form>}
         </div>}

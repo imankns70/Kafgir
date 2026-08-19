@@ -1,6 +1,7 @@
 import type { CartItem, OrderDto } from '../../types'
 import { CartSummary } from './CartSummary'
 import { CheckoutForm } from '../orders/CheckoutForm'
+import { ButtonLoading } from '../../design-system/ButtonLoading'
 import { Icon } from '../../design-system/Icon'
 
 type Props = {
@@ -27,7 +28,7 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
           ? <ul>{messages.map((message) => <li key={message}>{message}</li>)}</ul>
           : <small>بررسی موجودی کامل نشد. دوباره تلاش کنید.</small>}
       </div>
-      <button type="button" onClick={onRefresh} disabled={isChecking}><Icon name="refresh" size="sm" /> به‌روزرسانی موجودی</button>
+      <button type="button" onClick={onRefresh} disabled={isChecking}>{isChecking ? <ButtonLoading label="در حال بررسی موجودی…" /> : <><Icon name="refresh" size="sm" /> به‌روزرسانی موجودی</>}</button>
     </section>}
     <CartSummary items={items} onQuantityChange={onQuantityChange} />
     <CheckoutForm items={items} isCartVerified={isVerified} isCheckingCart={isChecking} onRefreshCart={onRefresh} onSuccess={onSuccess} onAuthenticationChange={onAuthenticationChange} />

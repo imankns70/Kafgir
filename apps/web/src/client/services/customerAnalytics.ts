@@ -1,6 +1,7 @@
 'use client'
 
 import type { AnalyticsHeartbeatResponse } from '@kafgir/contracts'
+import { randomUuid } from '../utils/uuid'
 
 const visitorKey = 'kafgir.analytics.visitor'
 const sessionKey = 'kafgir.analytics.session'
@@ -21,16 +22,23 @@ function validUuid(value: string | null): value is string {
   return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value))
 }
 
+/**
+ * Identifiers for this heartbeat, or `null` when one had to be minted and no secure random source
+ * exists. A stored id is only ever replaced when it is missing or invalid, so a browser without
+ * usable crypto still keeps reporting under identifiers it already holds.
+ */
 function analyticsIdentity(now: number) {
   let visitorId = storageValue(visitorKey)
   if (!validUuid(visitorId)) {
-    visitorId = crypto.randomUUID()
+    visitorId = randomUuid()
+    if (visitorId === null) return null
     storeValue(visitorKey, visitorId)
   }
   let sessionId = storageValue(sessionKey)
   const lastActivity = Number(storageValue(lastActivityKey) ?? 0)
   if (!validUuid(sessionId) || !Number.isFinite(lastActivity) || now - lastActivity > sessionInactivityMs) {
-    sessionId = crypto.randomUUID()
+    sessionId = randomUuid()
+    if (sessionId === null) return null
     storeValue(sessionKey, sessionId)
   }
   storeValue(lastActivityKey, String(now))
@@ -41,6 +49,9 @@ export function trackCustomerActivity() {
   if (typeof window === 'undefined' || document.visibilityState !== 'visible') return Promise.resolve()
   if (heartbeatInFlight) return heartbeatInFlight
   const identifiers = analyticsIdentity(Date.now())
+  // Analytics is never allowed to break the page it observes, so an unusable environment is a quiet
+  // no-op rather than a throw out of a `void`-called function.
+  if (identifiers === null) return Promise.resolve()
   heartbeatInFlight = fetch('/api/analytics/heartbeat', {
     method: 'POST',
     credentials: 'same-origin',

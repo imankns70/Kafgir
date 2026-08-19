@@ -3,6 +3,9 @@ export * from './social.js'
 export * from './support.js'
 export * from './order-enums.js'
 export * from './reference-data.js'
+export * from './pagination.js'
+export * from './customer-report.js'
+export * from './customer-directory.js'
 import { isoDate, timeOfDay } from './delivery.js'
 import { PaymentStatus } from './v15.js'
 import { DeliveryMethod, OrderStatus, PaymentMethod } from './order-enums.js'
@@ -772,6 +775,9 @@ export interface OrderReportQuery {
   deliveryMethod?: DeliveryMethod
   paymentMethod?: PaymentMethod
   foodName?: string
+  /** 1-based. Both must be present for the query to page; otherwise the whole day is returned. */
+  page?: number
+  pageSize?: number
 }
 
 /**

@@ -1,5 +1,6 @@
 import mssql from 'mssql'
 import postgres from 'postgres'
+import { inspectLegacyOrderNumbers, orderNumberPreflightError } from './legacy-order-numbers'
 
 type SourceRow = Record<string, unknown>
 type Mapping = {
@@ -11,6 +12,20 @@ type Mapping = {
 }
 
 let migrationDefaultCategoryId = 0
+
+/** Reads the source order numbers and refuses the migration before any row is written. */
+async function assertMigratableOrderNumbers(source: mssql.ConnectionPool) {
+  const result = await source.request()
+    .query<{ OrderNumber: string | null }>('SELECT OrderNumber FROM [dbo].[Orders]')
+  const report = inspectLegacyOrderNumbers(result.recordset.map((row) => row.OrderNumber))
+
+  for (const warning of report.warnings) {
+    console.warn(`Order number warning: "${warning.orderNumber}" ${warning.reason}`)
+  }
+  const message = orderNumberPreflightError(report)
+  if (message) throw new Error(message)
+  console.log(`Order number pre-flight passed for ${result.recordset.length} legacy orders.`)
+}
 
 const mergeAddressText = (line: unknown, description: unknown) => {
   const addressLine = typeof line === 'string' ? line.trim() : ''
@@ -191,6 +206,9 @@ async function main() {
     const tables = [...mappings].reverse().map((mapping) => `"${mapping.target}"`).join(', ')
     await target.unsafe(`TRUNCATE TABLE ${tables} RESTART IDENTITY CASCADE`)
   }
+
+  // Runs before the copy so an unusable order number is reported against an untouched target.
+  await assertMigratableOrderNumbers(source)
 
   const counts: Array<{ source: string; target: string; count: number }> = []
   await target.begin(async (tx) => {

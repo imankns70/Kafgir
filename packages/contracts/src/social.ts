@@ -239,7 +239,8 @@ export const socialHistoryQuerySchema = z.object({
   source: z.string().trim().max(150).nullable().optional(),
   origin: z.enum(['Manual', 'Suggestion', 'Automation']).nullable().optional(),
   page: z.number().int().positive().default(1),
-  pageSize: z.number().int().min(10).max(100).default(25),
+  // Upper bound matches the largest option the admin pager offers.
+  pageSize: z.number().int().min(10).max(1000).default(10),
 })
 export type SocialHistoryQuery = z.infer<typeof socialHistoryQuerySchema>
 export interface SocialHistoryPageDto {

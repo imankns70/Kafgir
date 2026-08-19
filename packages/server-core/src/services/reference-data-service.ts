@@ -13,6 +13,12 @@ import type {
 } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
 import { AppError, NotFoundError } from '../errors'
+import {
+  channelLeftWithoutOption,
+  channelLeftWithoutOptionMessage,
+  type ChannelAvailability,
+  type RemainingChannelOptions,
+} from '../domain/checkout-method-rules'
 
 type DbDate = Date | string
 const iso = (value: DbDate) => value instanceof Date ? value.toISOString() : new Date(value).toISOString()
@@ -146,10 +152,27 @@ export async function listPaymentMethodSettings(
   `
 }
 
+/** Counts the other rows still enabled per channel, then applies the shared rule. */
+async function assertChannelKeepsAnOption(
+  table: 'payment_method_settings' | 'delivery_method_settings',
+  method: number,
+  input: ChannelAvailability,
+  subject: string,
+) {
+  const others = await sqlClient<RemainingChannelOptions[]>`
+    SELECT COUNT(*) FILTER (WHERE is_customer_enabled)::int AS customer,
+           COUNT(*) FILTER (WHERE is_manual_enabled)::int AS manual
+    FROM ${sqlClient(table)} WHERE method <> ${method}
+  `
+  const emptyChannel = channelLeftWithoutOption(others[0] ?? { customer: 0, manual: 0 }, input)
+  if (emptyChannel) throw new AppError(channelLeftWithoutOptionMessage(subject, emptyChannel))
+}
+
 export async function updatePaymentMethodSetting(
   method: PaymentMethod,
   input: PaymentMethodSettingWriteRequest,
 ): Promise<PaymentMethodSettingDto> {
+  await assertChannelKeepsAnOption('payment_method_settings', method, input, 'روش‌های پرداخت')
   const rows = await sqlClient<PaymentMethodSettingDto[]>`
     UPDATE payment_method_settings SET title = ${input.title}, description = ${input.description ?? null},
       is_customer_enabled = ${input.isCustomerEnabled}, is_manual_enabled = ${input.isManualEnabled},
@@ -181,6 +204,7 @@ export async function updateDeliveryMethodSetting(
   method: DeliveryMethod,
   input: DeliveryMethodSettingWriteRequest,
 ): Promise<DeliveryMethodSettingDto> {
+  await assertChannelKeepsAnOption('delivery_method_settings', method, input, 'روش‌های دریافت')
   const rows = await sqlClient<DeliveryMethodSettingDto[]>`
     UPDATE delivery_method_settings SET title = ${input.title}, description = ${input.description ?? null},
       is_customer_enabled = ${input.isCustomerEnabled}, is_manual_enabled = ${input.isManualEnabled},

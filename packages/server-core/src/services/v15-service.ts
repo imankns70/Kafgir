@@ -1,3 +1,4 @@
+import type { PagedResult } from '@kafgir/contracts'
 import {
   PaymentMethod,
   FinancialTransactionType,
@@ -27,6 +28,7 @@ import {
 } from '@kafgir/contracts'
 import type { TransactionSql } from 'postgres'
 import { sqlClient } from '../db/client'
+import { pagedResult, resolvePaging, type ResolvedPaging } from '../db/paginate'
 import { AppError, NotFoundError } from '../errors'
 import { logger } from '../logging/logger'
 import { isAllowedPaymentTransition } from '../domain/v15-rules'
@@ -99,9 +101,12 @@ export async function saveIngredientCategory(id: number | null, name: string, is
   }
 }
 
-export async function listIngredients(search = '', active?: boolean) {
+type IngredientRow = Record<string, unknown> & { totalCount: number }
+
+/** One WHERE clause and one ORDER BY, shared by the paged and unpaged callers. */
+function ingredientRows(search: string, active: boolean | undefined, paging: ResolvedPaging | null) {
   const value = search.trim() || null
-  return sqlClient`
+  return sqlClient<IngredientRow[]>`
     SELECT i.id,i.name,i.code,i.category_id AS "categoryId",c.name AS "categoryName",
       i.base_unit_id AS "baseUnitId",u.name AS "baseUnitName",
       i.minimum_stock_level::text AS "minimumStockLevel",
@@ -115,13 +120,27 @@ export async function listIngredients(search = '', active?: boolean) {
         FROM inventory_transactions it WHERE it.ingredient_id=i.id
         AND it.transaction_type IN (${InventoryTransactionType.PurchaseIn},${InventoryTransactionType.PurchaseReversal})),0)::float8
         AS "weightedAverageCost",
-      i.created_at AS "createdAt",i.updated_at AS "updatedAt"
+      i.created_at AS "createdAt",i.updated_at AS "updatedAt",
+      COUNT(*) OVER ()::int AS "totalCount"
     FROM ingredients i JOIN units u ON u.id=i.base_unit_id
     LEFT JOIN ingredient_categories c ON c.id=i.category_id
     LEFT JOIN inventory_transactions t ON t.ingredient_id=i.id
     WHERE (${value}::text IS NULL OR i.name ILIKE '%'||${value}||'%' OR i.code ILIKE '%'||${value}||'%')
       AND (${active ?? null}::boolean IS NULL OR i.is_active=${active ?? null})
-    GROUP BY i.id,c.name,u.name ORDER BY i.name`
+    GROUP BY i.id,c.name,u.name ORDER BY i.name ASC,i.id ASC
+    ${paging ? sqlClient`LIMIT ${paging.limit} OFFSET ${paging.offset}` : sqlClient``}`
+}
+
+/** Unpaged. Kept for the legacy Next.js admin route; the Electron grid uses the paged sibling. */
+export async function listIngredients(search = '', active?: boolean) {
+  const rows = await ingredientRows(search, active, null)
+  return rows.map(({ totalCount: _ignored, ...row }) => row)
+}
+
+export async function listIngredientsPaged(search = '', active?: boolean, page?: number, pageSize?: number) {
+  const paging = resolvePaging(page, pageSize)
+  const rows = await ingredientRows(search, active, paging)
+  return pagedResult(rows.map(({ totalCount: _ignored, ...row }) => row), rows[0]?.totalCount ?? 0, paging)
 }
 export async function saveIngredient(id: number | null, input: IngredientWriteRequest) {
   const now = nowIso()
@@ -152,9 +171,29 @@ export async function saveIngredient(id: number | null, input: IngredientWriteRe
   })
 }
 
-export async function listSuppliers() {
-  return sqlClient`SELECT id,name,contact_name AS "contactName",mobile,phone,address,notes,
-    is_active AS "isActive",created_at AS "createdAt",updated_at AS "updatedAt" FROM suppliers ORDER BY name`
+type SupplierRow = Record<string, unknown> & { totalCount: number }
+
+function supplierRows(search: string, paging: ResolvedPaging | null) {
+  const value = search.trim() || null
+  return sqlClient<SupplierRow[]>`SELECT id,name,contact_name AS "contactName",mobile,phone,address,notes,
+    is_active AS "isActive",created_at AS "createdAt",updated_at AS "updatedAt",
+    COUNT(*) OVER ()::int AS "totalCount" FROM suppliers
+    WHERE (${value}::text IS NULL OR name ILIKE '%'||${value}||'%'
+      OR contact_name ILIKE '%'||${value}||'%' OR mobile ILIKE '%'||${value}||'%')
+    ORDER BY name ASC,id ASC
+    ${paging ? sqlClient`LIMIT ${paging.limit} OFFSET ${paging.offset}` : sqlClient``}`
+}
+
+/** Unpaged. Kept for the legacy Next.js admin route and for supplier pickers. */
+export async function listSuppliers(search = '') {
+  const rows = await supplierRows(search, null)
+  return rows.map(({ totalCount: _ignored, ...row }) => row)
+}
+
+export async function listSuppliersPaged(search = '', page?: number, pageSize?: number) {
+  const paging = resolvePaging(page, pageSize)
+  const rows = await supplierRows(search, paging)
+  return pagedResult(rows.map(({ totalCount: _ignored, ...row }) => row), rows[0]?.totalCount ?? 0, paging)
 }
 export async function saveSupplier(id: number | null, input: SupplierWriteRequest) {
   const now = nowIso()
@@ -221,15 +260,17 @@ export async function createPurchase(input: PurchaseWriteRequest, userId: number
     return purchase[0]!.id
   })
 }
-export async function listPurchases(status?: number) {
-  return sqlClient`SELECT p.id,p.purchase_number AS "purchaseNumber",p.purchase_date AS "purchaseDate",
+export async function listPurchases(status?: number, page?: number, pageSize?: number) {
+  const paging = resolvePaging(page, pageSize)
+  const rows = await sqlClient<Array<Record<string, unknown> & { totalCount: number }>>`SELECT p.id,p.purchase_number AS "purchaseNumber",p.purchase_date AS "purchaseDate",
     p.status,p.total_amount::float8 AS "totalAmount",p.paid_amount::float8 AS "paidAmount",
     p.payment_status AS "paymentStatus",p.supplier_id AS "supplierId",s.name AS "supplierName",
     p.invoice_number AS "invoiceNumber",p.subtotal_amount::float8 AS "subtotalAmount",
     p.discount_amount::float8 AS "discountAmount",p.additional_cost_amount::float8 AS "additionalCostAmount",
-    p.notes,p.attachment_url AS "attachmentUrl",p.created_at AS "createdAt",p.confirmed_at AS "confirmedAt"
+    p.notes,p.attachment_url AS "attachmentUrl",p.created_at AS "createdAt",p.confirmed_at AS "confirmedAt",COUNT(*) OVER ()::int AS "totalCount"
     FROM purchases p LEFT JOIN suppliers s ON s.id=p.supplier_id
-    WHERE (${status ?? null}::int IS NULL OR p.status=${status ?? null}) ORDER BY p.purchase_date DESC,p.id DESC`
+    WHERE (${status ?? null}::int IS NULL OR p.status=${status ?? null}) ORDER BY p.purchase_date DESC,p.id DESC LIMIT ${paging.limit} OFFSET ${paging.offset}`
+  return pagedResult(rows.map(({ totalCount: _ignored, ...row }) => row), rows[0]?.totalCount ?? 0, paging)
 }
 export async function confirmPurchase(id: number, userId: number) {
   await sqlClient.begin(async (tx) => {
@@ -319,15 +360,17 @@ async function insertMovement(tx: Tx, input: {
       (${input.quantity}::numeric*${cost}::numeric),${input.referenceType},${input.referenceId ?? null},
       ${input.group ?? null},${input.date ?? nowIso()},${nullable(input.notes)},${input.userId},${nowIso()})`
 }
-export async function listInventoryMovements(ingredientId?: number) {
-  return sqlClient`SELECT t.id,t.ingredient_id AS "ingredientId",i.name AS "ingredientName",
+export async function listInventoryMovements(ingredientId?: number, page?: number, pageSize?: number) {
+  const paging = resolvePaging(page, pageSize)
+  const rows = await sqlClient<Array<Record<string, unknown> & { totalCount: number }>>`SELECT t.id,t.ingredient_id AS "ingredientId",i.name AS "ingredientName",
     t.transaction_type AS "transactionType",t.quantity_in_base_unit::text AS "quantityInBaseUnit",
     t.unit_cost::float8 AS "unitCost",t.total_cost::float8 AS "totalCost",
     t.reference_type AS "referenceType",t.reference_id AS "referenceId",
     t.transaction_date AS "transactionDate",t.notes,t.reversed_transaction_id AS "reversedTransactionId",
-    t.created_at AS "createdAt" FROM inventory_transactions t JOIN ingredients i ON i.id=t.ingredient_id
+    t.created_at AS "createdAt",COUNT(*) OVER ()::int AS "totalCount" FROM inventory_transactions t JOIN ingredients i ON i.id=t.ingredient_id
     WHERE (${ingredientId ?? null}::int IS NULL OR t.ingredient_id=${ingredientId ?? null})
-    ORDER BY t.transaction_date DESC,t.id DESC LIMIT 500`
+    ORDER BY t.transaction_date DESC,t.id DESC LIMIT ${paging.limit} OFFSET ${paging.offset}`
+  return pagedResult(rows.map(({ totalCount: _ignored, ...row }) => row), rows[0]?.totalCount ?? 0, paging)
 }
 export async function adjustInventory(input: InventoryAdjustmentRequest, userId: number) {
   await sqlClient.begin(async (tx) => {
@@ -667,17 +710,19 @@ export async function transfer(input: AccountTransferRequest, userId: number) {
     await audit(tx, userId, 'finance.transfer', 'financial-account', input.fromAccountId, group)
   })
 }
-export async function listFinancialTransactions(from?: string, to?: string) {
-  return sqlClient`SELECT t.id,t.transaction_type AS "transactionType",t.financial_account_id AS "financialAccountId",
+export async function listFinancialTransactions(from?: string, to?: string, page?: number, pageSize?: number) {
+  const paging = resolvePaging(page, pageSize)
+  const rows = await sqlClient<Array<Record<string, unknown> & { totalCount: number }>>`SELECT t.id,t.transaction_type AS "transactionType",t.financial_account_id AS "financialAccountId",
     a.name AS "financialAccountName",t.amount::float8 amount,t.transaction_date AS "transactionDate",
-    c.name AS "categoryName",t.reference_type AS "referenceType",t.reference_id AS "referenceId",t.description
+    c.name AS "categoryName",t.reference_type AS "referenceType",t.reference_id AS "referenceId",t.description,COUNT(*) OVER ()::int AS "totalCount"
     FROM financial_transactions t JOIN financial_accounts a ON a.id=t.financial_account_id
     LEFT JOIN expense_categories c ON c.id=t.category_id
     WHERE (${from ?? null}::date IS NULL OR
       t.transaction_date>=(${from ?? null}::date AT TIME ZONE 'Asia/Tehran'))
       AND (${to ?? null}::date IS NULL OR
       t.transaction_date<((${to ?? null}::date+1) AT TIME ZONE 'Asia/Tehran'))
-    ORDER BY t.transaction_date DESC,t.id DESC LIMIT 1000`
+    ORDER BY t.transaction_date DESC,t.id DESC LIMIT ${paging.limit} OFFSET ${paging.offset}`
+  return pagedResult(rows.map(({ totalCount: _ignored, ...row }) => row), rows[0]?.totalCount ?? 0, paging)
 }
 export async function registerPurchasePayment(input: PurchasePaymentWriteRequest, userId: number) {
   await sqlClient.begin(async (tx) => {
@@ -709,22 +754,63 @@ export async function registerPurchasePayment(input: PurchasePaymentWriteRequest
     await audit(tx,userId,'purchase.payment','purchase',input.purchaseId)
   })
 }
-export async function listPayments(): Promise<CustomerPaymentDto[]> {
-  const rows = await sqlClient<Array<Omit<CustomerPaymentDto, 'createdAt' | 'paidAt'> & { createdAt: Date | string; paidAt: Date | string | null }>>`SELECT p.id,p.order_id AS "orderId",o.order_number AS "orderNumber",
+/** The status buckets the payments screen filters by, expanded to the codes each one covers. */
+export const paymentBuckets = {
+  successful: [PaymentStatus.Paid],
+  failed: [PaymentStatus.Failed, PaymentStatus.Rejected, PaymentStatus.Cancelled],
+  pending: [PaymentStatus.Pending, PaymentStatus.AwaitingVerification],
+  refunded: [PaymentStatus.Refunded],
+} as const
+
+export type PaymentBucket = keyof typeof paymentBuckets
+
+/**
+ * Totals per status bucket across every payment, not just the visible page.
+ *
+ * The screen's metric cards used to count the rows it had loaded. Once the grid pages, that would
+ * silently turn them into "counts on this page", so the totals come from their own aggregate query.
+ */
+export async function paymentBucketTotals(): Promise<Record<PaymentBucket, { count: number; amount: number }>> {
+  const rows = await sqlClient<Array<{ status: number; count: number; amount: number }>>`
+    SELECT status, COUNT(*)::int AS count, COALESCE(SUM(amount),0)::float8 AS amount
+    FROM payments GROUP BY status`
+  const empty = () => ({ count: 0, amount: 0 })
+  const totals: Record<PaymentBucket, { count: number; amount: number }> = {
+    successful: empty(), failed: empty(), pending: empty(), refunded: empty(),
+  }
+  for (const row of rows) {
+    for (const [bucket, codes] of Object.entries(paymentBuckets) as Array<[PaymentBucket, readonly number[]]>) {
+      if (!codes.includes(row.status)) continue
+      totals[bucket].count += row.count
+      totals[bucket].amount += row.amount
+    }
+  }
+  return totals
+}
+
+export async function listPayments(
+  bucket?: PaymentBucket | 'all' | null,
+  page?: number,
+  pageSize?: number,
+): Promise<PagedResult<CustomerPaymentDto>> {
+  const paging = resolvePaging(page, pageSize)
+  const statuses = bucket && bucket !== 'all' ? [...paymentBuckets[bucket]] : null
+  const rows = await sqlClient<Array<Omit<CustomerPaymentDto, 'createdAt' | 'paidAt'> & { createdAt: Date | string; paidAt: Date | string | null; totalCount: number }>>`SELECT p.id,p.order_id AS "orderId",o.order_number AS "orderNumber",
     o.delivery_full_name AS "customerFullName",o.delivery_phone_number AS "customerPhoneNumber",
     o.total_amount::float8 AS "orderTotalAmount",
     p.payment_method AS "paymentMethod",p.amount::float8 amount,p.status,
     p.financial_account_id AS "financialAccountId",a.name AS "financialAccountName",
     p.pos_terminal_id AS "posTerminalId",p.tracking_number AS "trackingNumber",
     p.reference_number AS "referenceNumber",p.receipt_image_url AS "receiptImageUrl",
-    p.description,p.paid_at AS "paidAt",p.created_at AS "createdAt"
+    p.description,p.paid_at AS "paidAt",p.created_at AS "createdAt",COUNT(*) OVER ()::int AS "totalCount"
     FROM payments p JOIN orders o ON o.id=p.order_id JOIN financial_accounts a ON a.id=p.financial_account_id
-    ORDER BY p.created_at DESC LIMIT 500`
-  return rows.map((row) => ({
+    WHERE (${statuses}::int[] IS NULL OR p.status = ANY(${statuses}::int[]))
+    ORDER BY p.created_at DESC,p.id DESC LIMIT ${paging.limit} OFFSET ${paging.offset}`
+  return pagedResult(rows.map(({ totalCount: _ignored, ...row }) => ({
     ...row,
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
     paidAt: row.paidAt instanceof Date ? row.paidAt.toISOString() : row.paidAt,
-  }))
+  })), rows[0]?.totalCount ?? 0, paging)
 }
 export async function refundPayment(id: number, userId: number) {
   await sqlClient.begin(async (tx) => {
@@ -783,19 +869,40 @@ export async function shoppingRequirements(from: string, to: string) {
     LEFT JOIN stock s ON s.ingredient_id=i.id LEFT JOIN costs c ON c.ingredient_id=i.id
     WHERE i.is_active AND i.is_inventory_tracked ORDER BY i.name`
 }
-export async function listShoppingLists(): Promise<ShoppingListSummaryDto[]> {
-  return sqlClient<ShoppingListSummaryDto[]>`
+type ShoppingListRow = ShoppingListSummaryDto & { totalCount: number }
+
+function shoppingListRows(search: string, paging: ResolvedPaging | null) {
+  const value = search.trim() || null
+  return sqlClient<ShoppingListRow[]>`
     SELECT l.id,l.title,l.target_date::text AS "targetDate",l.status,l.notes,
       COUNT(li.id)::int AS "itemCount",
       COALESCE(SUM(li.suggested_purchase_quantity*li.estimated_unit_cost),0)::float8 AS "estimatedTotal",
       COALESCE(string_agg(i.name,'، ' ORDER BY i.name),'') AS "itemSummary",
-      l.created_at::text AS "createdAt"
+      l.created_at::text AS "createdAt",
+      COUNT(*) OVER ()::int AS "totalCount"
     FROM shopping_lists l
     LEFT JOIN shopping_list_items li ON li.shopping_list_id=l.id
     LEFT JOIN ingredients i ON i.id=li.ingredient_id
+    WHERE (${value}::text IS NULL OR l.title ILIKE '%'||${value}||'%')
     GROUP BY l.id
     ORDER BY l.target_date DESC,l.id DESC
-    LIMIT 100`
+    ${paging ? sqlClient`LIMIT ${paging.limit} OFFSET ${paging.offset}` : sqlClient``}`
+}
+
+/** Unpaged. Kept for the legacy Next.js admin route. */
+export async function listShoppingLists(search = ''): Promise<ShoppingListSummaryDto[]> {
+  const rows = await shoppingListRows(search, null)
+  return rows.map(({ totalCount: _ignored, ...row }) => row)
+}
+
+export async function listShoppingListsPaged(search = '', page?: number, pageSize?: number) {
+  const paging = resolvePaging(page, pageSize)
+  const rows = await shoppingListRows(search, paging)
+  return pagedResult(
+    rows.map(({ totalCount: _ignored, ...row }) => row as ShoppingListSummaryDto),
+    rows[0]?.totalCount ?? 0,
+    paging,
+  )
 }
 export async function createShoppingList(input: ShoppingListCreateRequest,userId:number){
   return sqlClient.begin(async tx=>{

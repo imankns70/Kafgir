@@ -63,6 +63,8 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   const [reviewTarget, setReviewTarget] = useState<{ id: number; orderNumber: string; review: OrderReviewDto | null } | null>(null)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [isReviewSubmitting, setIsReviewSubmitting] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [openingOrderId, setOpeningOrderId] = useState<number | null>(null)
 
   const loadAccount = async () => {
     setIsLoading(true)
@@ -173,11 +175,12 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   }
 
   const openOrder = async (id: number) => {
-    setIsLoading(true)
+    if (openingOrderId != null) return
+    setOpeningOrderId(id)
     setError(null)
     try { setSelectedOrder(await getCustomerOrder(id)) }
     catch (orderError) { setError(orderError instanceof Error ? orderError.message : 'دریافت سفارش ممکن نشد.') }
-    finally { setIsLoading(false) }
+    finally { setOpeningOrderId(null) }
   }
 
   const openReview = (order: CustomerOrderSummaryDto | CustomerOrderDetailDto) => {
@@ -205,12 +208,20 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   }
 
   const logout = async () => {
-    await logoutCustomer()
-    setProfile(null)
-    setOrders(null)
-    setSelectedOrder(null)
-    setPhone('')
-    onAuthenticationChange(false)
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    try {
+      // The session ends locally whatever the server says: staying signed in after asking to leave is
+      // the worse outcome, and the cookie is cleared by the same request.
+      await logoutCustomer()
+    } finally {
+      setIsLoggingOut(false)
+      setProfile(null)
+      setOrders(null)
+      setSelectedOrder(null)
+      setPhone('')
+      onAuthenticationChange(false)
+    }
   }
 
   if (isLoading && !profile) return <BrandedState title="در حال دریافت حساب شما" message="کمی صبر کنید…" icon="profile" />
@@ -301,12 +312,12 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
             <label className="check-field"><input type="checkbox" checked={address.isDefault} onChange={(event) => setAddress({ ...address, isDefault: event.target.checked })} /> آدرس پیش‌فرض</label>
             <div className="form-actions"><button className="primary-button" disabled={isAddressSubmitting || deletingAddressId !== null}>{isAddressSubmitting ? <ButtonLoading label={editingAddressId ? 'در حال به‌روزرسانی آدرس…' : 'در حال ثبت آدرس…'} /> : editingAddressId ? 'به‌روزرسانی آدرس' : 'ثبت آدرس'}</button>{editingAddressId && <button type="button" className="outline-button" disabled={isAddressSubmitting} onClick={() => startAddressEdit()}>انصراف</button>}</div>
           </form>
-          <button className="outline-button danger-outline profile-logout" onClick={() => void logout()}><Icon name="logout" size="sm" /> خروج از حساب</button>
+          <button className="outline-button danger-outline profile-logout" disabled={isLoggingOut} onClick={() => void logout()}>{isLoggingOut ? <ButtonLoading label="در حال خروج…" /> : <><Icon name="logout" size="sm" /> خروج از حساب</>}</button>
         </div>
 
         <section className="panel customer-orders-panel" aria-labelledby="my-orders-title">
           <div className="orders-section-heading"><div><p className="eyebrow"><Icon name="orders" size="sm" /> سابقه خرید</p><h2 id="my-orders-title" className="section-title">سفارش‌های من</h2></div>{orders && <span>{formatNumber(orders.totalItems)} سفارش</span>}</div>
-          <CustomerOrdersList orders={orders} error={error} onRetry={() => void loadAccount()} onOpen={(id) => void openOrder(id)} onReview={openReview} onBrowse={onBack} onPage={(page) => void getCustomerOrders(page).then(setOrders).catch((loadError) => setError(loadError instanceof Error ? loadError.message : 'دریافت سفارش‌ها ممکن نشد.'))} />
+          <CustomerOrdersList orders={orders} error={error} openingOrderId={openingOrderId} onRetry={() => void loadAccount()} onOpen={(id) => void openOrder(id)} onReview={openReview} onBrowse={onBack} onPage={(page) => void getCustomerOrders(page).then(setOrders).catch((loadError) => setError(loadError instanceof Error ? loadError.message : 'دریافت سفارش‌ها ممکن نشد.'))} />
         </section>
       </div>
       {reviewTarget && <OrderReviewDialog key={reviewTarget.id} orderNumber={reviewTarget.orderNumber} review={reviewTarget.review} busy={isReviewSubmitting} error={reviewError} onClose={() => setReviewTarget(null)} onSave={(rating, comment) => void submitReview(rating, comment)} />}

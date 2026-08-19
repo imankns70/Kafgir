@@ -1831,3 +1831,4 @@ select:disabled {
 @media (prefers-reduced-motion:reduce) {
   .customer-orders-skeleton span,.review-dialog-card { animation:none }
 }
+.support-opening { color:var(--muted);font-size:11px;font-style:normal }

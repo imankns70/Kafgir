@@ -9,6 +9,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // `scripts` is included so migration/seed helpers can carry tests. Modules there must not run
+    // work at import time — `migrate-sqlserver.ts` calls `main()`, which is why its pre-flight rules
+    // live in `legacy-order-numbers.ts` instead.
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
   },
 })
