@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { defaultPageSize, pageSizeOptions, type PagedResult } from '@kafgir/contracts'
-import { formatNumber } from './number-format'
+import { formatAmountInput, formatNumber } from './number-format'
 import { PersianDatePicker } from './PersianDatePicker'
 import { PersianTimePicker } from './PersianTimePicker'
 
@@ -111,6 +111,43 @@ export function TimeField({ label, value, onChange, allowClear }: {
   return <div className="field admin-date-field">
     <label htmlFor={id}>{label}</label>
     <PersianTimePicker id={id} value={value} onChange={onChange} allowClear={allowClear} />
+  </div>
+}
+
+/**
+ * The one money control in the admin.
+ *
+ * The value is held as text while editing, so clearing the box stays empty instead of collapsing to
+ * zero, and the box regroups as the operator types — «70000» reads back as «70,000» in the same
+ * separator style as every price the app prints. Persian and Arabic-Indic digits are accepted and
+ * normalised, and a grouped value pasted back in still parses.
+ *
+ * Callers keep the text in their own state and parse it with `parseAmount` / `parseTomanAmount` when
+ * they submit. Nothing here ever does arithmetic on the displayed string.
+ */
+export function AmountField({ label, value, onChange, placeholder, invalid, hint }: {
+  label: string
+  /** The raw text the operator is editing, not a number. */
+  value: string
+  onChange: (value: string) => void
+  placeholder?: string
+  invalid?: boolean
+  hint?: string
+}) {
+  const id = useId()
+  return <div className="field admin-amount-field">
+    <label htmlFor={id}>{label}</label>
+    {/* `dir="ltr"` because digits and their separators read left-to-right even inside an RTL page. */}
+    <input
+      id={id}
+      inputMode="numeric"
+      dir="ltr"
+      value={formatAmountInput(value)}
+      placeholder={placeholder}
+      aria-invalid={invalid || undefined}
+      onChange={(event) => onChange(event.target.value)}
+    />
+    {hint && <small className="muted">{hint}</small>}
   </div>
 }
 

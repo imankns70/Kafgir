@@ -556,6 +556,13 @@ tr.selected-row:hover{background:var(--primary-soft)}
 /* Jalali calendar picker. The value stays ISO Gregorian; only the surface is Persian. */
 .admin-date-field{display:grid;gap:5px;min-width:168px}
 .admin-date-field>label{font-size:13px;font-weight:500}
+/* Money entry. Same caption-above-control shape as the date field, and it has to look right both in
+   a `.form-grid` and inside a settings card, which style their own direct-child labels. */
+.admin-amount-field{display:grid;gap:5px;min-width:168px}
+.admin-amount-field>label{font-size:13px;font-weight:500}
+.admin-amount-field>input{min-height:42px;border:1px solid var(--border);border-radius:10px;padding:8px 11px;background:#fff;font:inherit}
+.admin-amount-field>input[aria-invalid="true"]{border-color:var(--error)}
+.admin-amount-field>small{font-size:11px}
 .persian-date-picker{position:relative}
 .persian-date-trigger{width:100%;min-height:42px;justify-content:space-between;text-align:right;font-variant-numeric:normal}
 .persian-date-panel{position:absolute;inset-inline-start:0;top:calc(100% + 6px);z-index:60;display:grid;width:272px;gap:10px;border:1px solid var(--border);border-radius:14px;padding:12px;background:var(--surface);box-shadow:0 14px 34px #5d3d2a2e}

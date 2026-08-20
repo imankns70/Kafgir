@@ -7,7 +7,16 @@ import type {
   CourierSettlementDto,
 } from '@kafgir/contracts'
 import { adminApi } from './api'
-import { DateField, Pager, RowNumberCell, RowNumberHead, useAsyncAction, usePagination } from './admin-ui'
+import {
+  AmountField, DateField, Pager, RowNumberCell, RowNumberHead, useAsyncAction, usePagination,
+} from './admin-ui'
+import {
+  formatMoney as money,
+  formatNumber as count,
+  formatPersianDate as persianDay,
+  formatPersianDateTime as dateTime,
+  parseTomanAmount,
+} from './number-format'
 
 /**
  * Courier directory, per-day arrangement, and accounting.
@@ -20,35 +29,9 @@ import { DateField, Pager, RowNumberCell, RowNumberHead, useAsyncAction, usePagi
 
 const errorText = (reason: unknown) => reason instanceof Error ? reason.message : String(reason)
 
-const money = (value: number) => `${value.toLocaleString('fa-IR')} تومان`
-const count = (value: number) => value.toLocaleString('fa-IR')
-
-const dateTime = (value: string) => new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', {
-  dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Tehran',
-}).format(new Date(value)).replace(/[‎‏]/g, '')
-
-const persianDay = (value: string) => new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', {
-  dateStyle: 'medium', timeZone: 'Asia/Tehran',
-}).format(new Date(`${value}T12:00:00Z`)).replace(/[‎‏]/g, '')
-
 const today = () => new Intl.DateTimeFormat('en-CA-u-nu-latn', {
   timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit',
 }).format(new Date())
-
-/**
- * Amounts are held as text while editing so clearing a box does not silently become zero, then
- * parsed to an integer Toman value. Persian digits are accepted because the operator's keyboard
- * produces them.
- */
-const parseToman = (value: string): number | null => {
-  const normalized = value
-    .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
-    .replace(/[,،\s]/g, '')
-    .trim()
-  if (normalized === '') return null
-  const parsed = Number(normalized)
-  return Number.isInteger(parsed) && parsed >= 0 ? parsed : null
-}
 
 type CourierForm = { id: number | null; fullName: string; mobile: string; notes: string; isActive: boolean }
 const emptyCourierForm: CourierForm = { id: null, fullName: '', mobile: '', notes: '', isActive: true }
@@ -220,8 +203,8 @@ export function CourierDaysPage() {
   useEffect(() => { void loadDay(date) }, [date, loadDay])
 
   const activeCouriers = couriers.filter((courier) => courier.isActive)
-  const customerFee = parseToman(form.customerDeliveryFee)
-  const courierPayable = parseToman(form.courierPayablePerOrder)
+  const customerFee = parseTomanAmount(form.customerDeliveryFee)
+  const courierPayable = parseTomanAmount(form.courierPayablePerOrder)
   const amountsValid = customerFee !== null && courierPayable !== null
   const courierId = Number(form.courierId) || 0
 
@@ -278,14 +261,12 @@ export function CourierDaysPage() {
           </option>)}
         </select>
       </label>
-      <label className="field">هزینه ارسال برای مشتری (تومان)
-        <input inputMode="numeric" dir="ltr" value={form.customerDeliveryFee}
-          onChange={(e) => setForm({ ...form, customerDeliveryFee: e.target.value })} placeholder="70000" />
-      </label>
-      <label className="field">مبلغ هر تحویل برای پیک (تومان)
-        <input inputMode="numeric" dir="ltr" value={form.courierPayablePerOrder}
-          onChange={(e) => setForm({ ...form, courierPayablePerOrder: e.target.value })} placeholder="70000" />
-      </label>
+      <AmountField label="هزینه ارسال برای مشتری (تومان)" placeholder="70,000"
+        value={form.customerDeliveryFee} invalid={form.customerDeliveryFee !== '' && customerFee === null}
+        onChange={(value) => setForm({ ...form, customerDeliveryFee: value })} />
+      <AmountField label="مبلغ هر تحویل برای پیک (تومان)" placeholder="70,000"
+        value={form.courierPayablePerOrder} invalid={form.courierPayablePerOrder !== '' && courierPayable === null}
+        onChange={(value) => setForm({ ...form, courierPayablePerOrder: value })} />
       <div className="form-actions">
         <button type="button" className="primary-button" disabled={busy} onClick={() => void save(true)}>
           {busy ? 'در حال ذخیره…' : 'ذخیره و فعال کردن این روز'}
@@ -367,7 +348,7 @@ export function CourierAccountingPage() {
     catch (reason) { setError(errorText(reason)) }
   }
 
-  const parsedAmount = parseToman(amount)
+  const parsedAmount = parseTomanAmount(amount)
 
   const settle = async () => {
     if (!selected) return
@@ -452,10 +433,10 @@ export function CourierAccountingPage() {
       </section>
 
       <div className="form-grid two-columns">
-        <label className="field">مبلغ تسویه (تومان)
-          <input inputMode="numeric" dir="ltr" value={amount}
-            onChange={(e) => setAmount(e.target.value)} placeholder="500000" />
-        </label>
+        <AmountField label="مبلغ تسویه (تومان)" placeholder="500,000" value={amount}
+          invalid={amount !== '' && (parsedAmount === null || parsedAmount <= 0)}
+          hint={`حداکثر تا مانده فعلی: ${money(selected.outstandingAmount)}`}
+          onChange={setAmount} />
         <label className="field">توضیح
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} placeholder="اختیاری" />
         </label>

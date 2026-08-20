@@ -4,7 +4,8 @@ import type {
   PaymentMethodSettingDto,
 } from '@kafgir/contracts'
 import { adminApi } from './api'
-import { ListState, Message, PageFrame } from './admin-ui'
+import { AmountField, ListState, Message, PageFrame } from './admin-ui'
+import { formatAmountInput, parseAmount } from './number-format'
 
 /**
  * Checkout configuration.
@@ -18,14 +19,12 @@ import { ListState, Message, PageFrame } from './admin-ui'
 
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error)
 
-/** Money fields are held as text while editing so clearing the box does not silently become zero. */
-const amountText = (value: number) => String(value)
-const parseAmount = (value: string) => {
-  const normalized = value.replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit))).trim()
-  if (normalized === '') return null
-  const parsed = Number(normalized)
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
-}
+/**
+ * Money fields are held as text while editing so clearing the box does not silently become zero.
+ * The parsing and grouping rules live in `number-format` so this screen and the courier screens
+ * cannot drift into two different ideas of what «۷۰٬۰۰۰» or «70,000» means.
+ */
+const amountText = (value: number) => formatAmountInput(value)
 
 type ChannelFieldsProps = {
   isCustomerEnabled: boolean
@@ -201,14 +200,16 @@ export function DeliveryMethodsPage() {
           ? <p className="settings-method-note">
               هزینه ارسال این روش برای هر روز جداگانه در صفحه «پیک و هزینه ارسال روزانه» تعیین می‌شود.
             </p>
-          : <label>هزینه ارسال (تومان)<input inputMode="numeric" dir="ltr" value={entry.fee}
-              onChange={(event) => setAmounts((current) => ({
-                ...current, [row.method]: { ...entry, fee: event.target.value },
-              }))} /></label>}
-        <label>حداقل مبلغ سفارش (تومان)<input inputMode="numeric" dir="ltr" value={entry.minimum}
-          onChange={(event) => setAmounts((current) => ({
-            ...current, [row.method]: { ...entry, minimum: event.target.value },
-          }))} /></label>
+          : <AmountField label="هزینه ارسال (تومان)" value={entry.fee}
+              invalid={parseAmount(entry.fee) === null}
+              onChange={(value) => setAmounts((current) => ({
+                ...current, [row.method]: { ...entry, fee: value },
+              }))} />}
+        <AmountField label="حداقل مبلغ سفارش (تومان)" value={entry.minimum}
+          invalid={parseAmount(entry.minimum) === null}
+          onChange={(value) => setAmounts((current) => ({
+            ...current, [row.method]: { ...entry, minimum: value },
+          }))} />
         <label>ترتیب<input type="number" min="0" value={draft.displayOrder}
           onChange={(event) => patch(row.method, { displayOrder: Number(event.target.value) })} /></label>
         <ChannelFields

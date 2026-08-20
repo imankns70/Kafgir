@@ -1,4 +1,5 @@
 import { DeliveryMethod, PaymentMethod } from '@kafgir/contracts'
+import { formatToman } from './money'
 
 export type InvoiceMessageLine = {
   foodName: string
@@ -20,7 +21,7 @@ export type InvoiceMessageInput = {
   items: InvoiceMessageLine[]
 }
 
-const money = (value: number) => `${value.toLocaleString('en-US')} تومان`
+const money = formatToman
 const dateTime = (value: Date) => new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn', {
   dateStyle: 'medium',
   timeStyle: 'short',

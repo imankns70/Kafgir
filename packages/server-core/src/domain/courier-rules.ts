@@ -1,4 +1,5 @@
 import { OrderStatus } from '@kafgir/contracts'
+import { formatToman } from './money'
 
 /**
  * Pure courier pricing and accounting rules, shared by order creation, the customer pricing query,
@@ -74,7 +75,7 @@ export function courierOutstanding(totals: CourierAccountTotals): number {
 export function settlementRejection(amount: number, outstanding: number): string | null {
   if (!Number.isFinite(amount) || amount <= 0) return 'مبلغ تسویه باید بیشتر از صفر باشد.'
   if (amount > outstanding) {
-    return `مبلغ تسویه از مانده حساب پیک بیشتر است. مانده فعلی ${outstanding.toLocaleString('fa-IR')} تومان است.`
+    return `مبلغ تسویه از مانده حساب پیک بیشتر است. مانده فعلی ${formatToman(outstanding)} است.`
   }
   return null
 }

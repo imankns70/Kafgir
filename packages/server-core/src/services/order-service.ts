@@ -29,6 +29,7 @@ import {
 } from '../domain/courier-rules'
 import { logger } from '../logging/logger'
 import { formatTelegramOrderInvoice } from '../domain/order-invoice'
+import { formatToman } from '../domain/money'
 
 const defaultCity = 'اندیمشک'
 const customerRole = 'Customer'
@@ -416,7 +417,7 @@ export async function createOrder(
     })
     if (deliveryFee === null) throw new AppError(courierDayMissingMessage)
     if (subtotal < deliverySettings[0].minimumOrderAmount) {
-      throw new AppError(`حداقل مبلغ سفارش برای این روش دریافت ${deliverySettings[0].minimumOrderAmount.toLocaleString('fa-IR')} تومان است.`)
+      throw new AppError(`حداقل مبلغ سفارش برای این روش دریافت ${formatToman(deliverySettings[0].minimumOrderAmount)} است.`)
     }
     const total = subtotal + deliveryFee
     const orderRows = await tx<{ id: number }[]>`
@@ -464,7 +465,7 @@ export async function createOrder(
         VALUES
           (${NotificationChannel.Telegram}, ${NotificationType.NewOrderForAdmin},
            ${NotificationStatus.Pending}, ${adminChat},
-           ${`سفارش جدید کفگیر\nشماره سفارش: ${orderNumber}\nمشتری: ${fullName}\nموبایل: ${phoneNumber}\nمبلغ: ${total.toLocaleString('en-US')} تومان\nآدرس: ${city}، ${addressLine}`},
+           ${`سفارش جدید کفگیر\nشماره سفارش: ${orderNumber}\nمشتری: ${fullName}\nموبایل: ${phoneNumber}\nمبلغ: ${formatToman(total)}\nآدرس: ${city}، ${addressLine}`},
            ${orderId}, ${orderNumber}, 0, ${nowSql})
       `
     }
