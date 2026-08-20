@@ -189,7 +189,10 @@ export function CustomerOrderDetails({ order, onBack, onReview }: {
       </section>
       <section className="panel order-financial-panel">
         <h2 className="section-title">خلاصه مالی</h2>
-        <dl className="financial-breakdown">{discountAmount > 0 && <div><dt>تخفیف ثبت‌شده</dt><dd className="discount-value">− {formatMoney(discountAmount)}</dd></div>}<div><dt>جمع اقلام پس از تخفیف</dt><dd>{formatMoney(order.subtotalAmount)}</dd></div>{order.deliveryFee > 0 && <div><dt>هزینه ارسال</dt><dd>{formatMoney(order.deliveryFee)}</dd></div>}<div className="grand-total"><dt>جمع فاکتور</dt><dd>{formatMoney(order.totalAmount)}</dd></div></dl>
+        <dl className="financial-breakdown">{discountAmount > 0 && <div><dt>تخفیف ثبت‌شده</dt><dd className="discount-value">− {formatMoney(discountAmount)}</dd></div>}<div><dt>جمع اقلام پس از تخفیف</dt><dd>{formatMoney(order.subtotalAmount)}</dd></div>{/* Always shown, even at zero. A missing line reads as "we forgot to mention it"; an explicit
+    ۰ تومان reads as free delivery, which is what it actually means. The value is the order's own
+    snapshot, so a later change to that day's price never rewrites this receipt. */}
+<div><dt>هزینه ارسال</dt><dd>{formatMoney(order.deliveryFee)}</dd></div><div className="grand-total"><dt>جمع فاکتور</dt><dd>{formatMoney(order.totalAmount)}</dd></div></dl>
       </section>
       <section className="panel order-payment-panel">
         <h2 className="section-title">اطلاعات پرداخت</h2>

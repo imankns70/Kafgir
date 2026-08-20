@@ -25,6 +25,7 @@ let menuItemId = 0
 let noonSlotId = 0
 let eveningSlotId = 0
 let inactiveSlotId = 0
+let courierId = 0
 
 const orderRequest = (deliveryTimeSlotId: number | null, quantity = 1) => ({
   fullName: 'مشتری تست بازه',
@@ -72,6 +73,18 @@ integration.sequential('delivery time slots', () => {
     noonSlotId = await slot(`ظهر ${suffix}`, '12:00', '14:00', true, 1)
     eveningSlotId = await slot(`عصر ${suffix}`, '16:00', '18:00', true, 2)
     inactiveSlotId = await slot(`نیمه‌شب ${suffix}`, '23:00', '23:30', false, 3)
+
+    // Courier delivery now needs a priced day. These cases are about window capacity, so the day is
+    // given an ordinary arrangement and left alone; the courier rules have their own suite.
+    courierId = (await sql<{ id: number }[]>`
+      INSERT INTO couriers (full_name, mobile, is_active, created_at)
+      VALUES (${`پیک ${suffix}`}, ${`0912${suffix.replace(/\D/g, '').slice(0, 7).padEnd(7, '0')}`},
+              true, NOW())
+      RETURNING id`)[0]!.id
+    await sql`
+      INSERT INTO courier_delivery_days
+        (delivery_date, courier_id, customer_delivery_fee, courier_payable_per_order, is_active, created_at)
+      VALUES (${menuDate}, ${courierId}, 70000, 70000, true, NOW())`
   })
 
   afterAll(async () => {
@@ -79,6 +92,8 @@ integration.sequential('delivery time slots', () => {
     await sql`DELETE FROM order_items WHERE daily_menu_item_id = ${menuItemId}`
     await sql`DELETE FROM orders WHERE delivery_date = ${menuDate}`
     await sql`DELETE FROM delivery_time_slot_availabilities WHERE delivery_date = ${menuDate}`
+    await sql`DELETE FROM courier_delivery_days WHERE courier_id = ${courierId}`
+    await sql`DELETE FROM couriers WHERE id = ${courierId}`
     await sql`DELETE FROM delivery_time_slots WHERE title LIKE ${`%${suffix}`}`
     await sql`DELETE FROM daily_menu_items WHERE id = ${menuItemId}`
     await sql`DELETE FROM daily_menus WHERE id = ${menuId}`

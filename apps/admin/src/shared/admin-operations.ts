@@ -9,6 +9,18 @@ export const adminOperations = [
   'deliverySlots.setActive',
   'deliveryDays.get',
   'deliveryDays.setOverride',
+  // Couriers are three separate concerns, listed separately so a role can be given the dispatch view
+  // without being given the money: the directory, the per-day arrangement, and the accounting ledger.
+  'couriers.list',
+  'couriers.create',
+  'couriers.update',
+  'couriers.setActive',
+  'courierDays.get',
+  'courierDays.list',
+  'courierDays.save',
+  'courierAccounting.summary',
+  'courierAccounting.settlements',
+  'courierAccounting.settle',
   'foodCategories.list',
   'foodCategories.create',
   'foodCategories.update',

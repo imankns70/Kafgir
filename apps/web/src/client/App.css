@@ -1332,6 +1332,14 @@ select:disabled {
 .invoice-footer { display:flex;align-items:center;justify-content:space-between;gap:12px;border-block-start:1px dashed var(--kafgir-color-border-strong);padding-block-start:13px;color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
 .invoice-actions { display:flex;justify-content:flex-end }
 
+/* Checkout money breakdown. Deliberately mirrors the invoice summary so the figures the customer
+   approves before submitting look identical to the ones on the receipt afterwards. */
+.checkout-totals { display:grid;gap:6px;border-block-start:1px dashed var(--kafgir-color-border-strong);padding-block-start:12px }
+.checkout-totals>div { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:4px 2px }
+.checkout-totals span { color:var(--kafgir-color-text-secondary) }
+.checkout-totals-final { border:1px solid #e46a4a66;border-radius:var(--kafgir-radius-sm);padding:11px 12px!important;color:var(--kafgir-color-primary);background:var(--kafgir-color-primary-soft) }
+.checkout-totals-final span,.checkout-totals-final strong { color:inherit;font-size:1.05rem }
+
 @keyframes rise-in {
   from { opacity: 0; transform: translateY(7px); }
   to { opacity: 1; transform: translateY(0); }

@@ -1,5 +1,31 @@
 # Tasks
 
+## 2026-08-20 delivery-fee visibility and courier accounting
+
+- [x] Show food subtotal, delivery fee and final total as separate lines in checkout and in the
+  customer order receipt, always from the order's own snapshot.
+- [x] Add couriers, per-date courier configuration, and append-only courier settlements.
+- [x] Keep the customer delivery charge and the courier payable as independent values end to end.
+- [x] Snapshot courier, courier name, customer fee and courier payable on the order from one
+  consistent configuration read under a date-scoped advisory lock.
+- [x] Resolve pricing from the selected delivery date rather than today, in Asia/Tehran.
+- [x] Block courier orders on an unpriced delivery date with a clear Persian message in both the
+  customer web app and Admin manual orders; leave pickup unaffected.
+- [x] Give delivery pricing one source per method through
+  `delivery_method_settings.requires_courier`, and remove the fee field from Admin for courier methods.
+- [x] Count courier earnings only from orders whose current status is Delivered, and derive the
+  outstanding balance rather than storing it.
+- [x] Add the Admin courier directory, daily configuration and work/settlement pages, and show the
+  courier and payable snapshot on Admin order detail.
+- [x] Keep the courier payable out of every customer-facing payload.
+- [x] Add migration `0023_courier_delivery_accounting.sql` without altering existing order data.
+- [x] Add contract, domain and database integration tests, and keep the delivery-slot capacity and
+  concurrency suites passing.
+- [ ] Apply `0023_courier_delivery_accounting.sql` to the target database and verify tables, columns,
+  indexes and the journal record.
+- [ ] After migration, seed at least one courier and one day configuration, then smoke-test a customer
+  delivery order, an Admin manual order, and one courier settlement.
+
 ## 2026-08-15 private customer communication
 
 - [x] Keep reviews and support messages private between the authenticated customer and Admin.

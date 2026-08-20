@@ -39,6 +39,7 @@ export type {
   PendingOrderReviewDto,
   OrderReviewWriteRequest,
   OrderSummaryDto,
+  DeliveryPricingDto,
   PublicDailyMenuPageDto,
   PublicOrderOptionsDto,
   PersianRiceDto,

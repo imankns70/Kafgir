@@ -181,6 +181,7 @@ export function DeliveryMethodsPage() {
     <Message error={error} />
     {notice && <Message>{notice}</Message>}
     <Message>هزینه ارسال به مبلغ سفارش اضافه می‌شود و در همان لحظه ثبت سفارش در فاکتور ذخیره می‌ماند؛ تغییر بعدی آن سفارش‌های گذشته را عوض نمی‌کند.</Message>
+    <Message>برای روش‌هایی که با پیک انجام می‌شوند، هزینه ارسال از پیکربندی همان روز تحویل خوانده می‌شود و در این صفحه تعیین نمی‌گردد؛ فقط یک منبع برای قیمت ارسال وجود دارد.</Message>
     <ListState loading={loading} error={error} isEmpty={rows.length === 0} emptyText="روشی پیکربندی نشده است." />
     <div className="settings-method-grid">{rows.map((row) => {
       const draft = drafts[row.method] ?? row
@@ -193,10 +194,17 @@ export function DeliveryMethodsPage() {
           onChange={(event) => patch(row.method, { title: event.target.value })} /></label>
         <label>توضیح برای مشتری<input value={draft.description ?? ''}
           onChange={(event) => patch(row.method, { description: event.target.value || null })} /></label>
-        <label>هزینه ارسال (تومان)<input inputMode="numeric" dir="ltr" value={entry.fee}
-          onChange={(event) => setAmounts((current) => ({
-            ...current, [row.method]: { ...entry, fee: event.target.value },
-          }))} /></label>
+        {/* A courier method has no fee of its own: its price is a property of the delivery date, set
+            on «پیک و هزینه ارسال روزانه». Showing an editable box here would create a second,
+            never-consulted fee and leave an operator wondering which one the customer pays. */}
+        {row.requiresCourier
+          ? <p className="settings-method-note">
+              هزینه ارسال این روش برای هر روز جداگانه در صفحه «پیک و هزینه ارسال روزانه» تعیین می‌شود.
+            </p>
+          : <label>هزینه ارسال (تومان)<input inputMode="numeric" dir="ltr" value={entry.fee}
+              onChange={(event) => setAmounts((current) => ({
+                ...current, [row.method]: { ...entry, fee: event.target.value },
+              }))} /></label>}
         <label>حداقل مبلغ سفارش (تومان)<input inputMode="numeric" dir="ltr" value={entry.minimum}
           onChange={(event) => setAmounts((current) => ({
             ...current, [row.method]: { ...entry, minimum: event.target.value },

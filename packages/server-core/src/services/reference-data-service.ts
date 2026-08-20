@@ -191,7 +191,8 @@ export async function listDeliveryMethodSettings(
   return sqlClient<DeliveryMethodSettingDto[]>`
     SELECT method, title, description, is_customer_enabled AS "isCustomerEnabled",
            is_manual_enabled AS "isManualEnabled", display_order AS "displayOrder",
-           delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount"
+           delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount",
+           requires_courier AS "requiresCourier"
     FROM delivery_method_settings
     WHERE ${audience === 'all'} OR
       (${audience === 'customer'} AND is_customer_enabled) OR
@@ -213,7 +214,8 @@ export async function updateDeliveryMethodSetting(
     WHERE method = ${method}
     RETURNING method, title, description, is_customer_enabled AS "isCustomerEnabled",
               is_manual_enabled AS "isManualEnabled", display_order AS "displayOrder",
-              delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount"
+              delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount",
+              requires_courier AS "requiresCourier"
   `
   if (!rows[0]) throw new NotFoundError('روش دریافت پیدا نشد.')
   return rows[0]

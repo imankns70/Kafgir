@@ -6,6 +6,7 @@ import {
   verifyCustomerOtp,
 } from '../../services/customerApi'
 import { createOrder, getOrderOptions } from '../../services/ordersApi'
+import { getDeliveryPricing } from '../../services/deliveryApi'
 import { getTelegramInitData, getTelegramUser } from '../../services/telegram'
 import { cartItemIssue } from '../../services/cartReconciliation'
 import { Icon } from '../../design-system/Icon'
@@ -20,6 +21,7 @@ import {
   type CreateOrderRequest,
   type CustomerAddressDto,
   type CustomerProfileDto,
+  type DeliveryPricingDto,
   type OrderDto,
   type PublicOrderOptionsDto,
 } from '../../types'
@@ -48,6 +50,9 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   const [selectedAddressId, setSelectedAddressId] = useState<string>(newAddressValue)
   const [error, setError] = useState<string | null>(null)
   const [deliveryTimeSlotId, setDeliveryTimeSlotId] = useState<number | null>(null)
+  const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
+  const [pricing, setPricing] = useState<DeliveryPricingDto | null>(null)
+  const [isLoadingPricing, setIsLoadingPricing] = useState(true)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
@@ -74,6 +79,12 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   const cartSubtotal = items.reduce((sum, item) =>
     sum + (item.unitPrice + (item.withPersianRice ? item.persianRicePrice ?? 0 : 0)) * item.quantity, 0)
   const isBelowMinimum = Boolean(selectedDelivery && cartSubtotal < selectedDelivery.minimumOrderAmount)
+  // The charge always comes from the server's answer for the resolved delivery date, never from the
+  // delivery-method record: for courier delivery the price is a property of the day, not the method.
+  const selectedPricing = pricing?.methods.find((item) => item.method === form.deliveryMethod) ?? null
+  const deliveryFee = selectedPricing?.customerDeliveryFee ?? null
+  const isDeliveryUnpriced = Boolean(selectedPricing && deliveryFee === null)
+  const finalTotal = cartSubtotal + (deliveryFee ?? 0)
 
   const applyProfile = useCallback((profile: CustomerProfileDto, requireConfirmedPhone: boolean) => {
     setCustomerProfile(profile)
@@ -142,6 +153,21 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     return () => { active = false }
   }, [])
 
+  // Re-priced whenever the delivery date the picker resolved changes. Passing no date lets the
+  // server decide the business day, exactly as the window picker does, so the browser clock can
+  // never shift which day's price the customer is quoted.
+  useEffect(() => {
+    let active = true
+    setIsLoadingPricing(true)
+    getDeliveryPricing(deliveryDate ?? undefined)
+      .then((result) => { if (active) setPricing(result) })
+      .catch((reason: unknown) => {
+        if (active) setError(reason instanceof Error ? reason.message : 'دریافت هزینه ارسال ممکن نشد.')
+      })
+      .finally(() => { if (active) setIsLoadingPricing(false) })
+    return () => { active = false }
+  }, [deliveryDate])
+
   useEffect(() => {
     if (resendSeconds <= 0) return
     const timer = window.setInterval(() => setResendSeconds((current) => Math.max(0, current - 1)), 1_000)
@@ -202,6 +228,9 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     if (items.length === 0) return setError('حداقل یک غذا به سبد خرید اضافه کنید.')
     if (!selectedDelivery || !selectedPayment) return setError('روش پرداخت یا دریافت معتبری انتخاب نشده است.')
     if (isBelowMinimum) return setError(`حداقل مبلغ سفارش برای این روش ${formatMoney(selectedDelivery.minimumOrderAmount)} است.`)
+    // A day nobody has priced is not a free-delivery day. The server refuses such an order anyway;
+    // stopping here saves the customer a round trip and an unexplained failure.
+    if (isDeliveryUnpriced) return setError(selectedPricing!.unavailableMessage ?? 'هزینه ارسال برای این روز مشخص نشده است.')
     if (isCheckingCart) return setError('لطفاً تا پایان بررسی موجودی صبر کنید.')
     if (!isCartVerified) return setError('پیش از ثبت سفارش، موجودی سبد را دوباره بررسی کنید.')
     if (cartIssue) return setError(cartIssue)
@@ -327,10 +356,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         {orderOptions?.paymentMethods.map((item) => <option key={item.method} value={item.method}>{item.title}</option>)}
       </select></label>
     </div>
-    <div className="form-hint">
-      {selectedPayment?.description}
-      {selectedDelivery && selectedDelivery.deliveryFee > 0 && <> · هزینه ارسال: {formatMoney(selectedDelivery.deliveryFee)}</>}
-    </div>
+    <div className="form-hint">{selectedPayment?.description}</div>
     {isBelowMinimum && <div className="form-error" role="alert">حداقل مبلغ سفارش برای این روش {formatMoney(selectedDelivery!.minimumOrderAmount)} است.</div>}
     {form.deliveryMethod === DeliveryMethod.Delivery && savedAddresses.length > 0 && <SavedAddressPicker
       addresses={savedAddresses}
@@ -339,10 +365,30 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       onSelect={setSelectedAddressId}
     />}
     {form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && <label className="field">آدرس<textarea value={form.addressLine} onChange={(e) => setField('addressLine', e.target.value)} /></label>}
-    <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} />
+    <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} onDateResolved={setDeliveryDate} />
     <label className="field">توضیح سفارش<textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
+
+    {/* The delivery charge is shown as its own line, never folded into the total: the customer should
+        be able to read غذا + ارسال = پرداختی without doing arithmetic to find the difference. */}
+    <section className="checkout-totals" aria-label="خلاصه مبلغ سفارش">
+      <div><span>جمع غذاها</span><strong>{formatMoney(cartSubtotal)}</strong></div>
+      <div>
+        <span>هزینه ارسال</span>
+        <strong>{isLoadingPricing
+          ? 'در حال محاسبه…'
+          : deliveryFee === null ? 'مشخص نشده' : formatMoney(deliveryFee)}</strong>
+      </div>
+      <div className="checkout-totals-final">
+        <span>مبلغ نهایی</span>
+        <strong>{isLoadingPricing || deliveryFee === null ? '—' : formatMoney(finalTotal)}</strong>
+      </div>
+    </section>
+    {isDeliveryUnpriced && <div className="form-error" role="alert">
+      {selectedPricing?.unavailableMessage ?? 'هزینه ارسال برای این روز مشخص نشده است.'}
+    </div>}
+
     {error && <div className="form-error" role="alert">{error}</div>}
-    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || isLoadingOptions || showLogin || !isCartVerified || Boolean(cartIssue) || isBelowMinimum || !selectedDelivery || !selectedPayment || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting
+    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || isLoadingOptions || isLoadingPricing || isDeliveryUnpriced || showLogin || !isCartVerified || Boolean(cartIssue) || isBelowMinimum || !selectedDelivery || !selectedPayment || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting
       ? <ButtonLoading label={form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} />
       : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
   </form>

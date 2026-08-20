@@ -6,6 +6,7 @@ import {
   PaymentMethod,
   DeliverySlotUnavailableReason,
   type AdminDeliveryDayDto,
+  type CourierDeliveryDayViewDto,
   type AdminDashboardSummaryDto,
   type CustomerProfileDto,
   type CustomerAnalyticsTodayDto,
@@ -21,6 +22,7 @@ import {
   type FoodTagWriteRequest,
   type FoodWriteRequest,
   type IngredientDto,
+  type AdminOrderDetailDto,
   type OrderDto,
   type OrderReportQuery,
   type OrderSummaryDto,
@@ -29,6 +31,7 @@ import { adminApi } from './api'
 import { formatMoney as money, formatNumber, persianDateWithLatinDigitsLocale } from './number-format'
 import { FinancePage, IngredientsPage, InventoryPage, PaymentsPage, PurchasesPage, RecipesPage, ShoppingPage, SuppliersPage, V15ReportsPage } from './V15Pages'
 import { DeliveryDaysPage, DeliverySlotsPage } from './DeliveryPages'
+import { CourierAccountingPage, CourierDaysPage, CouriersPage } from './CourierPages'
 import { LogsPage } from './LogsPage'
 import { CustomerCommunicationPage } from './CustomerCommunicationPage'
 import { FoodTagGroupsPage, SupportSubjectsPage, UnitsPage } from './ReferenceDataPages'
@@ -177,6 +180,11 @@ const deliveryWindowLabel = (order: {
       timeZone: 'Asia/Tehran', weekday: 'long', day: 'numeric', month: 'long',
     }).format(new Date(`${order.deliveryDate}T12:00:00+03:30`))} — ${order.deliveryStartTime} تا ${order.deliveryEndTime}`
   : 'زمان تحویل ثبت نشده'
+
+/** The Jalali day on its own, for places that show the delivery date beside the window. */
+const persianDay = (value: string) => new Intl.DateTimeFormat(persianDateWithLatinDigitsLocale, {
+  timeZone: 'Asia/Tehran', weekday: 'long', day: 'numeric', month: 'long',
+}).format(new Date(`${value}T12:00:00+03:30`))
 
 
 type ToastMessage = {
@@ -505,7 +513,7 @@ function OrderStatusActions({ status, busy, onChange }: {
   </div>
 }
 
-function OrderDetails({ order }: { order: OrderDto }) {
+function OrderDetails({ order }: { order: AdminOrderDetailDto }) {
   const [showInvoice, setShowInvoice] = useState(false)
   return <div className="order-detail">
     <div className="order-detail-heading">
@@ -536,8 +544,27 @@ function OrderDetails({ order }: { order: OrderDto }) {
           <div><dt>زمان تحویل</dt><dd>{deliveryWindowLabel(order)}</dd></div>
           <div><dt>روش فروش</dt><dd>{paymentMethodLabel[order.paymentMethod]}</dd></div>
           <div><dt>جمع اقلام</dt><dd>{money(order.subtotalAmount)}</dd></div>
-          <div><dt>هزینه ارسال</dt><dd>{money(order.deliveryFee)}</dd></div>
+          <div><dt>هزینه ارسال (از مشتری)</dt><dd>{money(order.deliveryFee)}</dd></div>
           <div className="detail-total"><dt>مبلغ کل</dt><dd>{money(order.totalAmount)}</dd></div>
+        </dl>
+      </section>
+      {/* Internal dispatch and accounting. `courierPayableAmount` is what Kafgir owes the courier,
+          not part of what the customer paid, and it never reaches a customer-facing payload. */}
+      <section className="detail-section">
+        <h3>پیک و کارکرد</h3>
+        <dl>
+          <div><dt>پیک</dt><dd>{order.courierNameSnapshot ?? '—'}</dd></div>
+          <div><dt>روز تحویل</dt><dd>{order.deliveryDate ? persianDay(order.deliveryDate) : 'ثبت نشده'}</dd></div>
+          <div><dt>بازه تحویل</dt><dd>{deliveryWindowLabel(order)}</dd></div>
+          <div><dt>وضعیت سفارش</dt><dd><Status value={order.status} /></dd></div>
+          <div><dt>مبلغ این تحویل برای پیک</dt><dd>{order.courierPayableAmount == null
+            ? '—'
+            : money(order.courierPayableAmount)}</dd></div>
+          <div><dt>احتساب در کارکرد پیک</dt><dd>{order.courierPayableAmount == null
+            ? 'این سفارش پیک ندارد.'
+            : order.status === OrderStatus.Delivered
+            ? 'بله؛ این مبلغ در کارکرد پیک محاسبه شده است.'
+            : 'خیر؛ فقط پس از «تحویل شد» به کارکرد پیک اضافه می‌شود.'}</dd></div>
         </dl>
       </section>
       <section className="detail-section">
@@ -575,7 +602,7 @@ function OrdersPage() {
   const pageRef = useRef(page); pageRef.current = page
   const pageSizeRef = useRef(pageSize); pageSizeRef.current = pageSize
   const orders = result?.items ?? []
-  const [selected, setSelected] = useState<OrderDto | null>(null)
+  const [selected, setSelected] = useState<AdminOrderDetailDto | null>(null)
   const [status, setStatus] = useState<string>('')
   const [orderNumber, setOrderNumber] = useState('')
   const [auto, setAuto] = useState(true)
@@ -1324,6 +1351,9 @@ function DailyMenuPage() {
 function ManualOrderPage() {
   const [menu, setMenu] = useState<DailyMenuDto | null>(null)
   const [deliveryDay, setDeliveryDay] = useState<AdminDeliveryDayDto | null>(null)
+  // Today's courier arrangement. A manual delivery order is priced from it exactly as a customer
+  // checkout is, so an operator never quotes a figure the server will refuse or overwrite.
+  const [courierDay, setCourierDay] = useState<CourierDeliveryDayViewDto | null>(null)
   const [cart, setCart] = useState<Array<{ id: number; withPersianRice: boolean; persianRicePrice: number; name: string; price: number; quantity: number; remaining: number }>>([])
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
@@ -1347,11 +1377,12 @@ function ManualOrderPage() {
     const date = today()
     void Promise.all([
       adminApi.menu(date), adminApi.deliveryDay(date),
-      adminApi.deliveryMethods(), adminApi.paymentMethods(),
+      adminApi.deliveryMethods(), adminApi.paymentMethods(), adminApi.courierDay(date),
     ])
-      .then(([dailyMenu, day, deliveryOptions, paymentOptions]) => {
+      .then(([dailyMenu, day, deliveryOptions, paymentOptions, courier]) => {
         setMenu(dailyMenu)
         setDeliveryDay(day)
+        setCourierDay(courier)
         const availableDeliveryMethods = deliveryOptions.filter((item) => item.isManualEnabled)
         const availablePaymentMethods = paymentOptions.filter((item) => item.isManualEnabled)
         setDeliveryMethods(availableDeliveryMethods)
@@ -1363,6 +1394,7 @@ function ManualOrderPage() {
       .catch((reason) => {
         setMenu(null)
         setDeliveryDay(null)
+        setCourierDay(null)
         setError(reason instanceof Error ? reason.message : String(reason))
       })
   }, [])
@@ -1411,7 +1443,15 @@ function ManualOrderPage() {
   const availableDeliverySlots = deliveryDay?.slots.filter((slot) => slot.unavailableReason === null) ?? []
   const cartTotal = cart.reduce((sum, item) => sum + (item.price + item.persianRicePrice) * item.quantity, 0)
   const selectedDeliveryMethod = deliveryMethods.find((item) => item.method === delivery)
-  const orderTotal = cartTotal + (selectedDeliveryMethod?.deliveryFee ?? 0)
+  // Courier methods are priced by the day, not by the method record. A day with no configuration is
+  // unpriced, not free, so the fee is null and the order is blocked rather than quietly charging 0.
+  const manualDeliveryFee = !selectedDeliveryMethod
+    ? null
+    : selectedDeliveryMethod.requiresCourier
+    ? courierDay?.configuration?.customerDeliveryFee ?? null
+    : selectedDeliveryMethod.deliveryFee
+  const courierDayMissing = Boolean(selectedDeliveryMethod?.requiresCourier && manualDeliveryFee === null)
+  const orderTotal = cartTotal + (manualDeliveryFee ?? 0)
   const addSelected = () => {
     if (!selectedItem) return
     const withRice = withPersianRice && selectedItem.allowsPersianRice && riceAvailable
@@ -1472,6 +1512,12 @@ function ManualOrderPage() {
     }
     if (delivery === DeliveryMethod.Delivery && !deliveryTimeSlotId) {
       setError('برای سفارش ارسالی، بازه ارسال را انتخاب کنید.')
+      return
+    }
+    // The server refuses this too; stopping here gives the operator the actionable message instead
+    // of a rejected submission after the whole form was filled in.
+    if (courierDayMissing) {
+      setError('هزینه و پیک ارسال برای این روز هنوز مشخص نشده است. ابتدا صفحه «پیک و هزینه ارسال روزانه» را تکمیل کنید.')
       return
     }
     const request: CreateOrderRequest = {
@@ -1543,7 +1589,7 @@ function ManualOrderPage() {
         <label>یادداشت مشتری<textarea value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} /></label>
         <div className="manual-submit-row">
           <button type="button" className="secondary" disabled={isSubmittingOrder} onClick={clearOrder}>سفارش جدید</button>
-          <button className="primary" disabled={isSubmittingOrder || cart.length === 0 || !fullName.trim() || !phone.trim()}>{isSubmittingOrder ? <ButtonLoading label={delivery === DeliveryMethod.Delivery && !selectedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} /> : 'ثبت سفارش'}</button>
+          <button className="primary" disabled={isSubmittingOrder || courierDayMissing || cart.length === 0 || !fullName.trim() || !phone.trim()}>{isSubmittingOrder ? <ButtonLoading label={delivery === DeliveryMethod.Delivery && !selectedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} /> : 'ثبت سفارش'}</button>
         </div>
       </section>
       <section className="manual-order-main">
@@ -1579,7 +1625,9 @@ function ManualOrderPage() {
             </tr>) : <tr><td colSpan={5}>هنوز آیتمی به سفارش اضافه نشده است.</td></tr>}</tbody></table></div>
           <div className="table-summary"><span>{plainNumber(cart.length)} مورد</span><span>صفحه 1 از 1</span></div>
         </section>
-        <strong className="manual-total-bar">جمع کل سفارش: {money(orderTotal)}{selectedDeliveryMethod && selectedDeliveryMethod.deliveryFee > 0 ? ` (با ${money(selectedDeliveryMethod.deliveryFee)} هزینه ارسال)` : ''}</strong>
+        <strong className="manual-total-bar">{courierDayMissing
+          ? 'هزینه و پیک ارسال برای این روز هنوز مشخص نشده است.'
+          : `جمع کل سفارش: ${money(orderTotal)}${manualDeliveryFee ? ` (با ${money(manualDeliveryFee)} هزینه ارسال)` : ''}`}</strong>
       </section>
     </form>
   </PageFrame>
@@ -1591,7 +1639,7 @@ function ReportPage() {
   const [pageSize, setPageSize] = useState(defaultPageSize)
   const orders = result?.items ?? []
   const [foods, setFoods] = useState<FoodDto[]>([])
-  const [details, setDetails] = useState<OrderDto | null>(null)
+  const [details, setDetails] = useState<AdminOrderDetailDto | null>(null)
   const [page, setPage] = useState(1)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1744,6 +1792,9 @@ export function App() {
     dashboard: <DashboardPage />,
     'delivery-slots': <DeliverySlotsPage />,
     'delivery-days': <DeliveryDaysPage />,
+    couriers: <CouriersPage />,
+    'courier-days': <CourierDaysPage />,
+    'courier-accounting': <CourierAccountingPage />,
     orders: <OrdersPage />,
     manual: <ManualOrderPage />,
     'customer-communication': <CustomerCommunicationPage />,

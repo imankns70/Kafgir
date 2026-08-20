@@ -24,6 +24,14 @@ Orders have nullable visitor/session attribution for conversion reporting; this 
 required for order creation. Recent-activity, visitor/day, session-start and attributed-order indexes
 serve the one dashboard aggregate without adding a general event stream.
 
+`couriers`, `courier_delivery_days` and `courier_settlements` (migration
+`0023_courier_delivery_accounting.sql`) carry courier delivery pricing and accounting. A partial
+unique index allows at most one active configuration per delivery date. Orders gain nullable
+`courier_id`, `courier_name_snapshot`, `courier_delivery_day_id` and `courier_payable_amount`
+snapshot columns, and `delivery_method_settings.requires_courier` selects which of the two fee
+sources prices a method. Existing orders keep their recorded `delivery_fee` and stay NULL on the new
+columns. See `.ai/docs/courier-delivery.md`.
+
 Customer addresses and order delivery snapshots keep a single address text field. Migration `0007_mighty_kree.sql` preserves legacy note text by appending it into the address line before dropping the old `customer_addresses.description` and `orders.delivery_address_description` columns.
 
 Food discovery is normalized through:

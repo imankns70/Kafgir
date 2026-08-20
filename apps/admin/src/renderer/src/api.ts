@@ -85,6 +85,15 @@ import type {
   DeliveryMethod,
   DeliveryMethodSettingDto,
   DeliveryMethodSettingWriteRequest,
+  AdminOrderDetailDto,
+  CourierDto,
+  CourierWriteRequest,
+  CourierDeliveryDayDto,
+  CourierDeliveryDayViewDto,
+  CourierDeliveryDayWriteRequest,
+  CourierAccountSummaryDto,
+  CourierSettlementDto,
+  CourierSettlementWriteRequest,
 } from '@kafgir/contracts'
 import type { AdminOperation } from '../../shared/admin-operations'
 
@@ -397,6 +406,23 @@ export const adminApi = {
     request<AdminDeliveryDayDto>(`/api/admin/delivery-days?date=${encodeURIComponent(date)}`),
   setDeliveryDayOverride: (value: DeliveryDayOverrideRequest) =>
     request<void>('/api/admin/delivery-days', 'POST', value),
+  couriers: () => socialInvoke<CourierDto[]>('couriers.list'),
+  createCourier: (value: CourierWriteRequest) =>
+    socialInvoke<CourierDto>('couriers.create', { value }, true),
+  updateCourier: (id: number, value: CourierWriteRequest) =>
+    socialInvoke<CourierDto>('couriers.update', { id, value }, true),
+  setCourierActive: (id: number, isActive: boolean) =>
+    socialInvoke<void>('couriers.setActive', { id, isActive }, true),
+  courierDay: (date: string) =>
+    socialInvoke<CourierDeliveryDayViewDto>('courierDays.get', { date }),
+  courierDays: () => socialInvoke<CourierDeliveryDayDto[]>('courierDays.list'),
+  saveCourierDay: (value: CourierDeliveryDayWriteRequest) =>
+    socialInvoke<CourierDeliveryDayViewDto>('courierDays.save', { value }, true),
+  courierAccounts: () => socialInvoke<CourierAccountSummaryDto[]>('courierAccounting.summary'),
+  courierSettlements: (courierId: number) =>
+    socialInvoke<CourierSettlementDto[]>('courierAccounting.settlements', { courierId }),
+  settleCourier: (value: CourierSettlementWriteRequest) =>
+    socialInvoke<CourierAccountSummaryDto>('courierAccounting.settle', { value }, true),
   foodCategories: () => request<FoodCategoryDto[]>('/api/admin/food-categories'),
   createFoodCategory: (category: FoodCategoryWriteRequest) =>
     request<FoodCategoryDto>('/api/admin/food-categories', 'POST', category),
@@ -450,7 +476,7 @@ export const adminApi = {
     })
     return request<PagedResult<OrderSummaryDto>>(`/api/admin/orders?${params}`)
   },
-  order: (id: number) => request<OrderDto>(`/api/admin/orders/${id}`),
+  order: (id: number) => request<AdminOrderDetailDto>(`/api/admin/orders/${id}`),
   createOrder: (order: CreateOrderRequest) => request<OrderDto>('/api/admin/orders', 'POST', order),
   updateOrderStatus: (id: number, update: UpdateOrderStatusRequest) =>
     request<void>(`/api/admin/orders/${id}/status`, 'PATCH', update),

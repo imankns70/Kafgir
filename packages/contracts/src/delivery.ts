@@ -94,3 +94,29 @@ export type DeliveryTimeSlotWriteRequest = z.infer<typeof deliveryTimeSlotWriteS
 export type AdminDeliveryDaySlotDto = z.infer<typeof adminDeliveryDaySlotSchema>
 export type AdminDeliveryDayDto = z.infer<typeof adminDeliveryDaySchema>
 export type DeliveryDayOverrideRequest = z.infer<typeof deliveryDayOverrideWriteSchema>
+
+/**
+ * The effective customer delivery price for one delivery date, per delivery method.
+ *
+ * Checkout renders the fee from this before the order is submitted, but the server recalculates it
+ * during order creation — this endpoint is display only and is never trusted as an input.
+ *
+ * `customerDeliveryFee` is null exactly when a courier method has no active courier configuration
+ * for that date. Null means "not priced yet", never "free": checkout must block rather than quietly
+ * charging zero.
+ */
+export const deliveryMethodPricingSchema = z.object({
+  method: z.number().int().positive(),
+  requiresCourier: z.boolean(),
+  customerDeliveryFee: z.number().nonnegative().nullable(),
+  /** Persian explanation to show when the method cannot be used for this date. */
+  unavailableMessage: z.string().nullable(),
+})
+
+export const deliveryPricingSchema = z.object({
+  deliveryDate: isoDate,
+  methods: z.array(deliveryMethodPricingSchema),
+})
+
+export type DeliveryMethodPricingDto = z.infer<typeof deliveryMethodPricingSchema>
+export type DeliveryPricingDto = z.infer<typeof deliveryPricingSchema>

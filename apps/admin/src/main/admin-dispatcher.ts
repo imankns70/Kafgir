@@ -24,6 +24,9 @@ import {
   updateOrderStatusSchema,
   deliveryTimeSlotWriteSchema,
   deliveryDayOverrideWriteSchema,
+  courierWriteSchema,
+  courierDeliveryDayWriteSchema,
+  courierSettlementWriteSchema,
   wasteWriteSchema,
   socialChannelWriteSchema,
   socialPostWriteSchema,
@@ -67,7 +70,6 @@ import {
   getDashboard,
   getCustomerAnalyticsToday,
   getMenuByDate,
-  getOrder,
   getRecipe,
   listFinancialAccounts,
   listExpenseCategories,
@@ -155,6 +157,17 @@ import {
   updatePaymentMethodSetting,
   listDeliveryMethodSettings,
   updateDeliveryMethodSetting,
+  listCouriers,
+  createCourier,
+  updateCourier,
+  setCourierActive,
+  getCourierDeliveryDay,
+  listCourierDeliveryDays,
+  saveCourierDeliveryDay,
+  courierAccountSummaries,
+  listCourierSettlements,
+  recordCourierSettlement,
+  getAdminOrderDetail,
 } from '@kafgir/server-core'
 import { readServerLogs } from '@kafgir/server-core/logging/read-logs'
 import type { AdminOperation } from '../shared/admin-operations'
@@ -260,9 +273,26 @@ export async function dispatchAdminOperation(
     case 'deliveryDays.get': return getDeliveryDay(textField(body, 'date'))
     case 'deliveryDays.setOverride':
       return setDeliveryDayOverride(deliveryDayOverrideWriteSchema.parse(body.value))
+    case 'couriers.list': return listCouriers(true)
+    case 'couriers.create': return createCourier(courierWriteSchema.parse(body.value))
+    case 'couriers.update':
+      return updateCourier(numberField(body, 'id'), courierWriteSchema.parse(body.value))
+    case 'couriers.setActive':
+      return setCourierActive(numberField(body, 'id'), Boolean(body.isActive))
+    case 'courierDays.get': return getCourierDeliveryDay(textField(body, 'date'))
+    case 'courierDays.list': return listCourierDeliveryDays()
+    case 'courierDays.save':
+      return saveCourierDeliveryDay(courierDeliveryDayWriteSchema.parse(body.value))
+    case 'courierAccounting.summary': return courierAccountSummaries()
+    case 'courierAccounting.settlements':
+      return listCourierSettlements(numberField(body, 'courierId'))
+    case 'courierAccounting.settle':
+      return recordCourierSettlement(courierSettlementWriteSchema.parse(body.value))
     case 'customers.lookup': return findCustomerByPhone(textField(body, 'phoneNumber'))
     case 'orders.search': return searchOrdersPaged((body.query ?? {}) as OrderReportQuery)
-    case 'orders.get': return getOrder(numberField(body, 'id'))
+    // Admin's detail view, which adds the courier and the courier payable snapshot on top of the
+    // customer-safe order.
+    case 'orders.get': return getAdminOrderDetail(numberField(body, 'id'))
     case 'orders.create':
       return createOrder(createOrderSchema.parse(body.value), {
         userId: null,

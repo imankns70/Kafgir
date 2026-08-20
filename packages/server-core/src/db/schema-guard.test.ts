@@ -17,6 +17,7 @@ describe('missingTablesMessage', () => {
   it('covers every table the reference-data screens depend on', () => {
     expect(referenceDataTables).toEqual([
       'food_tag_groups', 'support_subjects', 'payment_method_settings', 'delivery_method_settings',
+      'couriers', 'courier_delivery_days', 'courier_settlements',
     ])
   })
 })

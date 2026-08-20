@@ -20,6 +20,8 @@ const kitchenOperations = new Set<AdminOperation>([
   'recipes.get', 'recipes.save', 'finance.accounts',
   'shopping.list', 'shopping.requirements', 'shopping.create', 'reports.v15', 'logs.server',
   'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',
+  // The kitchen sees who is delivering on a given day, but never the courier ledger.
+  'couriers.list', 'courierDays.get',
   'social.dashboard', 'social.channels.list', 'social.templates.list',
   'social.draft.generate', 'social.preview', 'social.posts.create',
   'social.suggestions.list', 'social.history',
@@ -35,6 +37,10 @@ const orderOperations = new Set<AdminOperation>([
   'finance.accounts', 'finance.posTerminals',
   'payments.list', 'payments.totals', 'payments.create', 'payments.changeStatus', 'logs.server', 'reports.customers', 'customers.search', 'customers.detail',
   'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',
+  // Order managers run dispatch, so they assign each day's courier and read the resulting work and
+  // settlement history. Recording a settlement is money leaving the business, and stays with Owner.
+  'couriers.list', 'courierDays.get', 'courierDays.list', 'courierDays.save',
+  'courierAccounting.summary', 'courierAccounting.settlements',
 ])
 
 export function isAdminOperationAllowed(operation: AdminOperation, roles: readonly string[]): boolean {

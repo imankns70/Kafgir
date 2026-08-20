@@ -44,8 +44,20 @@ describe('admin navigation structure', () => {
 describe('reference data versus configuration', () => {
   it('groups the lookup lists other records point at under اطلاعات پایه', () => {
     expect(groupItems('reference')).toEqual([
-      'categories', 'tags', 'food-tag-groups', 'units', 'delivery-slots', 'support-subjects',
+      'categories', 'tags', 'food-tag-groups', 'units', 'delivery-slots', 'couriers',
+      'support-subjects',
     ])
+  })
+
+  /**
+   * The three courier screens are deliberately in three different groups, because they answer three
+   * different questions: who our couriers are (a lookup list), what today's arrangement is (an
+   * operational decision taken per date), and what we owe (money).
+   */
+  it('splits the courier screens by what the operator is actually doing', () => {
+    expect(navigationGroupForPage('couriers')).toBe('reference')
+    expect(navigationGroupForPage('courier-days')).toBe('sales')
+    expect(navigationGroupForPage('courier-accounting')).toBe('finance')
   })
 
   it('keeps checkout configuration out of reference data', () => {

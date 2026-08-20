@@ -370,6 +370,75 @@ export const deliveryTimeSlotAvailabilities = pgTable('delivery_time_slot_availa
     sql`${table.capacityOrders} IS NULL OR ${table.capacityOrders} >= 0`),
 ])
 
+/**
+ * The delivery-person directory. Deliberately not an HR record: a name, a phone, an active flag and
+ * a note is everything dispatch and accounting need today.
+ *
+ * Rows are never deleted and orders reference them with `ON DELETE RESTRICT`, so deactivating a
+ * courier who has stopped working keeps every historical order and every settled amount intact.
+ */
+export const couriers = pgTable('couriers', {
+  id: serial('id').primaryKey(),
+  fullName: varchar('full_name', { length: 150 }).notNull(),
+  mobile: varchar('mobile', { length: 30 }).notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  notes: varchar('notes', { length: 1000 }),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at'),
+}, (table) => [
+  uniqueIndex('couriers_mobile_uidx').on(table.mobile),
+  index('couriers_active_name_idx').on(table.isActive, table.fullName),
+])
+
+/**
+ * One day's courier arrangement: who delivers, what the customer pays, and what the courier earns
+ * per delivered order.
+ *
+ * The two amounts are separate columns on purpose. They will often hold the same number, but
+ * charging the customer 50,000 while paying the courier 70,000 — or delivering free — must be a data
+ * change, never a code change.
+ *
+ * A date may hold at most one *active* configuration, enforced by the partial unique index rather
+ * than by application code, so a race between two Admin saves cannot leave the day ambiguous.
+ * Superseded configurations stay as inactive rows because orders point at them by id.
+ */
+export const courierDeliveryDays = pgTable('courier_delivery_days', {
+  id: serial('id').primaryKey(),
+  deliveryDate: date('delivery_date', { mode: 'string' }).notNull(),
+  courierId: integer('courier_id').notNull().references(() => couriers.id, { onDelete: 'restrict' }),
+  /** What the customer is charged. Reaches checkout and `orders.delivery_fee`. */
+  customerDeliveryFee: money('customer_delivery_fee').notNull(),
+  /** What the courier earns per delivered order. Internal accounting; never customer-facing. */
+  courierPayablePerOrder: money('courier_payable_per_order').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at'),
+}, (table) => [
+  uniqueIndex('courier_delivery_days_active_date_uidx')
+    .on(table.deliveryDate)
+    .where(sql`is_active`),
+  index('courier_delivery_days_date_idx').on(table.deliveryDate),
+  check('courier_delivery_days_amounts_check',
+    sql`${table.customerDeliveryFee} >= 0 AND ${table.courierPayablePerOrder} >= 0`),
+])
+
+/**
+ * Money actually handed to a courier. Append-only: settling never touches an order's payable
+ * snapshot, so «کارکرد» and «تسویه‌شده» stay independently auditable and the outstanding balance is
+ * always derived rather than stored.
+ */
+export const courierSettlements = pgTable('courier_settlements', {
+  id: serial('id').primaryKey(),
+  courierId: integer('courier_id').notNull().references(() => couriers.id, { onDelete: 'restrict' }),
+  amount: money('amount').notNull(),
+  settledAt: utcTimestamp('settled_at').notNull(),
+  note: varchar('note', { length: 1000 }),
+  createdAt: utcTimestamp('created_at').notNull(),
+}, (table) => [
+  index('courier_settlements_courier_settled_idx').on(table.courierId, table.settledAt),
+  check('courier_settlements_amount_check', sql`${table.amount} > 0`),
+])
+
 export const orders = pgTable('orders', {
   id: serial('id').primaryKey(),
   orderNumber: varchar('order_number', { length: 50 }).notNull(),
@@ -383,6 +452,11 @@ export const orders = pgTable('orders', {
   paymentMethod: integer('payment_method').notNull(),
   deliveryMethod: integer('delivery_method').notNull(),
   subtotalAmount: money('subtotal_amount').notNull(),
+  /**
+   * The customer delivery charge, snapshotted at creation. For courier methods it is copied from the
+   * delivery date's `courier_delivery_days.customer_delivery_fee`; for pickup it comes from
+   * `delivery_method_settings.delivery_fee`. Either way it is frozen here and never recomputed.
+   */
   deliveryFee: money('delivery_fee').notNull(),
   totalAmount: money('total_amount').notNull(),
   customerNote: varchar('customer_note', { length: 1000 }),
@@ -397,6 +471,18 @@ export const orders = pgTable('orders', {
   deliveryTimeSlotTitle: varchar('delivery_time_slot_title', { length: 100 }),
   deliveryStartTime: time('delivery_start_time'),
   deliveryEndTime: time('delivery_end_time'),
+  // Courier dispatch and accounting snapshot, taken from one consistent `courier_delivery_days` row
+  // at creation time. Editing that row afterwards — a different courier, a different rate, mid-day —
+  // cannot reach an order that was already placed, which is the whole point of copying the values.
+  //
+  // All four are nullable: pickup orders have no courier, and orders placed before this feature
+  // existed must keep null rather than be given a fabricated courier or an invented debt.
+  courierId: integer('courier_id').references(() => couriers.id, { onDelete: 'restrict' }),
+  courierNameSnapshot: varchar('courier_name_snapshot', { length: 150 }),
+  courierDeliveryDayId: integer('courier_delivery_day_id')
+    .references(() => courierDeliveryDays.id, { onDelete: 'restrict' }),
+  /** What the courier earns for this order once it is Delivered. Never customer-facing. */
+  courierPayableAmount: money('courier_payable_amount'),
   createdAt: utcTimestamp('created_at').notNull(),
   confirmedAt: utcTimestamp('confirmed_at'),
   deliveredAt: utcTimestamp('delivered_at'),
@@ -419,6 +505,15 @@ export const orders = pgTable('orders', {
   check('orders_payment_method_check', sql`${table.paymentMethod} IN (1, 2, 3, 4)`),
   check('orders_delivery_method_check', sql`${table.deliveryMethod} BETWEEN 1 AND 2`),
   check('orders_money_check', sql`${table.subtotalAmount} >= 0 AND ${table.deliveryFee} >= 0 AND ${table.totalAmount} = ${table.subtotalAmount} + ${table.deliveryFee}`),
+  // Serves the courier earnings aggregate, which scans by courier and current status.
+  index('orders_courier_status_idx').on(table.courierId, table.status)
+    .where(sql`courier_id IS NOT NULL`),
+  check('orders_courier_payable_check',
+    sql`${table.courierPayableAmount} IS NULL OR ${table.courierPayableAmount} >= 0`),
+  // A courier payable without a courier would be money owed to nobody.
+  check('orders_courier_snapshot_check',
+    sql`(${table.courierId} IS NULL AND ${table.courierPayableAmount} IS NULL)
+        OR (${table.courierId} IS NOT NULL AND ${table.courierPayableAmount} IS NOT NULL)`),
 ])
 
 export const orderItems = pgTable('order_items', {
@@ -575,8 +670,13 @@ export const deliveryMethodSettings = pgTable('delivery_method_settings', {
   isCustomerEnabled: boolean('is_customer_enabled').notNull().default(true),
   isManualEnabled: boolean('is_manual_enabled').notNull().default(true),
   displayOrder: integer('display_order').notNull().default(0),
+  // Applies only to methods that need no courier — in practice تحویل حضوری. Courier methods take
+  // their customer price from `courier_delivery_days` for the selected delivery date, so exactly one
+  // source prices any given order. See `requiresCourier` below and `.ai/docs/courier-delivery.md`.
   deliveryFee: money('delivery_fee').notNull().default(0),
   minimumOrderAmount: money('minimum_order_amount').notNull().default(0),
+  // Fixed per method by what the code does, not by operator choice; the write contract omits it.
+  requiresCourier: boolean('requires_courier').notNull().default(false),
   updatedAt: utcTimestamp('updated_at').notNull(),
 }, (table) => [
   check('delivery_method_settings_method_check', sql`${table.method} IN (1, 2)`),

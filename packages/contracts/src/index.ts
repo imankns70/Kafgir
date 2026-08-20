@@ -11,6 +11,7 @@ import { PaymentStatus } from './v15.js'
 import { DeliveryMethod, OrderStatus, PaymentMethod } from './order-enums.js'
 export * from './v15.js'
 export * from './delivery.js'
+export * from './courier.js'
 
 export const nullableText = z.string().trim().nullable().optional()
 
@@ -300,6 +301,22 @@ export const orderSchema = z.object({
   deliveryEndTime: timeOfDay.nullable().optional(),
   items: z.array(orderItemSchema),
   statusHistories: z.array(orderStatusHistorySchema),
+})
+
+/**
+ * Admin's order view: the shared order plus the courier dispatch and accounting snapshot.
+ *
+ * `courierPayableAmount` is what the business owes the courier for delivering this order. It is not
+ * what the customer paid — that is `deliveryFee` — and it must never appear in a customer-facing
+ * payload, which is precisely why it lives on this schema and not on `orderSchema`.
+ *
+ * All three fields are nullable: orders placed before couriers existed, and pickup orders, have no
+ * courier, and must not be given an invented one.
+ */
+export const adminOrderDetailSchema = orderSchema.extend({
+  courierId: z.number().int().positive().nullable(),
+  courierNameSnapshot: z.string().nullable(),
+  courierPayableAmount: z.number().nonnegative().nullable(),
 })
 
 type InvoiceSourceItem = z.infer<typeof orderItemSchema>
@@ -750,6 +767,7 @@ export type PendingOrderReviewDto = z.infer<typeof pendingOrderReviewSchema>
 export type CustomerProfileLookupRequest = z.infer<typeof customerProfileLookupSchema>
 export type CreateOrderRequest = z.infer<typeof createOrderSchema>
 export type OrderDto = z.infer<typeof orderSchema>
+export type AdminOrderDetailDto = z.infer<typeof adminOrderDetailSchema>
 export type OrderSummaryDto = z.infer<typeof orderSummarySchema>
 export type FoodDto = z.infer<typeof foodSchema>
 export type FoodWriteRequest = z.infer<typeof foodWriteSchema>

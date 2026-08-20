@@ -21,6 +21,11 @@ export const referenceDataTables = [
   'support_subjects',
   'payment_method_settings',
   'delivery_method_settings',
+  // Added by `0023_courier_delivery_accounting.sql`. Electron's courier pages read these directly,
+  // and an unmigrated database would otherwise fail deep inside a screen rather than at connect.
+  'couriers',
+  'courier_delivery_days',
+  'courier_settlements',
 ] as const
 
 /** Which of `tableNames` are absent from the connected database's `public` schema. */

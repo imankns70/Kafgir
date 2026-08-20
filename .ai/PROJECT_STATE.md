@@ -1,5 +1,38 @@
 # Project state
 
+## 2026-08-20 — Delivery-fee visibility and courier accounting
+
+- Customer checkout now shows جمع غذاها، هزینه ارسال and مبلغ نهایی as three separate lines before
+  submission, and the customer order receipt always shows the delivery-fee line rather than hiding it
+  at zero. Both read the order's own snapshot; the server recalculates the fee authoritatively during
+  order creation.
+- Delivery pricing has a single source per method. `delivery_method_settings.requires_courier` is true
+  for ارسال and false for تحویل حضوری: courier methods take their customer price from that delivery
+  date's `courier_delivery_days` row, non-courier methods keep `delivery_method_settings.delivery_fee`.
+  The flag is not operator-editable.
+- Customer delivery charge and courier payable are separate columns everywhere and neither is derived
+  from the other, so charging 50,000 while paying 70,000, or free delivery, is a data change only.
+- Orders snapshot courier, courier name, courier-day id, courier payable and the customer fee at
+  creation, read from one row under a date-scoped advisory lock. Editing a day's courier or rates —
+  including mid-day — never reaches an order already placed.
+- A courier order for a delivery date with no active configuration is refused with «هزینه و پیک ارسال
+  برای این روز هنوز مشخص نشده است.» in both customer checkout and Admin manual orders. Pickup orders
+  need no courier configuration.
+- Courier earnings count only orders whose current status is Delivered; Delivered is terminal, so no
+  event ledger is needed. Outstanding balance is always derived (earned − settled) and settlements are
+  append-only, never mutating an order snapshot. A settlement above the outstanding balance is refused.
+- Electron Admin gains «پیک‌ها» (اطلاعات پایه), «پیک و هزینه ارسال روزانه» (فروش) and «کارکرد و تسویه
+  پیک‌ها» (مالی). Admin order detail shows the courier, both amounts and whether the payable counts
+  toward courier earnings. Recording a settlement is Owner-only.
+- Customer-facing payloads never carry the courier payable: `orderSchema` has no field for it and the
+  Admin view is a separate `adminOrderDetailSchema` / `getAdminOrderDetail`.
+- Migration `0023_courier_delivery_accounting.sql` is additive. Existing orders keep their recorded
+  delivery fee and gain no courier and no payable. Not yet applied to any database.
+- TypeScript checks passed for all four workspaces; contracts (43), server-core (228), Web (252) and
+  Admin (105) unit tests pass, and the Web and Electron production builds succeed. Database
+  integration tests require `TEST_DATABASE_URL` and were not run in this environment.
+- Detailed design: `.ai/docs/courier-delivery.md`.
+
 ## 2026-08-15 — Private asynchronous customer communication
 
 - Customer contact now includes an authenticated, private asynchronous inbox. Customers can start a

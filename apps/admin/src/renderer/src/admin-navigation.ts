@@ -8,6 +8,7 @@ export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' |
   | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
   | 'food-tag-groups' | 'support-subjects' | 'units'
   | 'payment-methods' | 'delivery-methods' | 'customer-report' | 'customers'
+  | 'couriers' | 'courier-days' | 'courier-accounting'
 
 export type NavigationGroupId =
   'sales' | 'catalog' | 'supply' | 'finance' | 'social' | 'reference' | 'settings'
@@ -66,6 +67,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { page: 'menu', label: 'منوی امروز', operation: 'menus.get' },
       { page: 'delivery-days', label: 'ظرفیت ارسال روزانه', operation: 'deliveryDays.get' },
+      { page: 'courier-days', label: 'پیک و هزینه ارسال روزانه', operation: 'courierDays.get' },
       { page: 'orders', label: 'سفارش‌ها', operation: 'orders.search' },
       { page: 'manual', label: 'سفارش دستی', operation: 'orders.create' },
       { page: 'customers', label: 'مشتریان', operation: 'customers.search' },
@@ -106,6 +108,7 @@ export const navigationGroups: NavigationGroup[] = [
       { page: 'payments', label: 'پرداخت‌های سفارش', operation: 'payments.list' },
       { page: 'finance', label: 'حساب‌ها و تراکنش‌ها', operation: 'finance.accounts' },
       { page: 'v15-reports', label: 'گزارش‌های مالی', operation: 'reports.v15' },
+      { page: 'courier-accounting', label: 'کارکرد و تسویه پیک‌ها', operation: 'courierAccounting.summary' },
     ],
   },
   {
@@ -134,6 +137,7 @@ export const navigationGroups: NavigationGroup[] = [
       { page: 'food-tag-groups', label: 'گروه‌های برچسب', operation: 'foodTagGroups.list' },
       { page: 'units', label: 'واحدهای اندازه‌گیری', operation: 'units.list' },
       { page: 'delivery-slots', label: 'بازه‌های ارسال', operation: 'deliverySlots.list' },
+      { page: 'couriers', label: 'پیک‌ها', operation: 'couriers.list' },
       { page: 'support-subjects', label: 'موضوعات پشتیبانی', operation: 'supportSubjects.list' },
     ],
   },

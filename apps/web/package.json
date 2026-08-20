@@ -10,7 +10,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:integration": "vitest run --no-file-parallelism src/server/db/postgres.integration.test.ts src/server/db/food-discovery.integration.test.ts src/server/db/v15.integration.test.ts src/server/db/rice-options.integration.test.ts src/server/db/order-capacity.integration.test.ts src/server/db/delivery-slots.integration.test.ts src/server/db/order-number.integration.test.ts src/server/db/customer-auth.integration.test.ts src/server/db/customer-analytics.integration.test.ts src/server/db/otp-rate-limit.integration.test.ts src/server/db/pagination.integration.test.ts",
+    "test:integration": "vitest run --no-file-parallelism src/server/db/postgres.integration.test.ts src/server/db/food-discovery.integration.test.ts src/server/db/v15.integration.test.ts src/server/db/rice-options.integration.test.ts src/server/db/order-capacity.integration.test.ts src/server/db/delivery-slots.integration.test.ts src/server/db/courier-accounting.integration.test.ts src/server/db/order-number.integration.test.ts src/server/db/customer-auth.integration.test.ts src/server/db/customer-analytics.integration.test.ts src/server/db/otp-rate-limit.integration.test.ts src/server/db/pagination.integration.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/seed.ts",

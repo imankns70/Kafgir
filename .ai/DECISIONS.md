@@ -1,5 +1,43 @@
 # Decisions
 
+## 2026-08-20 — Customer delivery charge and courier payable are never one value
+
+- Model the two amounts as separate columns from the first version, even while they hold the same
+  number. Deriving one from the other would make "charge 50,000, pay 70,000" or subsidised delivery a
+  schema change instead of a data change.
+- Never expose the courier payable through a customer-facing DTO. The guarantee is structural: the
+  shared `orderSchema` has no field for it and Admin uses a separate `adminOrderDetailSchema`, so a
+  careless spread cannot leak it.
+
+## 2026-08-20 — One fee source per delivery method
+
+- `delivery_method_settings.requires_courier` decides where a method's customer price comes from:
+  the delivery date's `courier_delivery_days` row for courier methods, `delivery_method_settings.delivery_fee`
+  for the rest. Keeping both fields live but scoping each to a disjoint set of methods avoids two
+  competing prices for the same order.
+- The flag is not operator-editable. Like the enum value itself it describes what the code does with a
+  method, so it is omitted from the write contract and set by migration.
+- Pricing follows the selected delivery date, taken from the menu the items belong to, not from
+  today's date and never from client input.
+
+## 2026-08-20 — Courier earnings from current status, not an event ledger
+
+- Count earnings from orders whose current status is Delivered. `isAllowedOrderTransition` has no
+  outgoing transition from Delivered, so the status is terminal and the figure cannot be un-earned; a
+  durable ledger would be machinery with no failure mode to prevent. A unit test asserts that
+  Delivered stays terminal, so introducing a backward transition breaks the build rather than the books.
+- Derive the outstanding balance (earned − settled) on every read instead of storing a running total,
+  and keep settlements append-only so paying a courier never rewrites what an order says was earned.
+- Refuse a settlement above the outstanding balance: there is no advance or credit model for couriers.
+
+## 2026-08-20 — An unpriced delivery day blocks the order
+
+- A delivery date with no active courier configuration is not a free-delivery day. Courier orders for
+  such a date are refused with an actionable Persian message rather than defaulting the fee to zero,
+  which would also make the courier's work silently unpayable.
+- Deactivating a courier is never deletion. Orders reference couriers with `ON DELETE RESTRICT`, so
+  history and any unpaid balance survive.
+
 ## 2026-08-16 — Electron release requires explicit approval
 
 - A successful Electron build or a completed feature does not authorize creating a GitHub Release.

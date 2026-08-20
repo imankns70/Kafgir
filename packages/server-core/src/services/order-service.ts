@@ -4,6 +4,7 @@ import {
   NotificationStatus,
   NotificationType,
   OrderStatus,
+  type AdminOrderDetailDto,
   type CreateOrderRequest,
   type OrderDto,
   type OrderReportQuery,
@@ -20,6 +21,12 @@ import type { TelegramIdentity } from '../telegram/validation'
 import { isAllowedOrderTransition, normalizePhone, optionalText } from '../domain/order-rules'
 import { consumeOrderInventory, reverseOrderInventory } from './v15-service'
 import { reserveDeliverySlot } from './delivery-slot-service'
+import { reserveCourierDay } from './courier-service'
+import {
+  courierDayMissingMessage,
+  effectiveCustomerDeliveryFee,
+  type CourierDayPricing,
+} from '../domain/courier-rules'
 import { logger } from '../logging/logger'
 import { formatTelegramOrderInvoice } from '../domain/order-invoice'
 
@@ -227,10 +234,12 @@ export async function createOrder(
       enabled: boolean
       deliveryFee: number
       minimumOrderAmount: number
+      requiresCourier: boolean
     }[]>`
       SELECT CASE WHEN ${allowMissingTelegramIdentity}
         THEN is_manual_enabled ELSE is_customer_enabled END AS enabled,
-        delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount"
+        delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount",
+        requires_courier AS "requiresCourier"
       FROM delivery_method_settings WHERE method = ${request.deliveryMethod} LIMIT 1
     `
     if (!deliverySettings[0]?.enabled) throw new AppError('روش دریافت انتخاب‌شده در حال حاضر فعال نیست.')
@@ -351,6 +360,20 @@ export async function createOrder(
       deliverySnapshot = await reserveDeliverySlot(tx, request.deliveryTimeSlotId, deliveryDate, now)
     }
 
+    // The courier arrangement is keyed on the DELIVERY date, not on today: an order placed tonight
+    // for tomorrow must use tomorrow's courier and tomorrow's rate. `deliveryDate` above is the menu
+    // date the items belong to, which is exactly that day.
+    //
+    // Courier, customer fee and courier payable are all read from one row, once, inside this
+    // transaction and under the day's advisory lock. That is what makes a mixed snapshot — old
+    // courier with new rate, or old fee with new payable — unrepresentable when an operator edits
+    // the day's configuration while a checkout is in flight.
+    let courierDay: CourierDayPricing | null = null
+    if (deliverySettings[0].requiresCourier) {
+      if (!deliveryDate) throw new AppError('تاریخ تحویل این سفارش مشخص نیست.')
+      courierDay = await reserveCourierDay(tx, deliveryDate)
+    }
+
     const orderLines = [...dishes.values()]
     if (persianRicePortions > 0) {
       const menuId = orderLines[0]!.menuItem.dailyMenuId
@@ -383,7 +406,15 @@ export async function createOrder(
     `
     const orderNumber = `${year}${(counters[0]?.value ?? 0) + 1}`
     const subtotal = orderLines.reduce((sum, line) => sum + line.menuItem.price * line.quantity, 0)
-    const deliveryFee = deliverySettings[0].deliveryFee
+    // Authoritative: the fee is recalculated here from server state regardless of anything the
+    // client displayed. `reserveCourierDay` has already refused a courier order on an unpriced day,
+    // so a null here is impossible rather than silently worth zero.
+    const deliveryFee = effectiveCustomerDeliveryFee({
+      requiresCourier: deliverySettings[0].requiresCourier,
+      methodDeliveryFee: deliverySettings[0].deliveryFee,
+      courierDay,
+    })
+    if (deliveryFee === null) throw new AppError(courierDayMissingMessage)
     if (subtotal < deliverySettings[0].minimumOrderAmount) {
       throw new AppError(`حداقل مبلغ سفارش برای این روش دریافت ${deliverySettings[0].minimumOrderAmount.toLocaleString('fa-IR')} تومان است.`)
     }
@@ -394,8 +425,9 @@ export async function createOrder(
          delivery_phone_number, delivery_city, delivery_address_line,
          status, payment_method, delivery_method, subtotal_amount, delivery_fee,
          total_amount, customer_note, delivery_date, delivery_time_slot_id,
-         delivery_time_slot_title, delivery_start_time, delivery_end_time, created_at,
-         analytics_visitor_id, analytics_session_id)
+         delivery_time_slot_title, delivery_start_time, delivery_end_time,
+         courier_id, courier_name_snapshot, courier_delivery_day_id, courier_payable_amount,
+         created_at, analytics_visitor_id, analytics_session_id)
       VALUES
         (${orderNumber}, ${customer.profileId}, ${customerAddressId}, ${fullName},
          ${phoneNumber}, ${city}, ${addressLine}, ${OrderStatus.PendingConfirmation},
@@ -404,7 +436,10 @@ export async function createOrder(
          ${deliverySnapshot ? deliveryDate : null}::date, ${deliverySnapshot?.slotId ?? null},
          ${deliverySnapshot?.title ?? null},
          ${deliverySnapshot?.startTime ?? null}::time,
-         ${deliverySnapshot?.endTime ?? null}::time, ${nowSql},
+         ${deliverySnapshot?.endTime ?? null}::time,
+         ${courierDay?.courierId ?? null}, ${courierDay?.courierName ?? null},
+         ${courierDay?.courierDeliveryDayId ?? null}, ${courierDay?.courierPayablePerOrder ?? null},
+         ${nowSql},
          ${analytics?.visitorId ?? null}::uuid,
          (SELECT id FROM analytics_sessions
           WHERE id = ${analytics?.sessionId ?? null}::uuid
@@ -478,6 +513,11 @@ export async function createOrder(
   return created
 }
 
+/**
+ * The customer-safe order. Carries the customer delivery charge and nothing about what the courier
+ * is owed — `OrderDto` has no field for it, so a courier payable cannot reach a customer payload
+ * through this function. Admin's richer view is `getAdminOrderDetail` below.
+ */
 export async function getOrder(id: number): Promise<OrderDto> {
   const records = await sqlClient<OrderRecord[]>`
     SELECT id, order_number AS "orderNumber", customer_profile_id AS "customerId",
@@ -524,6 +564,29 @@ export async function getOrder(id: number): Promise<OrderDto> {
       changedAt: isoTimestamp(history.changedAt),
     })),
   }
+}
+
+/**
+ * Admin's order view: the customer-safe order plus the courier dispatch and accounting snapshot.
+ *
+ * The courier fields are read separately and attached here rather than being added to `getOrder`,
+ * because `getOrder` feeds the customer's own order response. Keeping the internal amount out of
+ * that shape is a structural guarantee, not a convention someone has to remember.
+ */
+export async function getAdminOrderDetail(id: number): Promise<AdminOrderDetailDto> {
+  const order = await getOrder(id)
+  const rows = await sqlClient<{
+    courierId: number | null
+    courierNameSnapshot: string | null
+    courierPayableAmount: number | null
+  }[]>`
+    SELECT courier_id AS "courierId", courier_name_snapshot AS "courierNameSnapshot",
+           courier_payable_amount::float8 AS "courierPayableAmount"
+    FROM orders WHERE id = ${id} LIMIT 1
+  `
+  const courier = rows[0]
+  if (!courier) throw new NotFoundError()
+  return { ...order, ...courier }
 }
 
 /**
