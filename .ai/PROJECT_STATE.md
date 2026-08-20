@@ -666,3 +666,9 @@
   `apps/admin/.env.local`). Electron now runs `assertReferenceDataSchemaReady` once at connect time
   and fails with an actionable Persian message if a future migration drifts the same way. See the
   `.env.local` warning in `.ai/docs/reference-data.md`.
+- Electron's quick-entry screens now use one shallow form and one viewport-bounded grid. Courier-day
+  pricing no longer stacks a guide, a date field, a form, a duplicated status card and a grid; the
+  date and selected-day state live inside the form. The same compact workspace is shared by courier,
+  delivery-window, daily-capacity, purchase, payment and small catalog/reference-data screens. Courier
+  settlement details open in a bounded dialog instead of appending a second form and history table
+  below the account grid.

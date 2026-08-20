@@ -63,7 +63,7 @@ export function FoodTagGroupsPage() {
     actions={<button onClick={reset}>گروه جدید</button>}
   >
     <Message error={error} />
-    <form className="panel form-grid catalog-form" onSubmit={save}>
+    <form className="panel form-grid catalog-form compact-entry-form" onSubmit={save}>
       <label>عنوان<input value={form.title} required
         onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
       <label>کد انگلیسی<input dir="ltr" value={form.code} required
@@ -78,7 +78,7 @@ export function FoodTagGroupsPage() {
     </form>
     {editing?.isSystem && <Message>کد گروه‌های سیستمی ثابت است؛ فقط عنوان، ترتیب و وضعیت را می‌توان تغییر داد.</Message>}
     <ListState loading={loading} error={error} isEmpty={rows.length === 0} emptyText="هنوز گروهی ثبت نشده است." />
-    {rows.length > 0 && <><div className="panel table-wrap"><table>
+    {rows.length > 0 && <><div className="panel table-wrap compact-grid-panel"><table>
       <thead><tr><RowNumberHead /><th>ترتیب</th><th>عنوان</th><th>کد</th><th>نوع</th><th>وضعیت</th><th /></tr></thead>
       <tbody>{paged.visible.map((row, index) => <tr key={row.code}><RowNumberCell offset={paged.rowOffset} index={index} />
         <td>{row.displayOrder}</td><td>{row.title}</td><td dir="ltr">{row.code}</td>
@@ -127,7 +127,7 @@ export function SupportSubjectsPage() {
     actions={<button onClick={reset}>موضوع جدید</button>}
   >
     <Message error={error} />
-    <form className="panel form-grid catalog-form" onSubmit={save}>
+    <form className="panel form-grid catalog-form compact-entry-form" onSubmit={save}>
       <label>عنوان<input value={form.title} required
         onChange={(event) => setForm({ ...form, title: event.target.value })} /></label>
       <label>ترتیب<input type="number" min="0" value={form.displayOrder}
@@ -139,7 +139,7 @@ export function SupportSubjectsPage() {
     </form>
     <Message>غیرفعال کردن یک موضوع، گفتگوهای ثبت‌شده با آن را تغییر نمی‌دهد؛ فقط از فهرست انتخاب مشتری حذف می‌شود.</Message>
     <ListState loading={loading} error={error} isEmpty={rows.length === 0} emptyText="هنوز موضوعی ثبت نشده است." />
-    {rows.length > 0 && <><div className="panel table-wrap"><table>
+    {rows.length > 0 && <><div className="panel table-wrap compact-grid-panel"><table>
       <thead><tr><RowNumberHead /><th>ترتیب</th><th>عنوان</th><th>نوع</th><th>وضعیت</th><th /></tr></thead>
       <tbody>{paged.visible.map((row, index) => <tr key={row.id}><RowNumberCell offset={paged.rowOffset} index={index} />
         <td>{row.displayOrder}</td><td>{row.title}</td>
@@ -152,4 +152,4 @@ export function SupportSubjectsPage() {
     </table></div><Pager {...paged} /></>}
   </PageFrame>
 }
-
+

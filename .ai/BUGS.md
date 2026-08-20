@@ -17,6 +17,19 @@
 
 ## Resolved
 
+### 2026-08-20 — Daily courier pricing and similar Admin pages required excessive vertical scrolling
+
+- **Symptoms:** The courier-day screen stacked an expanded guide, date control, editor, repeated
+  selected-day details and history grid. Similar newly added courier/delivery screens used several
+  uncoordinated panels, forcing operators to scroll before reaching the grid.
+- **Root cause:** These pages hand-built layout classes instead of using the established Admin page,
+  form and grid primitives; several of those class names had no shared styling at all.
+- **Fix:** Reduce quick-entry pages to a shallow form plus a viewport-bounded grid, fold selected-day
+  state into the form, reuse shared messages/status pills, and show courier settlement details in a
+  bounded dialog.
+- **Verification:** Electron TypeScript validation, all 113 Admin tests and the production Electron
+  build pass.
+
 ### 2026-08-15 — Customer reviews had no private Admin handling path
 
 - **Symptoms:** Customers could submit a delivered-order rating/comment, but Admin had no dedicated

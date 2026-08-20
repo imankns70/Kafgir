@@ -141,7 +141,7 @@ export function PaymentsPage() {
     description="پرداخت مشتری برای هر سفارش: روش، مبلغ و وضعیت. این صفحه دفتر حساب نیست."
   >
     <section className="panel admin-controls">
-      <form className="form-grid two-columns" onSubmit={create}>
+      <form className="form-grid two-columns compact-entry-form" onSubmit={create}>
         <DateField label="تاریخ سفارش" value={orderDate} onChange={setOrderDate} />
         <label className="field">سفارش
           <select value={orderId} onChange={(event) => setOrderId(event.target.value)} required>
@@ -190,7 +190,7 @@ export function PaymentsPage() {
           className={filter === key ? 'active' : ''} onClick={() => applyFilter(key)}>{label}</button>)}
     </div>
 
-    <section className="panel">
+    <section className="panel compact-grid-panel">
       <div className="table-panel-head">
         <h2>پرداخت‌های مشتریان</h2>
         <span>{formatNumber(paged.totalItems)} مورد</span>

@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import type { AdminDeliveryDayDto, AdminDeliveryTimeSlotDto } from '@kafgir/contracts'
 import { DeliverySlotUnavailableReason } from '@kafgir/contracts'
 import { adminApi } from './api'
-import { DateField, Pager, RowNumberCell, RowNumberHead, TimeField, useAsyncAction, usePagination } from './admin-ui'
+import {
+  DateField, Message, PageFrame, Pager, RowNumberCell, RowNumberHead, StatusPill, TimeField,
+  useAsyncAction, usePagination,
+} from './admin-ui'
 
 const adminReasonLabels: Record<DeliverySlotUnavailableReason, string> = {
   [DeliverySlotUnavailableReason.Inactive]: 'غیرفعال در تنظیمات پایه',
@@ -83,25 +86,13 @@ export function DeliverySlotsPage() {
     })
   }
 
-  return <section className="panel">
-    <header className="panel-header">
-      <h2>بازه‌های ارسال</h2>
-      <p>ساعت‌هایی که سفارش‌ها در آن تحویل داده می‌شوند. این تنظیمات پایه است و برای همه روزها به کار می‌رود.</p>
-    </header>
+  return <PageFrame
+    title="بازه‌های ارسال"
+    description="تعریف ساعت تحویل و مهلت ثبت سفارش؛ ظرفیت هر تاریخ در صفحه ظرفیت ارسال روزانه تعیین می‌شود."
+  >
+    <Message error={error} />
 
-    <details className="page-guide" open>
-      <summary>راهنما</summary>
-      <ul>
-        <li>«مهلت ثبت» یعنی چند دقیقه پیش از شروع بازه، سفارش‌گیری برای آن بازه بسته می‌شود. مثلاً بازه ۱۲:۰۰ با مهلت ۶۰ دقیقه، ساعت ۱۱:۰۰ بسته می‌شود.</li>
-        <li>بازه‌ها نباید با هم هم‌پوشانی داشته باشند؛ در صورت هم‌پوشانی ذخیره انجام نمی‌شود.</li>
-        <li>ظرفیت هر روز جداگانه در صفحه «ظرفیت ارسال روزانه» تنظیم می‌شود. اینجا فقط ساعت‌ها تعریف می‌شوند.</li>
-        <li>غیرفعال کردن یک بازه آن را از سفارش‌های جدید حذف می‌کند، ولی سفارش‌های قبلی دست‌نخورده می‌مانند.</li>
-      </ul>
-    </details>
-
-    {error && <div className="form-error" role="alert">{error}</div>}
-
-    <form className="form-grid two-columns" onSubmit={submit}>
+    <form className="panel form-grid compact-entry-form delivery-slot-entry-form" onSubmit={submit}>
       <label className="field">عنوان
         <input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
           placeholder="ظهر" required maxLength={100} />
@@ -118,22 +109,22 @@ export function DeliverySlotsPage() {
         <input type="number" min={0} max={1440} value={form.orderCutoffMinutesBeforeStart}
           onChange={(e) => setForm({ ...form, orderCutoffMinutesBeforeStart: e.target.value })} />
       </label>
-      <label className="field checkbox-field">
+      <label className="switch">
         <input type="checkbox" checked={form.isActive}
           onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
         فعال
       </label>
       <div className="form-actions">
-        <button className="primary-button" disabled={busy}>
+        <button className="primary" disabled={busy}>
           {busy ? 'در حال ذخیره…' : form.id == null ? 'افزودن بازه' : 'ذخیره تغییرات'}
         </button>
-        {form.id != null && <button type="button" className="outline-button"
+        {form.id != null && <button type="button"
           onClick={() => setForm(emptySlotForm)}>انصراف</button>}
       </div>
     </form>
 
-    <div className="table-panel">
-      <div className="table-panel-head"><h3>بازه‌های تعریف‌شده</h3><span>{slots.length} مورد</span></div>
+    <div className="panel table-wrap compact-grid-panel">
+      <div className="table-summary"><strong>بازه‌های تعریف‌شده</strong><span>{slots.length} مورد</span></div>
       {slots.length === 0
         ? <p className="muted">هنوز بازه‌ای تعریف نشده است.</p>
         : <><table>
@@ -146,9 +137,9 @@ export function DeliverySlotsPage() {
                 <td dir="ltr">{window_(slot.startTime, slot.endTime)}</td>
                 <td>{slot.orderCutoffMinutesBeforeStart} دقیقه</td>
                 <td>{slot.sortOrder}</td>
-                <td>{slot.isActive ? 'فعال' : 'غیرفعال'}</td>
-                <td>
-                  <button type="button" className="outline-button" onClick={() => setForm({
+                <td><StatusPill active={slot.isActive} /></td>
+                <td className="actions">
+                  <button type="button" onClick={() => setForm({
                     id: slot.id,
                     title: slot.title,
                     startTime: slot.startTime,
@@ -157,7 +148,7 @@ export function DeliverySlotsPage() {
                     orderCutoffMinutesBeforeStart: String(slot.orderCutoffMinutesBeforeStart),
                     isActive: slot.isActive,
                   })}>ویرایش</button>
-                  <button type="button" className="outline-button" disabled={toggleAction.busy}
+                  <button type="button" disabled={toggleAction.busy}
                     onClick={() => toggleActive(slot)}>
                     {togglingId === slot.id ? 'در حال تغییر…' : slot.isActive ? 'غیرفعال کردن' : 'فعال کردن'}
                   </button>
@@ -166,7 +157,7 @@ export function DeliverySlotsPage() {
             </tbody>
           </table><Pager {...pagedSlots} /></>}
     </div>
-  </section>
+  </PageFrame>
 }
 
 /** Per-day overrides. Absent row means the window follows its master setting with no order limit. */
@@ -214,29 +205,21 @@ export function DeliveryDaysPage() {
     })
   }
 
-  return <section className="panel">
-    <header className="panel-header">
-      <h2>ظرفیت ارسال روزانه</h2>
-      <p>فعال یا غیرفعال کردن بازه‌ها و تعیین سقف سفارش برای یک روز مشخص.</p>
-    </header>
+  return <PageFrame
+    title="ظرفیت ارسال روزانه"
+    description="انتخاب روز و تنظیم سقف هر بازه؛ ظرفیت خالی یعنی بدون محدودیت سفارش."
+  >
+    <Message error={error} />
 
-    <details className="page-guide" open>
-      <summary>راهنما</summary>
-      <ul>
-        <li>اگر برای یک روز چیزی ثبت نکنید، همه بازه‌های فعال با ظرفیت نامحدود در دسترس مشتری هستند.</li>
-        <li>ظرفیت خالی یعنی بدون سقف. عدد یعنی حداکثر همان تعداد سفارش برای آن بازه در آن روز.</li>
-        <li>ظرفیت ارسال با ظرفیت پخت غذا فرق دارد؛ هر سفارش باید هر دو را داشته باشد.</li>
-        <li>سفارش لغوشده جای خود را در بازه آزاد می‌کند.</li>
-      </ul>
-    </details>
+    <form className="panel form-grid compact-entry-form delivery-day-entry-form"
+      onSubmit={(event) => event.preventDefault()}>
+      <DateField label="روز تحویل" value={date} onChange={setDate} />
+      <p className="compact-form-note">سفارش لغوشده ظرفیت بازه را آزاد می‌کند؛ ظرفیت پخت غذا جداگانه کنترل می‌شود.</p>
+    </form>
 
-    {error && <div className="form-error" role="alert">{error}</div>}
-
-    <DateField label="روز" value={date} onChange={setDate} />
-
-    <div className="table-panel">
-      <div className="table-panel-head">
-        <h3>بازه‌های این روز</h3><span>{day?.slots.length ?? 0} مورد</span>
+    <div className="panel table-wrap compact-grid-panel">
+      <div className="table-summary">
+        <strong>بازه‌های این روز</strong><span>{day?.slots.length ?? 0} مورد</span>
       </div>
       {!day || day.slots.length === 0
         ? <p className="muted">بازه‌ای تعریف نشده است. ابتدا از صفحه «بازه‌های ارسال» بازه بسازید.</p>
@@ -263,10 +246,10 @@ export function DeliveryDaysPage() {
                 </td>
                 <td>{slot.usedOrders}</td>
                 <td>
-                  <button type="button" className="outline-button" disabled={saveAction.busy}
+                  <button type="button" disabled={saveAction.busy}
                     onClick={() => save(slot.slotId, true)}>
                     {pendingSlotId === slot.slotId ? 'در حال ذخیره…' : 'ذخیره و فعال'}</button>
-                  <button type="button" className="outline-button" disabled={saveAction.busy}
+                  <button type="button" disabled={saveAction.busy}
                     onClick={() => save(slot.slotId, false)}>
                     {pendingSlotId === slot.slotId ? 'در حال ذخیره…' : 'غیرفعال کردن'}</button>
                 </td>
@@ -274,5 +257,5 @@ export function DeliveryDaysPage() {
             </tbody>
           </table><Pager {...pagedDay} /></>}
     </div>
-  </section>
+  </PageFrame>
 }

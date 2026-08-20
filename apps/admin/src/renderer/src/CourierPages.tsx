@@ -8,7 +8,8 @@ import type {
 } from '@kafgir/contracts'
 import { adminApi } from './api'
 import {
-  AmountField, DateField, Pager, RowNumberCell, RowNumberHead, useAsyncAction, usePagination,
+  AmountField, DateField, Message, PageFrame, Pager, RowNumberCell, RowNumberHead, StatusPill,
+  useAsyncAction, usePagination,
 } from './admin-ui'
 import {
   formatMoney as money,
@@ -84,24 +85,13 @@ export function CouriersPage() {
     })
   }
 
-  return <section className="panel">
-    <header className="panel-header">
-      <h2>پیک‌ها</h2>
-      <p>فهرست افرادی که سفارش‌ها را تحویل می‌دهند. هزینه و نرخ هر روز در صفحه «پیک و هزینه ارسال روزانه» تعیین می‌شود.</p>
-    </header>
+  return <PageFrame
+    title="پیک‌ها"
+    description="ثبت و ویرایش پیک‌ها؛ غیرفعال‌سازی، سوابق سفارش و حساب قبلی را تغییر نمی‌دهد."
+  >
+    <Message error={error} />
 
-    <details className="page-guide" open>
-      <summary>راهنما</summary>
-      <ul>
-        <li>هر شماره موبایل فقط برای یک پیک قابل ثبت است.</li>
-        <li>غیرفعال کردن پیک او را از انتخاب برای روزهای جدید حذف می‌کند، ولی سفارش‌های گذشته، کارکرد و مانده حساب او دست‌نخورده می‌ماند.</li>
-        <li>پیک حذف نمی‌شود؛ سابقه مالی باید همیشه قابل بازبینی بماند.</li>
-      </ul>
-    </details>
-
-    {error && <div className="form-error" role="alert">{error}</div>}
-
-    <form className="form-grid two-columns" onSubmit={submit}>
+    <form className="panel form-grid compact-entry-form courier-entry-form" onSubmit={submit}>
       <label className="field">نام و نام خانوادگی
         <input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })}
           required maxLength={150} placeholder="علی رضایی" />
@@ -114,22 +104,22 @@ export function CouriersPage() {
         <input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
           maxLength={1000} placeholder="اختیاری" />
       </label>
-      <label className="field checkbox-field">
+      <label className="switch">
         <input type="checkbox" checked={form.isActive}
           onChange={(e) => setForm({ ...form, isActive: e.target.checked })} />
         فعال
       </label>
       <div className="form-actions">
-        <button className="primary-button" disabled={busy}>
+        <button className="primary" disabled={busy}>
           {busy ? 'در حال ذخیره…' : form.id == null ? 'افزودن پیک' : 'ذخیره تغییرات'}
         </button>
-        {form.id != null && <button type="button" className="outline-button"
+        {form.id != null && <button type="button"
           onClick={() => setForm(emptyCourierForm)}>انصراف</button>}
       </div>
     </form>
 
-    <div className="table-panel">
-      <div className="table-panel-head"><h3>پیک‌های ثبت‌شده</h3><span>{count(couriers.length)} مورد</span></div>
+    <div className="panel table-wrap compact-grid-panel">
+      <div className="table-summary"><strong>پیک‌های ثبت‌شده</strong><span>{count(couriers.length)} مورد</span></div>
       {couriers.length === 0
         ? <p className="muted">هنوز پیکی ثبت نشده است.</p>
         : <><table>
@@ -142,16 +132,16 @@ export function CouriersPage() {
                 <td>{courier.fullName}</td>
                 <td dir="ltr">{courier.mobile}</td>
                 <td>{courier.notes || '—'}</td>
-                <td>{courier.isActive ? 'فعال' : 'غیرفعال'}</td>
-                <td>
-                  <button type="button" className="outline-button" onClick={() => setForm({
+                <td><StatusPill active={courier.isActive} /></td>
+                <td className="actions">
+                  <button type="button" onClick={() => setForm({
                     id: courier.id,
                     fullName: courier.fullName,
                     mobile: courier.mobile,
                     notes: courier.notes ?? '',
                     isActive: courier.isActive,
                   })}>ویرایش</button>
-                  <button type="button" className="outline-button" disabled={toggleAction.busy}
+                  <button type="button" disabled={toggleAction.busy}
                     onClick={() => toggleActive(courier)}>
                     {togglingId === courier.id ? 'در حال تغییر…' : courier.isActive ? 'غیرفعال کردن' : 'فعال کردن'}
                   </button>
@@ -160,7 +150,7 @@ export function CouriersPage() {
             </tbody>
           </table><Pager {...paged} /></>}
     </div>
-  </section>
+  </PageFrame>
 }
 
 type DayForm = { courierId: string; customerDeliveryFee: string; courierPayablePerOrder: string }
@@ -228,32 +218,19 @@ export function CourierDaysPage() {
     finally { setBusy(false) }
   }
 
-  return <section className="panel">
-    <header className="panel-header">
-      <h2>پیک و هزینه ارسال روزانه</h2>
-      <p>تعیین پیک هر روز، هزینه‌ای که از مشتری گرفته می‌شود و مبلغی که بابت هر تحویل به پیک پرداخت می‌شود.</p>
-    </header>
+  const submit = (event: FormEvent) => {
+    event.preventDefault()
+    void save(true)
+  }
 
-    <details className="page-guide" open>
-      <summary>راهنما</summary>
-      <ul>
-        <li>مبنای محاسبه، «روز تحویل» سفارش است، نه روز ثبت آن. سفارشی که امشب برای فردا ثبت شود، پیک و نرخ فردا را می‌گیرد.</li>
-        <li>هر روز فقط یک پیکربندی فعال دارد. ذخیره دوباره، پیکربندی قبلی را بایگانی و پیکربندی تازه را جایگزین می‌کند.</li>
-        <li>تغییر پیک یا نرخ در میانه روز فقط روی سفارش‌های بعدی اثر دارد؛ سفارش‌های ثبت‌شده مقدار لحظه ثبت خود را نگه می‌دارند.</li>
-        <li>«هزینه ارسال برای مشتری» و «مبلغ هر تحویل برای پیک» دو عدد مستقل‌اند و می‌توانند متفاوت باشند.</li>
-        <li>اگر برای روزی پیکربندی فعالی وجود نداشته باشد، ثبت سفارش ارسالی برای آن روز ممکن نیست.</li>
-      </ul>
-    </details>
+  return <PageFrame
+    title="پیک و هزینه ارسال روزانه"
+    description="پیک و دو مبلغ مستقل هر روز بر اساس تاریخ تحویل تعیین می‌شوند؛ تغییرات روی سفارش‌های قبلی اثر ندارد."
+  >
+    <Message error={error} />
 
-    {error && <div className="form-error" role="alert">{error}</div>}
-
-    <DateField label="روز تحویل" value={date} onChange={setDate} />
-
-    {activeCouriers.length === 0 && <p className="muted">
-      هیچ پیک فعالی ثبت نشده است. ابتدا از صفحه «پیک‌ها» یک پیک اضافه کنید.
-    </p>}
-
-    <div className="form-grid two-columns">
+    <form className="panel form-grid compact-entry-form courier-day-entry-form" onSubmit={submit}>
+      <DateField label="روز تحویل" value={date} onChange={setDate} />
       <label className="field">پیک
         <select value={form.courierId} onChange={(e) => setForm({ ...form, courierId: e.target.value })}>
           <option value="">انتخاب کنید</option>
@@ -269,28 +246,23 @@ export function CourierDaysPage() {
         value={form.courierPayablePerOrder}
         onChange={(value) => setForm({ ...form, courierPayablePerOrder: value })} />
       <div className="form-actions">
-        <button type="button" className="primary-button" disabled={busy} onClick={() => void save(true)}>
+        <button className="primary" disabled={busy || activeCouriers.length === 0}>
           {busy ? 'در حال ذخیره…' : 'ذخیره و فعال کردن این روز'}
         </button>
-        {day?.configuration && <button type="button" className="outline-button" disabled={busy}
+        {day?.configuration && <button type="button" disabled={busy}
           onClick={() => void save(false)}>غیرفعال کردن این روز</button>}
       </div>
-    </div>
+      <p className={`compact-form-note ${day?.configuration ? 'success' : 'warning'}`}>
+        {activeCouriers.length === 0
+          ? 'ابتدا در صفحه «پیک‌ها» یک پیک فعال ثبت کنید.'
+          : day?.configuration
+            ? `${persianDay(date)} فعال است؛ ${count(day.snapshottedOrders)} سفارش با تنظیمات ثبت‌شده این روز وجود دارد.`
+            : `${persianDay(date)} هنوز پیک و هزینه فعال ندارد.`}
+      </p>
+    </form>
 
-    <section className="detail-section">
-      <h3>وضعیت {persianDay(date)}</h3>
-      {day?.configuration
-        ? <dl>
-            <div><dt>پیک</dt><dd>{day.configuration.courierFullName} — <bdi dir="ltr">{day.configuration.courierMobile}</bdi></dd></div>
-            <div><dt>هزینه ارسال برای مشتری</dt><dd>{money(day.configuration.customerDeliveryFee)}</dd></div>
-            <div><dt>مبلغ هر تحویل برای پیک</dt><dd>{money(day.configuration.courierPayablePerOrder)}</dd></div>
-            <div><dt>سفارش‌های ثبت‌شده با این تنظیمات</dt><dd>{count(day.snapshottedOrders)}</dd></div>
-          </dl>
-        : <p className="muted">برای این روز پیک و هزینه ارسال تعیین نشده است؛ ثبت سفارش ارسالی برای این روز ممکن نیست.</p>}
-    </section>
-
-    <div className="table-panel">
-      <div className="table-panel-head"><h3>روزهای تنظیم‌شده</h3><span>{count(recent.length)} مورد</span></div>
+    <div className="panel table-wrap compact-grid-panel">
+      <div className="table-summary"><strong>روزهای تنظیم‌شده</strong><span>{count(recent.length)} مورد</span></div>
       {recent.length === 0
         ? <p className="muted">هنوز روزی تنظیم نشده است.</p>
         : <><table>
@@ -305,14 +277,14 @@ export function CourierDaysPage() {
                 <td>{money(row.customerDeliveryFee)}</td>
                 <td>{money(row.courierPayablePerOrder)}</td>
                 <td>
-                  <button type="button" className="outline-button"
+                  <button type="button"
                     onClick={() => setDate(row.deliveryDate)}>باز کردن</button>
                 </td>
               </tr>)}
             </tbody>
           </table><Pager {...pagedRecent} /></>}
     </div>
-  </section>
+  </PageFrame>
 }
 
 /**
@@ -373,27 +345,20 @@ export function CourierAccountingPage() {
     finally { setBusy(false) }
   }
 
-  return <section className="panel">
-    <header className="panel-header">
-      <h2>کارکرد و تسویه پیک‌ها</h2>
-      <p>تعداد تحویل موفق، کارکرد، مبلغ تسویه‌شده و مانده حساب هر پیک.</p>
-    </header>
+  const submitSettlement = (event: FormEvent) => {
+    event.preventDefault()
+    void settle()
+  }
 
-    <details className="page-guide" open>
-      <summary>راهنما</summary>
-      <ul>
-        <li>فقط سفارش‌هایی که وضعیت آن‌ها «تحویل شد» است در کارکرد پیک حساب می‌شوند. سفارش در انتظار تایید، تاییدشده، در حال آماده‌سازی، آماده یا لغوشده کارکردی ایجاد نمی‌کند.</li>
-        <li>مبلغ هر سفارش همان مبلغی است که در لحظه ثبت آن سفارش ذخیره شده؛ تغییر نرخ روزانه، کارکرد گذشته را عوض نمی‌کند.</li>
-        <li>مانده = کارکرد − تسویه‌شده. ثبت تسویه هیچ تغییری در سفارش‌ها ایجاد نمی‌کند.</li>
-        <li>مبلغ تسویه نمی‌تواند از مانده حساب بیشتر باشد.</li>
-      </ul>
-    </details>
+  return <PageFrame
+    title="کارکرد و تسویه پیک‌ها"
+    description="کارکرد فقط از سفارش‌های تحویل‌شده محاسبه می‌شود؛ جزئیات و ثبت تسویه در پنجره همان پیک باز می‌شود."
+  >
+    <Message error={error} />
+    {notice && <Message>{notice}</Message>}
 
-    {error && <div className="form-error" role="alert">{error}</div>}
-    {notice && <div className="form-hint" role="status">{notice}</div>}
-
-    <div className="table-panel">
-      <div className="table-panel-head"><h3>خلاصه حساب پیک‌ها</h3><span>{count(accounts.length)} مورد</span></div>
+    <div className="panel table-wrap compact-grid-panel">
+      <div className="table-summary"><strong>خلاصه حساب پیک‌ها</strong><span>{count(accounts.length)} مورد</span></div>
       {accounts.length === 0
         ? <p className="muted">هنوز پیکی ثبت نشده است.</p>
         : <><table>
@@ -404,13 +369,13 @@ export function CourierAccountingPage() {
               {paged.visible.map((account, index) => <tr key={account.courierId}>
                 <RowNumberCell offset={paged.rowOffset} index={index} />
                 <td>{account.fullName}</td>
-                <td>{account.isActive ? 'فعال' : 'غیرفعال'}</td>
+                <td><StatusPill active={account.isActive} /></td>
                 <td>{count(account.deliveredOrders)}</td>
                 <td>{money(account.earnedAmount)}</td>
                 <td>{money(account.settledAmount)}</td>
                 <td>{money(account.outstandingAmount)}</td>
                 <td>
-                  <button type="button" className="outline-button" onClick={() => void open(account)}>
+                  <button type="button" onClick={() => void open(account)}>
                     تسویه و سوابق
                   </button>
                 </td>
@@ -419,21 +384,23 @@ export function CourierAccountingPage() {
           </table><Pager {...paged} /></>}
     </div>
 
-    {selected && <div className="table-panel">
-      <div className="table-panel-head">
-        <h3>{selected.fullName}</h3>
-        <span>مانده: {money(selected.outstandingAmount)}</span>
-      </div>
-      <section className="detail-section">
-        <dl>
+    {selected && <div className="admin-dialog-backdrop">
+      <section className="admin-dialog-card settlement-dialog" role="dialog" aria-modal="true"
+        aria-labelledby="settlement-dialog-title">
+        <header className="admin-dialog-header">
+          <div><h2 id="settlement-dialog-title">تسویه {selected.fullName}</h2>
+            <p>مانده فعلی: <strong>{money(selected.outstandingAmount)}</strong></p></div>
+          <button type="button" onClick={() => setSelected(null)}>بستن</button>
+        </header>
+
+        <dl className="settlement-summary">
           <div><dt>تحویل موفق</dt><dd>{count(selected.deliveredOrders)}</dd></div>
           <div><dt>کارکرد</dt><dd>{money(selected.earnedAmount)}</dd></div>
           <div><dt>تسویه‌شده</dt><dd>{money(selected.settledAmount)}</dd></div>
-          <div className="detail-total"><dt>مانده</dt><dd>{money(selected.outstandingAmount)}</dd></div>
+          <div><dt>مانده</dt><dd>{money(selected.outstandingAmount)}</dd></div>
         </dl>
-      </section>
 
-      <div className="form-grid two-columns">
+        <form className="form-grid compact-entry-form settlement-entry-form" onSubmit={submitSettlement}>
         <AmountField label="مبلغ تسویه (تومان)" placeholder="500,000" value={amount}
           hint={`حداکثر تا مانده فعلی: ${money(selected.outstandingAmount)}`}
           onChange={setAmount} />
@@ -441,19 +408,18 @@ export function CourierAccountingPage() {
           <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} placeholder="اختیاری" />
         </label>
         <div className="form-actions">
-          <button type="button" className="primary-button"
-            disabled={busy || selected.outstandingAmount <= 0} onClick={() => void settle()}>
+          <button className="primary" disabled={busy || selected.outstandingAmount <= 0}>
             {busy ? 'در حال ثبت…' : 'ثبت تسویه'}
           </button>
-          <button type="button" className="outline-button" onClick={() => setSelected(null)}>بستن</button>
         </div>
-      </div>
+        </form>
       {selected.outstandingAmount <= 0 && <p className="muted">مانده‌ای برای تسویه وجود ندارد.</p>}
 
-      <div className="table-panel-head"><h3>سوابق تسویه</h3><span>{count(settlements.length)} مورد</span></div>
-      {settlements.length === 0
-        ? <p className="muted">هنوز تسویه‌ای ثبت نشده است.</p>
-        : <table>
+        <div className="table-wrap settlement-history">
+          <div className="table-summary"><strong>سوابق تسویه</strong><span>{count(settlements.length)} مورد</span></div>
+          {settlements.length === 0
+            ? <p className="muted">هنوز تسویه‌ای ثبت نشده است.</p>
+            : <table>
             <thead><tr><th>زمان</th><th>مبلغ</th><th>توضیح</th></tr></thead>
             <tbody>{settlements.map((row) => <tr key={row.id}>
               <td>{dateTime(row.settledAt)}</td>
@@ -461,6 +427,8 @@ export function CourierAccountingPage() {
               <td>{row.note || '—'}</td>
             </tr>)}</tbody>
           </table>}
+        </div>
+      </section>
     </div>}
-  </section>
+  </PageFrame>
 }

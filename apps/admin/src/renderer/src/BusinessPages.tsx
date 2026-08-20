@@ -173,7 +173,7 @@ export function PurchasesPage() {
     {notice && <Message>{notice}</Message>}
 
     <section className="panel admin-controls">
-      <form className="form-grid purchase-form" onSubmit={submit}>
+      <form className="form-grid purchase-form compact-entry-form" onSubmit={submit}>
         <DateField label="تاریخ خرید" value={form.purchaseDate}
           onChange={(value) => setForm({ ...form, purchaseDate: value })} />
         <AmountField label="مبلغ (تومان)" value={form.amount} placeholder="4,850,000"
@@ -200,7 +200,7 @@ export function PurchasesPage() {
       </form>
     </section>
 
-    <section className="panel">
+    <section className="panel compact-grid-panel">
       <div className="table-panel-head">
         <h2>خریدهای {data?.title ?? ''}</h2>
         <span>جمع خرید این ماه: {formatMoney(data?.totalAmount ?? 0)}</span>

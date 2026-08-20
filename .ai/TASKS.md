@@ -406,5 +406,8 @@
 - [x] Restructure the Electron Admin sidebar around the domain, split the combined «اطلاعات پایه»
   page into one screen per entity, move checkout configuration to «تنظیمات», add the missing
   واحدهای اندازه‌گیری screen, and filter navigation by role.
+- [x] Compact Electron form-and-grid screens so courier pricing, courier management, settlement,
+  delivery windows, daily delivery capacity and the existing small CRUD pages do not create an
+  unnecessarily tall page.
 - [ ] Before production rollout, apply migration `0021_striped_thunderbolt_ross.sql` and review the
   customer-visible methods, delivery fee and minimum order.

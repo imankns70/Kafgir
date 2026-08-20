@@ -859,3 +859,13 @@
   a visit while the order stays eligible to rate later from order history.
 - Added `orders_customer_status_idx` (migration 0022). Measured at 200k orders the pending-rating
   lookup went from a 25ms sequential scan to 0.16ms; it runs for every customer on every app open.
+
+## 2026-08-20 — Electron quick-entry pages are form + grid workspaces
+
+- Operational and small master-data screens keep a single compact entry/edit form above a single
+  data grid. Explanations belong in the page description or a short form note, not in an expanded
+  guide card that pushes the working rows below the viewport.
+- Long results scroll inside a viewport-bounded grid. The application page should not gain vertical
+  height merely because the grid has more rows.
+- Contextual secondary work, such as one courier's settlement history, opens in a bounded dialog so
+  the primary grid stays in place and the operator does not lose context.

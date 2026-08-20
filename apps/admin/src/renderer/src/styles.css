@@ -652,6 +652,48 @@ td.row-number{color:var(--muted);font-size:12px;font-variant-numeric:tabular-num
 .purchase-form{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end}
 .purchase-form .form-actions{display:flex;align-items:stretch;gap:8px}
 
+/* Compact form + grid workspaces. These screens are used for quick daily operations, so the page
+   itself should not become a stack of cards. The entry form stays shallow and the grid owns the
+   remaining viewport height; long results scroll inside the grid while its header remains useful. */
+.compact-entry-form{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end;padding:12px 14px}
+.compact-entry-form .form-actions{display:flex;align-items:stretch;flex-wrap:wrap;gap:8px}
+.compact-entry-form .form-actions button{white-space:nowrap}
+.compact-entry-form .switch{min-height:42px;white-space:nowrap}
+.courier-entry-form{grid-template-columns:minmax(170px,1fr) minmax(150px,.8fr) minmax(190px,1.25fr) auto auto}
+.courier-day-entry-form{grid-template-columns:minmax(168px,.8fr) minmax(210px,1.2fr) minmax(185px,1fr) minmax(185px,1fr) auto}
+.delivery-slot-entry-form{grid-template-columns:minmax(140px,1fr) minmax(110px,.55fr) minmax(140px,.75fr) minmax(140px,.75fr) minmax(175px,1fr) auto auto}
+.delivery-day-entry-form{grid-template-columns:minmax(190px,240px) minmax(360px,1fr)}
+.settlement-entry-form{grid-template-columns:minmax(200px,1fr) minmax(220px,1.2fr) auto;border-top:1px solid var(--border);padding-top:12px}
+.compact-form-note{grid-column:1/-1;margin:0;border-inline-start:3px solid var(--olive);border-radius:7px;padding:7px 10px;color:var(--muted);background:#f1f4e9;font-size:12px;line-height:1.7}
+.compact-form-note.warning{border-inline-start-color:#c58b00;background:#fff0c8}
+.compact-form-note.success{border-inline-start-color:var(--success);background:#e5ebd9}
+.compact-grid-panel{min-height:0;max-height:calc(100vh - 250px);overflow:auto}
+.table-panel-head{display:flex;min-height:44px;align-items:center;justify-content:space-between;gap:12px;padding:9px 14px;color:var(--olive)}
+.table-panel-head h2,.table-panel-head h3{margin:0;font-size:16px}.table-panel-head span{font-size:12px}
+.compact-grid-panel>.table-summary{position:sticky;z-index:3;top:0;border-bottom:1px solid var(--border);background:var(--surface)}
+.compact-grid-panel>.table-panel-head{position:sticky;z-index:3;top:0;border-bottom:1px solid var(--border);background:var(--surface)}
+.compact-grid-panel>.table-summary+table th{top:42px}
+.compact-grid-panel>.table-wrap{overflow:visible}
+.compact-grid-panel>.muted{padding:18px;text-align:center}
+
+/* Settlement details are contextual to one courier. A dialog keeps the account grid in place and
+   avoids appending another form and another table below it, which previously doubled page height. */
+.admin-dialog-backdrop{position:fixed;z-index:1000;inset:0;display:grid;place-items:center;padding:24px;background:#2b2b2b88}
+.admin-dialog-card{display:grid;width:min(900px,calc(100vw - 72px));max-height:calc(100vh - 48px);gap:14px;overflow:auto;border:1px solid var(--border);border-radius:18px;padding:18px;background:var(--surface);box-shadow:0 20px 70px #2b2b2b55}
+.admin-dialog-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;border-bottom:1px solid var(--border);padding-bottom:12px}
+.admin-dialog-header h2,.admin-dialog-header p{margin:0}.admin-dialog-header p{margin-top:4px;color:var(--muted);font-size:13px}.admin-dialog-header strong{color:var(--primary)}
+.settlement-summary{display:grid;grid-template-columns:repeat(4,minmax(120px,1fr));gap:8px;margin:0}
+.settlement-summary>div{display:grid;gap:4px;border:1px solid var(--border);border-radius:10px;padding:10px;background:#fff}
+.settlement-summary dt{color:var(--muted);font-size:12px}.settlement-summary dd{margin:0;color:var(--olive);font-size:16px;font-weight:700}
+.settlement-summary>div:last-child dd{color:var(--primary)}
+.settlement-history{max-height:300px;border:1px solid var(--border);border-radius:12px}
+
+@media(max-width:1350px){
+  .courier-entry-form,.courier-day-entry-form,.delivery-slot-entry-form{grid-template-columns:repeat(3,minmax(150px,1fr))}
+  .compact-entry-form .form-actions{grid-column:auto}
+  .compact-grid-panel{max-height:calc(100vh - 320px)}
+}
+
 /* Month cards. Each is a button because opening a month is the only thing you do with one. */
 .month-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px;margin-block-end:16px}
 .month-card{display:grid;gap:4px;border:1px solid var(--border);border-radius:12px;padding:12px 14px;background:#fff;font:inherit;text-align:start;cursor:pointer}

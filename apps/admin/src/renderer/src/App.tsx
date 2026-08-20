@@ -738,7 +738,7 @@ function CategoriesPage() {
   }
   return <PageFrame title="دسته‌بندی غذاها" actions={<button onClick={() => { setEditId(null); setForm(emptyCategory) }}>دسته جدید</button>}>
     <Message error={error} />
-    <form className="panel form-grid catalog-form" onSubmit={save}>
+    <form className="panel form-grid catalog-form compact-entry-form" onSubmit={save}>
       <label>عنوان<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label>
       <label>عنوان انگلیسی<input dir="ltr" value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value.toLowerCase() })} required /></label>
       <label>آیکن<input value={form.icon ?? ''} onChange={(event) => setForm({ ...form, icon: event.target.value || null })} /></label>
@@ -746,7 +746,7 @@ function CategoriesPage() {
       <label className="switch"><input type="checkbox" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />فعال</label>
       <button className="primary" disabled={busy}>{busy ? 'در حال ذخیره…' : editId ? 'ذخیره' : 'افزودن'}</button>
     </form>
-    <div className="panel table-wrap"><table><thead><tr><RowNumberHead /><th>ترتیب</th><th>آیکن</th><th>عنوان</th><th>عنوان انگلیسی</th><th>وضعیت</th><th /></tr></thead>
+    <div className="panel table-wrap compact-grid-panel"><table><thead><tr><RowNumberHead /><th>ترتیب</th><th>آیکن</th><th>عنوان</th><th>عنوان انگلیسی</th><th>وضعیت</th><th /></tr></thead>
       <tbody>{pagedCategories.visible.map((row, index) => <tr key={row.id}><RowNumberCell offset={pagedCategories.rowOffset} index={index} /><td>{plainNumber(row.displayOrder)}</td><td>{row.icon}</td><td>{row.title}</td><td dir="ltr">{row.slug}</td><td><StatusPill active={row.isActive} /></td><td><button onClick={() => edit(row)}>ویرایش</button></td></tr>)}</tbody></table></div>
     <Pager {...pagedCategories} />
   </PageFrame>
@@ -788,7 +788,7 @@ function TagsPage() {
   return <PageFrame title="برچسب‌های غذا" actions={<button onClick={() => { setEditId(null); setForm(emptyTag) }}>برچسب جدید</button>}>
     <Message error={error} />
     <AdminControls>
-      <form className="form-grid tag-form" onSubmit={save}>
+      <form className="form-grid tag-form compact-entry-form" onSubmit={save}>
         <label>عنوان<input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label>
         <label>عنوان انگلیسی<input dir="ltr" value={form.slug} onChange={(event) => setForm({ ...form, slug: event.target.value.toLowerCase() })} required /></label>
         <label>گروه<select value={form.group} onChange={(event) => setForm({ ...form, group: event.target.value as FoodTagWriteRequest['group'] })}>
@@ -802,7 +802,7 @@ function TagsPage() {
       <div className="toolbar"><label>گروه<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">همه گروه‌ها</option>
         {groups.map((item) => <option key={item.code} value={item.code}>{item.title}</option>)}</select></label></div>
     </AdminControls>
-    <div className="panel table-wrap"><table><thead><tr><RowNumberHead /><th>عنوان</th><th>گروه</th><th>عنوان انگلیسی</th><th>نمایش مشتری</th><th>وضعیت</th><th /></tr></thead>
+    <div className="panel table-wrap compact-grid-panel"><table><thead><tr><RowNumberHead /><th>عنوان</th><th>گروه</th><th>عنوان انگلیسی</th><th>نمایش مشتری</th><th>وضعیت</th><th /></tr></thead>
       <tbody>{pagedTags.visible.map((row, index) => <tr key={row.id}><RowNumberCell offset={pagedTags.rowOffset} index={index} /><td>{row.icon} {row.title}</td><td>{groups.find((item) => item.code === row.group)?.title ?? row.group}</td><td dir="ltr">{row.slug}</td><td>{row.isCustomerVisible ? 'بله' : 'خیر'}</td><td><StatusPill active={row.isActive} /></td><td><button onClick={() => edit(row)}>ویرایش</button></td></tr>)}</tbody></table></div>
     <Pager {...pagedTags} />
   </PageFrame>
@@ -1301,7 +1301,7 @@ function DailyMenuPage() {
     {toggleAction.busy ? 'در حال تغییر…' : <>سفارش‌گیری {menu?.isOpen ? 'باز است' : 'بسته است'}</>}
   </button>}>
     <Message error={error} />
-    <form className="panel form-grid menu-form" onSubmit={saveItem}>
+    <form className="panel form-grid menu-form compact-entry-form" onSubmit={saveItem}>
       <label>غذا<select value={foodId} disabled={editing !== null} onChange={(event) => setFoodId(event.target.value)} required>
         <option value="">انتخاب غذا</option>{foods.filter((food) => food.isActive).map((food) => <option value={food.id} key={food.id}>{food.name}{food.isPersianRice ? ' (ارتقای مخفی)' : ''}</option>)}</select>
         <small>{selectedFood?.isPersianRice ? 'قیمت این ردیف باید مابه‌التفاوت ارتقا به برنج ایرانی باشد، نه قیمت یک پرس کامل برنج.' : selectedFood?.allowsPersianRice ? 'مشتری می‌تواند به این غذا برنج ایرانی اضافه کند؛ «برنج ایرانی» را هم به منوی امروز اضافه کنید.' : ''}</small></label>
@@ -1326,7 +1326,7 @@ function DailyMenuPage() {
         {saveAction.busy ? (editing ? 'در حال ذخیره…' : 'در حال افزودن…') : editing ? 'ذخیره' : 'افزودن به منو'}
       </button>
     </form>
-    <div className="panel table-wrap"><table><thead><tr><RowNumberHead /><th>غذا</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
+    <div className="panel table-wrap compact-grid-panel"><table><thead><tr><RowNumberHead /><th>غذا</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
       <tbody>{pagedMenu.visible.map((item, index) => <tr key={item.id}><RowNumberCell offset={pagedMenu.rowOffset} index={index} /><td>{item.foodName}</td><td>{item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{plainNumber(item.capacityPortions)}</td><td>{plainNumber(item.soldPortions)}</td><td>{plainNumber(item.remainingPortions)}</td><td className="actions"><button onClick={() => edit(item)}>ویرایش</button><button className="discount-action" onClick={() => edit(item, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button><button className="danger" disabled={removeAction.busy} onClick={() => removeItem(item.id)}>{removingId === item.id ? 'در حال حذف…' : 'حذف'}</button></td></tr>)}</tbody></table></div>
     <Pager {...pagedMenu} />
   </PageFrame>
