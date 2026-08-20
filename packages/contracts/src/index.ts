@@ -12,6 +12,7 @@ import { DeliveryMethod, OrderStatus, PaymentMethod } from './order-enums.js'
 export * from './v15.js'
 export * from './delivery.js'
 export * from './courier.js'
+export * from './money.js'
 
 export const nullableText = z.string().trim().nullable().optional()
 

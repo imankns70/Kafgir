@@ -1,4 +1,4 @@
-import type { SocialPostTemplateType } from '@kafgir/contracts'
+import { formatMoney, type SocialPostTemplateType } from '@kafgir/contracts'
 
 const forbiddenCapacityPlaceholder = /\{\{\s*(remainingCapacity|initialCapacity|capacity|soldQuantity|remainingPercentage|productionQuantity)\s*\}\}/iu
 const suspiciousPublicCapacity = /(?:[0-9۰-۹٠-٩]+\s*(?:پرس|درصد|٪|%)|(?:ظرفیت|تولید|باقی.?مانده)\s*[:：]?\s*[0-9۰-۹٠-٩]+)/iu
@@ -29,5 +29,10 @@ export function renderSocialTemplate(
   return rendered
 }
 
-export const formatSocialMoney = (value: number) =>
-  `${new Intl.NumberFormat('fa-IR-u-nu-latn', { maximumFractionDigits: 0 }).format(value)} تومان`
+/**
+ * Prices inside a published post. Same presentation as everywhere else — a follower who sees a price
+ * in a post and then opens the app should read the identical figure. This used to build its own
+ * `fa-IR-u-nu-latn` formatter; that happens to emit the same string today, but it is one ICU update
+ * away from disagreeing with the rest of the app for no reason anybody would have chosen.
+ */
+export const formatSocialMoney = formatMoney

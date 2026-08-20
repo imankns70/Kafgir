@@ -1,7 +1,14 @@
+/**
+ * Counts, quantities and order numbers, printed as they are. These are not money: an order number
+ * is an identifier and grouping it would invent digits that are not in it.
+ */
 export const formatNumber = (value: string | number): string => String(value)
 
-export const formatMoney = (amount: number): string =>
-  `${new Intl.NumberFormat('en-US').format(amount)} تومان`
+/**
+ * Prices, fees and totals. Re-exported from `@kafgir/contracts` so the customer app, Admin and the
+ * server all print «1,260,000 تومان» identically; see that module for why the rules live there.
+ */
+export { formatMoney } from '@kafgir/contracts'
 
 /** «سه‌شنبه ۲۱ مرداد» for an ISO business date. Latin digits, per the project's numeric convention —
  *  Vazir FD renders their Persian glyphs without changing the underlying characters. */

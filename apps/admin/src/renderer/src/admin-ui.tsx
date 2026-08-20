@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { defaultPageSize, pageSizeOptions, type PagedResult } from '@kafgir/contracts'
-import { formatAmountInput, formatNumber } from './number-format'
+import {
+  formatNumber, isInvalidMoneyText, moneyInputText, normalizeMoneyText, parseMoney,
+} from './number-format'
 import { PersianDatePicker } from './PersianDatePicker'
 import { PersianTimePicker } from './PersianTimePicker'
 
@@ -117,24 +119,26 @@ export function TimeField({ label, value, onChange, allowClear }: {
 /**
  * The one money control in the admin.
  *
- * The value is held as text while editing, so clearing the box stays empty instead of collapsing to
- * zero, and the box regroups as the operator types — «70000» reads back as «70,000» in the same
- * separator style as every price the app prints. Persian and Arabic-Indic digits are accepted and
- * normalised, and a grouped value pasted back in still parses.
+ * Grouping is applied on blur, not on every keystroke. Regrouping a React controlled input while it
+ * is being typed into rewrites the value under the caret: inserting a digit in the middle of
+ * «1,260,000» shifts every separator after it, the string the browser gets back differs from the one
+ * it just rendered, and the caret snaps to the end. Formatting once the field is left gives the same
+ * readable «1,260,000» with none of that, and focusing strips the separators back out so editing an
+ * existing amount is ordinary text editing.
  *
- * Callers keep the text in their own state and parse it with `parseAmount` / `parseTomanAmount` when
- * they submit. Nothing here ever does arithmetic on the displayed string.
+ * The caller holds the text and parses it with `parseMoney` when it submits. Nothing here ever does
+ * arithmetic on the displayed string.
  */
-export function AmountField({ label, value, onChange, placeholder, invalid, hint }: {
+export function AmountField({ label, value, onChange, placeholder, hint }: {
   label: string
   /** The raw text the operator is editing, not a number. */
   value: string
   onChange: (value: string) => void
   placeholder?: string
-  invalid?: boolean
   hint?: string
 }) {
   const id = useId()
+  const invalid = isInvalidMoneyText(value)
   return <div className="field admin-amount-field">
     <label htmlFor={id}>{label}</label>
     {/* `dir="ltr"` because digits and their separators read left-to-right even inside an RTL page. */}
@@ -142,12 +146,20 @@ export function AmountField({ label, value, onChange, placeholder, invalid, hint
       id={id}
       inputMode="numeric"
       dir="ltr"
-      value={formatAmountInput(value)}
+      value={value}
       placeholder={placeholder}
       aria-invalid={invalid || undefined}
       onChange={(event) => onChange(event.target.value)}
+      onFocus={() => onChange(normalizeMoneyText(value))}
+      // Unusable text is left exactly as typed, so the operator can see and fix what they wrote
+      // rather than watching it silently vanish or become zero.
+      onBlur={() => {
+        const parsed = parseMoney(value)
+        if (parsed !== null) onChange(moneyInputText(parsed))
+      }}
     />
     {hint && <small className="muted">{hint}</small>}
+    {invalid && <small className="field-error" role="alert">مبلغ باید عددی صحیح به تومان باشد.</small>}
   </div>
 }
 

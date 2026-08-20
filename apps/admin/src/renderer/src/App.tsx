@@ -28,7 +28,10 @@ import {
   type OrderSummaryDto,
 } from '@kafgir/contracts'
 import { adminApi } from './api'
-import { formatMoney as money, formatNumber, persianDateWithLatinDigitsLocale } from './number-format'
+import {
+  formatMoney as money, formatNumber, isInvalidMoneyText, moneyInputText, parseMoney,
+  persianDateWithLatinDigitsLocale,
+} from './number-format'
 import { FinancePage, IngredientsPage, InventoryPage, PaymentsPage, PurchasesPage, RecipesPage, ShoppingPage, SuppliersPage, V15ReportsPage } from './V15Pages'
 import { DeliveryDaysPage, DeliverySlotsPage } from './DeliveryPages'
 import { CourierAccountingPage, CourierDaysPage, CouriersPage } from './CourierPages'
@@ -59,7 +62,7 @@ import {
 } from './admin-navigation'
 import { SidebarIcon } from './SidebarIcon'
 import {
-  AdminControls, DateField, Pager, RowNumberCell, RowNumberHead, defaultPageSize, rowOffsetOf,
+  AdminControls, AmountField, DateField, Pager, RowNumberCell, RowNumberHead, defaultPageSize, rowOffsetOf,
   useAsyncAction, usePagination, useServerPagedGrid,
 } from './admin-ui'
 import type { PagedResult } from '@kafgir/contracts'
@@ -100,8 +103,6 @@ const integerDigits = (value: string) => asciiDigits(value).replace(/\D/g, '')
 function ButtonLoading({ label }: { label: string }) {
   return <span className="button-loading" role="status" aria-live="polite"><span className="button-loading-mark" aria-hidden="true"><i /></span><span>{label}</span></span>
 }
-const parseMoneyInput = (value: string) => Number(asciiDigits(value).replace(/[,\s٬،]/g, '')) || 0
-const formatMoneyInput = (value: number) => value > 0 ? groupedNumber(value) : ''
 const persianOnes = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه']
 const persianTeens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده']
 const persianTens = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود']
@@ -1255,9 +1256,9 @@ function DailyMenuPage() {
   const [menu, setMenu] = useState<DailyMenuDto | null>(null)
   const [foods, setFoods] = useState<FoodDto[]>([])
   const [foodId, setFoodId] = useState('')
-  const [price, setPrice] = useState(0)
+  const [priceText, setPriceText] = useState('')
   const [discountEnabled, setDiscountEnabled] = useState(false)
-  const [discountPrice, setDiscountPrice] = useState(0)
+  const [discountPriceText, setDiscountPriceText] = useState('')
   const [capacity, setCapacity] = useState(1)
   const [editing, setEditing] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -1273,8 +1274,19 @@ function DailyMenuPage() {
   const pagedMenu = usePagination(menu?.items ?? [])
   const persianRice = menu?.persianRice ?? null
   const selectedFood = foods.find((food) => food.id === Number(foodId))
+  // Parsed once, here, and only numbers travel onward into validation and the request payload.
+  const price = parseMoney(priceText) ?? 0
+  const discountPrice = parseMoney(discountPriceText) ?? 0
   const saveItem = (event: FormEvent) => {
     event.preventDefault()
+    if (isInvalidMoneyText(priceText) || (discountEnabled && isInvalidMoneyText(discountPriceText))) {
+      setError('مبلغ واردشده معتبر نیست؛ عدد صحیح به تومان وارد کنید.')
+      return
+    }
+    if (price <= 0) {
+      setError('قیمت امروز را وارد کنید.')
+      return
+    }
     if (discountEnabled && (discountPrice <= 0 || discountPrice >= price)) {
       setError('قیمت تخفیف باید بیشتر از صفر و کمتر از قیمت اصلی باشد.')
       return
@@ -1285,7 +1297,7 @@ function DailyMenuPage() {
         const updated = editing
           ? await adminApi.updateMenuItem(editing, item)
           : await adminApi.addMenuItem(date, { foodId: Number(foodId), ...item })
-        setMenu(updated); setEditing(null); setFoodId(''); setPrice(0); setDiscountEnabled(false); setDiscountPrice(0); setCapacity(1); setError(null)
+        setMenu(updated); setEditing(null); setFoodId(''); setPriceText(''); setDiscountEnabled(false); setDiscountPriceText(''); setCapacity(1); setError(null)
       } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
     })
   }
@@ -1294,9 +1306,9 @@ function DailyMenuPage() {
     const hasDiscount = item.originalPrice != null
     setEditing(item.id)
     setFoodId(String(item.foodId))
-    setPrice(regularPrice)
+    setPriceText(moneyInputText(regularPrice))
     setDiscountEnabled(hasDiscount || startDiscount)
-    setDiscountPrice(hasDiscount ? item.price : Math.max(1, Math.round((regularPrice * 0.9) / 1_000) * 1_000))
+    setDiscountPriceText(moneyInputText(hasDiscount ? item.price : Math.max(1, Math.round((regularPrice * 0.9) / 1_000) * 1_000)))
     setCapacity(item.capacityPortions)
     setError(null)
   }
@@ -1327,12 +1339,18 @@ function DailyMenuPage() {
       <label>غذا<select value={foodId} disabled={editing !== null} onChange={(event) => setFoodId(event.target.value)} required>
         <option value="">انتخاب غذا</option>{foods.filter((food) => food.isActive).map((food) => <option value={food.id} key={food.id}>{food.name}{food.isPersianRice ? ' (ارتقای مخفی)' : ''}</option>)}</select>
         <small>{selectedFood?.isPersianRice ? 'قیمت این ردیف باید مابه‌التفاوت ارتقا به برنج ایرانی باشد، نه قیمت یک پرس کامل برنج.' : selectedFood?.allowsPersianRice ? 'مشتری می‌تواند به این غذا برنج ایرانی اضافه کند؛ «برنج ایرانی» را هم به منوی امروز اضافه کنید.' : ''}</small></label>
-      <label>قیمت امروز<input dir="ltr" inputMode="numeric" value={formatMoneyInput(price)} onChange={(event) => setPrice(parseMoneyInput(event.target.value))} /><small className="price-help">{numberToPersianWords(price)}</small></label>
+      <div className="menu-price-field">
+        <AmountField label="قیمت امروز (تومان)" value={priceText} onChange={setPriceText} placeholder="240,000" />
+        <small className="price-help">{numberToPersianWords(price)}</small>
+      </div>
       <label>ظرفیت پرس<input type="number" min="0" value={capacity} onChange={(event) => setCapacity(Number(event.target.value))} /><small /></label>
       <div className={`menu-discount-control ${discountEnabled ? 'active' : ''}`}>
         <label className="switch"><input type="checkbox" checked={discountEnabled} onChange={(event) => setDiscountEnabled(event.target.checked)} /> تخفیف فوری</label>
         {discountEnabled
-          ? <label>قیمت نهایی<input dir="ltr" inputMode="numeric" value={discountPrice ? formatMoneyInput(discountPrice) : ''} onChange={(event) => setDiscountPrice(parseMoneyInput(event.target.value))} /><small>{discountPercentage > 0 ? `${plainNumber(discountPercentage)}٪ تخفیف؛ ${money(price - discountPrice)} صرفه‌جویی` : 'قیمت نهایی باید کمتر از قیمت اصلی باشد'}</small></label>
+          ? <div className="menu-price-field">
+              <AmountField label="قیمت نهایی (تومان)" value={discountPriceText} onChange={setDiscountPriceText} />
+              <small>{discountPercentage > 0 ? `${plainNumber(discountPercentage)}٪ تخفیف؛ ${money(price - discountPrice)} صرفه‌جویی` : 'قیمت نهایی باید کمتر از قیمت اصلی باشد'}</small>
+            </div>
           : <small>با فعال‌سازی، قیمت تخفیف همان لحظه در وب نمایش داده می‌شود.</small>}
       </div>
       {selectedFood?.allowsPersianRice && !persianRice && <p className="menu-rice-warning">

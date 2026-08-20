@@ -15,7 +15,8 @@ import {
   formatNumber as count,
   formatPersianDate as persianDay,
   formatPersianDateTime as dateTime,
-  parseTomanAmount,
+  moneyInputText,
+  parseMoney,
 } from './number-format'
 
 /**
@@ -183,8 +184,8 @@ export function CourierDaysPage() {
       setForm(result.configuration
         ? {
           courierId: String(result.configuration.courierId),
-          customerDeliveryFee: String(result.configuration.customerDeliveryFee),
-          courierPayablePerOrder: String(result.configuration.courierPayablePerOrder),
+          customerDeliveryFee: moneyInputText(result.configuration.customerDeliveryFee),
+          courierPayablePerOrder: moneyInputText(result.configuration.courierPayablePerOrder),
         }
         : emptyDayForm)
     } catch (reason) { setError(errorText(reason)) }
@@ -203,8 +204,8 @@ export function CourierDaysPage() {
   useEffect(() => { void loadDay(date) }, [date, loadDay])
 
   const activeCouriers = couriers.filter((courier) => courier.isActive)
-  const customerFee = parseTomanAmount(form.customerDeliveryFee)
-  const courierPayable = parseTomanAmount(form.courierPayablePerOrder)
+  const customerFee = parseMoney(form.customerDeliveryFee)
+  const courierPayable = parseMoney(form.courierPayablePerOrder)
   const amountsValid = customerFee !== null && courierPayable !== null
   const courierId = Number(form.courierId) || 0
 
@@ -262,10 +263,10 @@ export function CourierDaysPage() {
         </select>
       </label>
       <AmountField label="هزینه ارسال برای مشتری (تومان)" placeholder="70,000"
-        value={form.customerDeliveryFee} invalid={form.customerDeliveryFee !== '' && customerFee === null}
+        value={form.customerDeliveryFee}
         onChange={(value) => setForm({ ...form, customerDeliveryFee: value })} />
       <AmountField label="مبلغ هر تحویل برای پیک (تومان)" placeholder="70,000"
-        value={form.courierPayablePerOrder} invalid={form.courierPayablePerOrder !== '' && courierPayable === null}
+        value={form.courierPayablePerOrder}
         onChange={(value) => setForm({ ...form, courierPayablePerOrder: value })} />
       <div className="form-actions">
         <button type="button" className="primary-button" disabled={busy} onClick={() => void save(true)}>
@@ -348,7 +349,7 @@ export function CourierAccountingPage() {
     catch (reason) { setError(errorText(reason)) }
   }
 
-  const parsedAmount = parseTomanAmount(amount)
+  const parsedAmount = parseMoney(amount)
 
   const settle = async () => {
     if (!selected) return
@@ -434,7 +435,6 @@ export function CourierAccountingPage() {
 
       <div className="form-grid two-columns">
         <AmountField label="مبلغ تسویه (تومان)" placeholder="500,000" value={amount}
-          invalid={amount !== '' && (parsedAmount === null || parsedAmount <= 0)}
           hint={`حداکثر تا مانده فعلی: ${money(selected.outstandingAmount)}`}
           onChange={setAmount} />
         <label className="field">توضیح

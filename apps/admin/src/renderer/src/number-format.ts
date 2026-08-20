@@ -1,7 +1,22 @@
+/**
+ * Non-money figures: counts, quantities, priorities, row numbers. `maximumFractionDigits` exists for
+ * inventory quantities, which are genuinely fractional — money never is.
+ */
 export const formatNumber = (value: string | number, maximumFractionDigits = 0): string =>
   new Intl.NumberFormat('en-US', { maximumFractionDigits }).format(Number(value))
 
-export const formatMoney = (value: number): string => `${formatNumber(value)} تومان`
+/**
+ * Money display and entry, re-exported from `@kafgir/contracts` so Admin, the customer app and
+ * server-generated text cannot drift apart. See that module for the reasoning.
+ */
+export {
+  formatAmount,
+  formatMoney,
+  isInvalidMoneyText,
+  moneyInputText,
+  normalizeMoneyText,
+  parseMoney,
+} from '@kafgir/contracts'
 
 export const persianDateWithLatinDigitsLocale = 'fa-IR-u-nu-latn'
 
@@ -36,53 +51,4 @@ export const formatPersianDateTime = (value: string | Date | null | undefined): 
   return Number.isNaN(date.getTime())
     ? '—'
     : persianDate({ dateStyle: 'short', timeStyle: 'short' }).format(date)
-}
-
-/**
- * Money entry.
- *
- * Amounts are typed, not just displayed, so the same three rules live here once rather than being
- * re-invented per screen: an operator's keyboard may produce Persian or Arabic-Indic digits, a
- * grouped value pasted back in («70,000») must still read as a number, and arithmetic is always done
- * on the parsed number — never on the formatted string.
- */
-
-const latinDigits = (value: string) => value
-  .replace(/[۰-۹]/gu, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
-  .replace(/[٠-٩]/gu, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
-
-/** Latin, Persian and Arabic-Indic digits all normalise to Latin; separators and spaces drop out. */
-export const normalizeAmountText = (value: string): string =>
-  latinDigits(value).replace(/[,،٬⁦-⁩\s]/gu, '').trim()
-
-/**
- * Reads a money box. Returns null for anything that is not a non-negative number, including an empty
- * box — clearing a field must not silently mean zero.
- */
-export const parseAmount = (value: string): number | null => {
-  const normalized = normalizeAmountText(value)
-  if (normalized === '') return null
-  const parsed = Number(normalized)
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null
-}
-
-/** The same, for the whole-Toman amounts the courier screens hold. Fractions are rejected. */
-export const parseTomanAmount = (value: string): number | null => {
-  const parsed = parseAmount(value)
-  return parsed !== null && Number.isInteger(parsed) ? parsed : null
-}
-
-/**
- * What a money box shows while it is being edited: grouped digits, no unit. Trailing input the
- * operator is still typing (a lone «.», a partial decimal) is preserved rather than reformatted out
- * from under the caret.
- */
-export const formatAmountInput = (value: string | number): string => {
-  if (typeof value === 'number') return Number.isFinite(value) ? formatNumber(value) : ''
-  const normalized = normalizeAmountText(value)
-  if (normalized === '') return ''
-  const [whole = '', fraction] = normalized.split('.')
-  if (!/^\d*$/u.test(whole) || (fraction !== undefined && !/^\d*$/u.test(fraction))) return value
-  const grouped = whole === '' ? '' : formatNumber(whole)
-  return fraction === undefined ? grouped : `${grouped}.${fraction}`
 }

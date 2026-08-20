@@ -5,7 +5,7 @@ import type {
 } from '@kafgir/contracts'
 import { adminApi } from './api'
 import { AmountField, ListState, Message, PageFrame } from './admin-ui'
-import { formatAmountInput, parseAmount } from './number-format'
+import { moneyInputText, parseMoney } from './number-format'
 
 /**
  * Checkout configuration.
@@ -24,7 +24,7 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : S
  * The parsing and grouping rules live in `number-format` so this screen and the courier screens
  * cannot drift into two different ideas of what «۷۰٬۰۰۰» or «70,000» means.
  */
-const amountText = (value: number) => formatAmountInput(value)
+const amountText = (value: number) => moneyInputText(value)
 
 type ChannelFieldsProps = {
   isCustomerEnabled: boolean
@@ -147,15 +147,15 @@ export function DeliveryMethodsPage() {
 
   const invalidAmount = (method: number) => {
     const entry = amounts[method]
-    return !entry || parseAmount(entry.fee) === null || parseAmount(entry.minimum) === null
+    return !entry || parseMoney(entry.fee) === null || parseMoney(entry.minimum) === null
   }
 
   const save = async (method: number) => {
     const draft = drafts[method]
     const entry = amounts[method]
     if (!draft || !entry) return
-    const deliveryFee = parseAmount(entry.fee)
-    const minimumOrderAmount = parseAmount(entry.minimum)
+    const deliveryFee = parseMoney(entry.fee)
+    const minimumOrderAmount = parseMoney(entry.minimum)
     if (deliveryFee === null || minimumOrderAmount === null) {
       setError('هزینه ارسال و حداقل سفارش باید عددی نامنفی باشند.')
       return
@@ -187,7 +187,7 @@ export function DeliveryMethodsPage() {
       const entry = amounts[row.method] ?? { fee: '0', minimum: '0' }
       const amountsValid = !invalidAmount(row.method)
       const dirty = isDirty(row.method) ||
-        parseAmount(entry.fee) !== row.deliveryFee || parseAmount(entry.minimum) !== row.minimumOrderAmount
+        parseMoney(entry.fee) !== row.deliveryFee || parseMoney(entry.minimum) !== row.minimumOrderAmount
       return <article className="panel settings-method-card" key={row.method}>
         <label>عنوان<input value={draft.title}
           onChange={(event) => patch(row.method, { title: event.target.value })} /></label>
@@ -201,12 +201,10 @@ export function DeliveryMethodsPage() {
               هزینه ارسال این روش برای هر روز جداگانه در صفحه «پیک و هزینه ارسال روزانه» تعیین می‌شود.
             </p>
           : <AmountField label="هزینه ارسال (تومان)" value={entry.fee}
-              invalid={parseAmount(entry.fee) === null}
               onChange={(value) => setAmounts((current) => ({
                 ...current, [row.method]: { ...entry, fee: value },
               }))} />}
         <AmountField label="حداقل مبلغ سفارش (تومان)" value={entry.minimum}
-          invalid={parseAmount(entry.minimum) === null}
           onChange={(value) => setAmounts((current) => ({
             ...current, [row.method]: { ...entry, minimum: value },
           }))} />
