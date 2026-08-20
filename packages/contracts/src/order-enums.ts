@@ -34,3 +34,17 @@ export enum NotificationStatus {
   Sent = 2,
   Failed = 3,
 }
+
+/**
+ * The life of a payment attached to an order. Customer-facing: the order detail shows this back to
+ * the person who paid, so it is part of the ordering vocabulary rather than of any accounting system.
+ */
+export enum PaymentStatus {
+  Pending = 1,
+  AwaitingVerification = 2,
+  Paid = 3,
+  Failed = 4,
+  Rejected = 5,
+  Cancelled = 6,
+  Refunded = 7,
+}

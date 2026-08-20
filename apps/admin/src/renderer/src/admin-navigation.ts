@@ -2,20 +2,20 @@ import type { AdminOperation } from '../../shared/admin-operations'
 import { isAdminOperationAllowed } from '../../shared/admin-permissions'
 
 export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' | 'food-photos' | 'food-tags'
-  | 'categories' | 'tags' | 'menu' | 'report' | 'ingredients' | 'inventory' | 'purchases'
-  | 'suppliers' | 'recipes' | 'finance' | 'shopping' | 'payments' | 'v15-reports' | 'delivery-slots' | 'delivery-days' | 'logs'
+  | 'categories' | 'tags' | 'menu' | 'report' | 'purchases' | 'months' | 'payments'
+  | 'delivery-slots' | 'delivery-days' | 'logs'
   | 'social-dashboard' | 'social-channels' | 'social-publish' | 'social-templates'
   | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
-  | 'food-tag-groups' | 'support-subjects' | 'units'
-  | 'payment-methods' | 'delivery-methods' | 'customer-report' | 'customers'
+  | 'food-tag-groups' | 'support-subjects'
+  | 'payment-methods' | 'delivery-methods' | 'customer-report' | 'customers' | 'site-analytics'
   | 'couriers' | 'courier-days' | 'courier-accounting'
 
 export type NavigationGroupId =
-  'sales' | 'catalog' | 'supply' | 'finance' | 'social' | 'reference' | 'settings'
+  'sales' | 'catalog' | 'finance' | 'social' | 'reference' | 'settings'
 
 /** Keys into the sidebar icon set. One per group, so the collapsed rail stays navigable. */
 export type NavigationIcon =
-  'sales' | 'catalog' | 'supply' | 'finance' | 'social' | 'reference' | 'settings'
+  'sales' | 'catalog' | 'finance' | 'social' | 'reference' | 'settings'
 
 export interface NavigationItem {
   page: Page
@@ -44,10 +44,13 @@ export interface NavigationGroup {
  * day and lists that are configured once and then referenced:
  *
  * - `sales` is the working day: today's menu, the capacity behind it, the orders it produces, and the
- *   customer conversations attached to those orders.
+ *   customer conversations attached to those orders. Website-visitor statistics live at the end of
+ *   this group rather than on the dashboard: they describe the same audience, but nothing about them
+ *   needs acting on before lunch.
  * - `catalog` is what the kitchen can sell, independent of any one day.
- * - `supply` is what the kitchen consumes and how it is replenished.
- * - `finance` is money that actually moved.
+ * - `finance` is money: what was bought, how each month compares, what customers paid, and what the
+ *   couriers are owed. Four destinations, not a subsystem — Kafgir does not run an accounting
+ *   system, and the screens that implied it did are gone.
  * - `social` is outbound publishing.
  * - `reference` is master data: lookup lists other records point at. Every entry here is a title,
  *   an order and an active flag, edited rarely, and referenced by a foreign key somewhere.
@@ -74,40 +77,27 @@ export const navigationGroups: NavigationGroup[] = [
       { page: 'customer-communication', label: 'پشتیبانی و نظرها', operation: 'support.conversations.list' },
       { page: 'report', label: 'گزارش سفارش‌ها', operation: 'orders.search' },
       { page: 'customer-report', label: 'گزارش مشتریان', operation: 'reports.customers' },
+      { page: 'site-analytics', label: 'آمار کاربران سایت', operation: 'dashboard.analytics' },
     ],
   },
   {
     id: 'catalog',
     label: 'کاتالوگ غذا',
     icon: 'catalog',
-    hint: 'غذاهایی که می‌توان فروخت و دستور پخت آن‌ها',
+    hint: 'غذاهایی که می‌توان فروخت',
     items: [
       { page: 'foods', label: 'غذاها', operation: 'foods.list' },
-      { page: 'recipes', label: 'دستور پخت', operation: 'recipes.get' },
-    ],
-  },
-  {
-    id: 'supply',
-    label: 'انبار و تدارکات',
-    icon: 'supply',
-    hint: 'مواد اولیه، موجودی، خرید و تأمین‌کنندگان',
-    items: [
-      { page: 'ingredients', label: 'مواد اولیه', operation: 'ingredients.list' },
-      { page: 'inventory', label: 'انبار', operation: 'inventory.movements' },
-      { page: 'shopping', label: 'لیست خرید', operation: 'shopping.list' },
-      { page: 'purchases', label: 'خریدها', operation: 'purchases.list' },
-      { page: 'suppliers', label: 'تأمین‌کنندگان', operation: 'suppliers.list' },
     ],
   },
   {
     id: 'finance',
     label: 'مالی',
     icon: 'finance',
-    hint: 'پرداخت‌ها، حساب‌ها و گزارش‌های مالی',
+    hint: 'خریدها، وضعیت هر ماه، پرداخت مشتری و حساب پیک‌ها',
     items: [
+      { page: 'purchases', label: 'خریدها', operation: 'purchases.month' },
+      { page: 'months', label: 'ماه‌ها', operation: 'months.list' },
       { page: 'payments', label: 'پرداخت‌های سفارش', operation: 'payments.list' },
-      { page: 'finance', label: 'حساب‌ها و تراکنش‌ها', operation: 'finance.accounts' },
-      { page: 'v15-reports', label: 'گزارش‌های مالی', operation: 'reports.v15' },
       { page: 'courier-accounting', label: 'کارکرد و تسویه پیک‌ها', operation: 'courierAccounting.summary' },
     ],
   },
@@ -135,7 +125,6 @@ export const navigationGroups: NavigationGroup[] = [
       { page: 'categories', label: 'دسته‌بندی غذا', operation: 'foodCategories.list' },
       { page: 'tags', label: 'برچسب‌های غذا', operation: 'foodTags.list' },
       { page: 'food-tag-groups', label: 'گروه‌های برچسب', operation: 'foodTagGroups.list' },
-      { page: 'units', label: 'واحدهای اندازه‌گیری', operation: 'units.list' },
       { page: 'delivery-slots', label: 'بازه‌های ارسال', operation: 'deliverySlots.list' },
       { page: 'couriers', label: 'پیک‌ها', operation: 'couriers.list' },
       { page: 'support-subjects', label: 'موضوعات پشتیبانی', operation: 'supportSubjects.list' },

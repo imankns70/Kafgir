@@ -11,6 +11,15 @@ Kafgir uses PostgreSQL with Drizzle ORM.
 
 ## Model
 
+Kafgir dropped its inventory, procurement and accounting subsystem in migration
+`0024_simple_monthly_business.sql`. Units, ingredient categories, ingredients, suppliers, purchase
+items, inventory transactions, recipes and recipe items, order inventory consumptions, shopping
+lists and their items, financial accounts, expense categories, financial transactions, purchase
+payments and POS terminals are gone. `purchases` was transformed in place into one simple record —
+date, amount, title, optional seller/receipt/note — and `payments` lost its financial-account and
+POS-terminal columns. Monthly reporting derives from purchase dates and order snapshots, with no
+period table. See `.ai/docs/business-reporting.md`.
+
 The schema includes users, roles and Identity compatibility tables, Telegram accounts, customer profiles and addresses, foods, daily menus and menu items, delivery time slots and their per-date availability overrides, orders and immutable order lines, status history, notification outbox messages, application settings, and social-publishing channels/templates/posts/targets/attempts/rules/suggestions/settings.
 
 `order_reviews` (migration `0018_warm_order_reviews.sql`) stores the customer's single review for an

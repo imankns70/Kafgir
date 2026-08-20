@@ -21,13 +21,13 @@ describe('admin navigation structure', () => {
 
   it('reaches every admin screen the app can render', () => {
     expect(allPages).toEqual(expect.arrayContaining([
-      'menu', 'delivery-days', 'orders', 'manual', 'customer-communication', 'report', 'customer-report', 'customers',
-      'foods', 'recipes',
-      'ingredients', 'inventory', 'shopping', 'purchases', 'suppliers',
-      'payments', 'finance', 'v15-reports',
+      'menu', 'delivery-days', 'courier-days', 'orders', 'manual', 'customer-communication',
+      'report', 'customer-report', 'customers', 'site-analytics',
+      'foods',
+      'purchases', 'months', 'payments', 'courier-accounting',
       'social-dashboard', 'social-channels', 'social-publish', 'social-templates',
       'social-rules', 'social-suggestions', 'social-history',
-      'categories', 'tags', 'food-tag-groups', 'units', 'delivery-slots', 'support-subjects',
+      'categories', 'tags', 'food-tag-groups', 'delivery-slots', 'couriers', 'support-subjects',
       'payment-methods', 'delivery-methods', 'logs',
     ]))
   })
@@ -44,8 +44,7 @@ describe('admin navigation structure', () => {
 describe('reference data versus configuration', () => {
   it('groups the lookup lists other records point at under اطلاعات پایه', () => {
     expect(groupItems('reference')).toEqual([
-      'categories', 'tags', 'food-tag-groups', 'units', 'delivery-slots', 'couriers',
-      'support-subjects',
+      'categories', 'tags', 'food-tag-groups', 'delivery-slots', 'couriers', 'support-subjects',
     ])
   })
 
@@ -75,6 +74,40 @@ describe('reference data versus configuration', () => {
 
   it('keeps order-scoped support with the sales flow rather than in reference data', () => {
     expect(navigationGroupForPage('customer-communication')).toBe('sales')
+  })
+})
+
+describe('the simplified information architecture', () => {
+  /**
+   * The inventory, procurement and accounting screens are gone, not hidden. A destination left
+   * behind — even an unreachable one — is how a "removed" subsystem quietly comes back.
+   */
+  it('has no destination left from the removed subsystems', () => {
+    for (const page of [
+      'ingredients', 'inventory', 'shopping', 'suppliers', 'recipes', 'finance', 'v15-reports', 'units',
+    ]) {
+      expect(allPages).not.toContain(page)
+    }
+  })
+
+  it('has no supply group at all', () => {
+    expect(navigationGroups.map((group) => group.id)).not.toContain('supply')
+  })
+
+  /** Money is now four destinations rather than a subsystem. */
+  it('keeps the finance group small and about money that moved', () => {
+    expect(groupItems('finance')).toEqual([
+      'purchases', 'months', 'payments', 'courier-accounting',
+    ])
+  })
+
+  /**
+   * Website statistics used to be the largest block on the dashboard. They kept their data and their
+   * service; only their location changed, to somewhere an operator goes deliberately.
+   */
+  it('gives website-user analytics a destination of its own, in the sales group', () => {
+    expect(allPages).toContain('site-analytics')
+    expect(navigationGroupForPage('site-analytics')).toBe('sales')
   })
 })
 
@@ -111,7 +144,6 @@ describe('permission-aware navigation', () => {
     const kitchen = visibleNavigationGroups(['KitchenAdmin'])
     const pages = kitchen.flatMap((group) => group.items.map((item) => item.page))
     expect(pages).toContain('food-tag-groups')
-    expect(pages).toContain('units')
     expect(pages).not.toContain('payment-methods')
     expect(pages).not.toContain('delivery-methods')
   })
@@ -136,7 +168,6 @@ describe('permission-aware navigation', () => {
     expect(pages).toContain('orders')
     expect(pages).toContain('payments')
     expect(pages).not.toContain('food-tag-groups')
-    expect(pages).not.toContain('units')
   })
 
   it('drops a group entirely when no item in it is permitted', () => {

@@ -14,7 +14,6 @@ const paths: Record<NavigationIcon | 'dashboard', string> = {
   // Bowl with steam: the food catalog.
   catalog: 'M3 12h18a9 9 0 0 1-18 0Zm6-4c0-1 1-1.5 1-2.5S9 4 9 4m6 4c0-1 1-1.5 1-2.5S15 4 15 4',
   // Crate: stock and procurement.
-  supply: 'M3 8h18v12H3V8Zm0 0 2-4h14l2 4M9 12h6',
   // Banknote: money that moved.
   finance: 'M2 6h20v12H2V6Zm10 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6ZM5 9h.01M19 15h.01',
   // Share nodes: outbound publishing.

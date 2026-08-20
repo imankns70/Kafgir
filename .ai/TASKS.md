@@ -1,5 +1,23 @@
 # Tasks
 
+## 2026-08-20 simplified purchasing, monthly reporting, and dashboard
+
+- [x] Remove the inventory, procurement and accounting architecture end to end: schema, services,
+  contracts, routes, IPC operations, permissions, navigation, pages, styles, seeds and tests.
+- [x] Replace the purchase workflow with a single editable purchase line.
+- [x] Derive Jalali monthly reporting from purchase dates and order snapshots, with no period table.
+- [x] Compare food sales against purchases without including the customer delivery charge, and keep
+  courier pay beside the comparison.
+- [x] Rebuild the Admin dashboard around today plus the current month, served by one aggregated call.
+- [x] Move website-user analytics to a dedicated page, reusing the existing service.
+- [x] Break the order-confirmation dependency on recipes, ingredients and stock.
+- [x] Keep order payments working with their accounting attachments removed.
+- [x] Add migration `0024_simple_monthly_business.sql`, converting old confirmed purchases.
+- [x] Add Jalali boundary, monthly summary, purchase and dashboard tests.
+- [x] Apply the migration to the working database and verify the conversion and survivors.
+- [ ] Apply `0024_simple_monthly_business.sql` to any other deployed database before releasing.
+- [ ] Watch the first real month of purchase entry and confirm the form is fast enough in practice.
+
 ## 2026-08-20 delivery-fee visibility and courier accounting
 
 - [x] Show food subtotal, delivery fee and final total as separate lines in checkout and in the

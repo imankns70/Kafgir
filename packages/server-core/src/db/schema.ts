@@ -685,249 +685,41 @@ export const deliveryMethodSettings = pgTable('delivery_method_settings', {
   index('delivery_method_settings_order_idx').on(table.displayOrder),
 ])
 
-export const units = pgTable('units', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 80 }).notNull(),
-  symbol: varchar('symbol', { length: 20 }).notNull(),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: utcTimestamp('created_at').notNull(),
-  updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [uniqueIndex('units_name_uidx').on(table.name)])
-
-export const ingredientCategories = pgTable('ingredient_categories', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 100 }).notNull(),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: utcTimestamp('created_at').notNull(),
-  updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [uniqueIndex('ingredient_categories_name_uidx').on(table.name)])
-
-export const ingredients = pgTable('ingredients', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 150 }).notNull(),
-  code: varchar('code', { length: 50 }),
-  categoryId: integer('category_id').references(() => ingredientCategories.id, { onDelete: 'set null' }),
-  baseUnitId: integer('base_unit_id').notNull().references(() => units.id, { onDelete: 'restrict' }),
-  minimumStockLevel: quantity('minimum_stock_level').notNull().default('0'),
-  preferredStockLevel: quantity('preferred_stock_level'),
-  isInventoryTracked: boolean('is_inventory_tracked').notNull().default(true),
-  isActive: boolean('is_active').notNull().default(true),
-  notes: text('notes'),
-  createdAt: utcTimestamp('created_at').notNull(),
-  updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [
-  uniqueIndex('ingredients_name_uidx').on(sql`lower(trim(${table.name}))`),
-  uniqueIndex('ingredients_code_uidx').on(table.code).where(sql`${table.code} IS NOT NULL`),
-  index('ingredients_category_idx').on(table.categoryId),
-  check('ingredients_stock_levels_check', sql`${table.minimumStockLevel} >= 0 AND (${table.preferredStockLevel} IS NULL OR ${table.preferredStockLevel} >= 0)`),
-])
-
-export const suppliers = pgTable('suppliers', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 150 }).notNull(),
-  contactName: varchar('contact_name', { length: 150 }),
-  mobile: varchar('mobile', { length: 30 }),
-  phone: varchar('phone', { length: 30 }),
-  address: varchar('address', { length: 1000 }),
-  notes: text('notes'),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: utcTimestamp('created_at').notNull(),
-  updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [uniqueIndex('suppliers_name_uidx').on(sql`lower(trim(${table.name}))`)])
-
+/**
+ * A purchase is one line the kitchen writes down: a date, an amount and a few words about it.
+ *
+ * It replaces an itemised procurement model — supplier records, purchase lines, units and conversion
+ * factors, a draft/confirm workflow, a payment ledger and inventory posting — that nobody had time
+ * to operate. Nothing is derived from a purchase except its month, and the month comes from the
+ * date, which is why there is no period table.
+ */
 export const purchases = pgTable('purchases', {
   id: serial('id').primaryKey(),
-  purchaseNumber: varchar('purchase_number', { length: 50 }).notNull(),
-  supplierId: integer('supplier_id').references(() => suppliers.id, { onDelete: 'restrict' }),
-  invoiceNumber: varchar('invoice_number', { length: 100 }),
   purchaseDate: date('purchase_date', { mode: 'string' }).notNull(),
-  status: integer('status').notNull().default(1),
-  subtotalAmount: money('subtotal_amount').notNull(),
-  discountAmount: money('discount_amount').notNull().default(0),
-  additionalCostAmount: money('additional_cost_amount').notNull().default(0),
-  totalAmount: money('total_amount').notNull(),
-  paidAmount: money('paid_amount').notNull().default(0),
-  paymentStatus: integer('payment_status').notNull().default(1),
-  notes: text('notes'),
-  attachmentUrl: varchar('attachment_url', { length: 2000 }),
-  createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
-  confirmedByUserId: integer('confirmed_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
-  confirmedAt: utcTimestamp('confirmed_at'),
-  createdAt: utcTimestamp('created_at').notNull(),
-  updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [
-  uniqueIndex('purchases_number_uidx').on(table.purchaseNumber),
-  index('purchases_date_status_idx').on(table.purchaseDate, table.status),
-  index('purchases_supplier_idx').on(table.supplierId),
-  check('purchases_status_check', sql`${table.status} BETWEEN 1 AND 3`),
-  check('purchases_payment_status_check', sql`${table.paymentStatus} BETWEEN 1 AND 3`),
-  check('purchases_amounts_check', sql`${table.subtotalAmount} >= 0 AND ${table.discountAmount} >= 0 AND ${table.additionalCostAmount} >= 0 AND ${table.totalAmount} = ${table.subtotalAmount} - ${table.discountAmount} + ${table.additionalCostAmount} AND ${table.paidAmount} >= 0 AND ${table.paidAmount} <= ${table.totalAmount}`),
-])
-
-export const purchaseItems = pgTable('purchase_items', {
-  id: serial('id').primaryKey(),
-  purchaseId: integer('purchase_id').notNull().references(() => purchases.id, { onDelete: 'cascade' }),
-  ingredientId: integer('ingredient_id').notNull().references(() => ingredients.id, { onDelete: 'restrict' }),
-  purchaseUnitId: integer('purchase_unit_id').notNull().references(() => units.id, { onDelete: 'restrict' }),
-  quantity: quantity('quantity').notNull(),
-  conversionFactorToBaseUnit: quantity('conversion_factor_to_base_unit').notNull(),
-  baseUnitQuantity: quantity('base_unit_quantity').notNull(),
-  unitPrice: money('unit_price').notNull(),
-  lineDiscountAmount: money('line_discount_amount').notNull().default(0),
-  lineTotalAmount: money('line_total_amount').notNull(),
-  expirationDate: date('expiration_date', { mode: 'string' }),
-  batchNumber: varchar('batch_number', { length: 100 }),
-  notes: text('notes'),
-}, (table) => [
-  index('purchase_items_purchase_idx').on(table.purchaseId),
-  index('purchase_items_ingredient_idx').on(table.ingredientId),
-  check('purchase_items_quantity_check', sql`${table.quantity} > 0 AND ${table.conversionFactorToBaseUnit} > 0 AND ${table.baseUnitQuantity} > 0`),
-  check('purchase_items_amount_check', sql`${table.unitPrice} >= 0 AND ${table.lineDiscountAmount} >= 0 AND ${table.lineTotalAmount} = ROUND(${table.quantity} * ${table.unitPrice} - ${table.lineDiscountAmount}, 2) AND ${table.lineTotalAmount} >= 0`),
-])
-
-export const inventoryTransactions = pgTable('inventory_transactions', {
-  id: serial('id').primaryKey(),
-  ingredientId: integer('ingredient_id').notNull().references(() => ingredients.id, { onDelete: 'restrict' }),
-  transactionType: integer('transaction_type').notNull(),
-  quantityInBaseUnit: quantity('quantity_in_base_unit').notNull(),
-  unitCost: money('unit_cost').notNull().default(0),
-  totalCost: money('total_cost').notNull().default(0),
-  referenceType: varchar('reference_type', { length: 50 }).notNull(),
-  referenceId: integer('reference_id'),
-  transactionGroup: varchar('transaction_group', { length: 80 }),
-  transactionDate: utcTimestamp('transaction_date').notNull(),
-  notes: text('notes'),
-  createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
-  reversedTransactionId: integer('reversed_transaction_id'),
-  createdAt: utcTimestamp('created_at').notNull(),
-}, (table) => [
-  index('inventory_transactions_ingredient_date_idx').on(table.ingredientId, table.transactionDate),
-  uniqueIndex('inventory_transactions_reversal_uidx').on(table.reversedTransactionId).where(sql`${table.reversedTransactionId} IS NOT NULL`),
-  index('inventory_transactions_reference_idx').on(table.referenceType, table.referenceId),
-  check('inventory_transactions_quantity_check', sql`${table.quantityInBaseUnit} <> 0`),
-  check('inventory_transactions_type_check', sql`${table.transactionType} BETWEEN 1 AND 8`),
-  check('inventory_transactions_sign_check', sql`(
-    (${table.transactionType} IN (1, 4, 8) AND ${table.quantityInBaseUnit} > 0) OR
-    (${table.transactionType} IN (2, 3, 5, 7) AND ${table.quantityInBaseUnit} < 0) OR
-    (${table.transactionType} = 6 AND ${table.quantityInBaseUnit} <> 0)
-  ) AND ${table.unitCost} >= 0 AND ${table.quantityInBaseUnit} * ${table.totalCost} >= 0`),
-])
-
-export const recipes = pgTable('recipes', {
-  id: serial('id').primaryKey(),
-  foodId: integer('food_id').notNull().references(() => foods.id, { onDelete: 'restrict' }),
-  yieldQuantity: integer('yield_quantity').notNull(),
-  preparationLossPercent: numeric('preparation_loss_percent', { precision: 5, scale: 2, mode: 'number' }),
-  overheadPerPortion: money('overhead_per_portion').notNull().default(0),
-  notes: text('notes'),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: utcTimestamp('created_at').notNull(),
-  updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [
-  uniqueIndex('recipes_active_food_uidx').on(table.foodId).where(sql`${table.isActive} = true`),
-  check('recipes_yield_check', sql`${table.yieldQuantity} > 0`),
-  check('recipes_values_check', sql`${table.overheadPerPortion} >= 0 AND (${table.preparationLossPercent} IS NULL OR (${table.preparationLossPercent} >= 0 AND ${table.preparationLossPercent} < 100))`),
-])
-
-export const recipeItems = pgTable('recipe_items', {
-  id: serial('id').primaryKey(),
-  recipeId: integer('recipe_id').notNull().references(() => recipes.id, { onDelete: 'cascade' }),
-  ingredientId: integer('ingredient_id').notNull().references(() => ingredients.id, { onDelete: 'restrict' }),
-  quantityInBaseUnit: quantity('quantity_in_base_unit').notNull(),
-  wastePercent: numeric('waste_percent', { precision: 5, scale: 2, mode: 'number' }),
-  notes: text('notes'),
-}, (table) => [
-  uniqueIndex('recipe_items_recipe_ingredient_uidx').on(table.recipeId, table.ingredientId),
-  check('recipe_items_quantity_check', sql`${table.quantityInBaseUnit} > 0`),
-  check('recipe_items_waste_check', sql`${table.wastePercent} IS NULL OR (${table.wastePercent} >= 0 AND ${table.wastePercent} < 100)`),
-])
-
-export const orderInventoryConsumptions = pgTable('order_inventory_consumptions', {
-  id: serial('id').primaryKey(),
-  orderId: integer('order_id').notNull().references(() => orders.id, { onDelete: 'restrict' }),
-  orderItemId: integer('order_item_id').notNull().references(() => orderItems.id, { onDelete: 'restrict' }),
-  foodId: integer('food_id').notNull().references(() => foods.id, { onDelete: 'restrict' }),
-  recipeId: integer('recipe_id').references(() => recipes.id, { onDelete: 'restrict' }),
-  quantityProduced: integer('quantity_produced').notNull(),
-  transactionGroup: varchar('transaction_group', { length: 80 }),
-  recipeMissing: boolean('recipe_missing').notNull().default(false),
-  consumedAt: utcTimestamp('consumed_at').notNull(),
-  reversedAt: utcTimestamp('reversed_at'),
-}, (table) => [
-  uniqueIndex('order_inventory_consumptions_item_uidx').on(table.orderItemId),
-  index('order_inventory_consumptions_order_idx').on(table.orderId),
-])
-
-export const shoppingLists = pgTable('shopping_lists', {
-  id: serial('id').primaryKey(),
+  amount: money('amount').notNull(),
   title: varchar('title', { length: 200 }).notNull(),
-  targetDate: date('target_date', { mode: 'string' }).notNull(),
-  status: integer('status').notNull().default(1),
-  notes: text('notes'),
-  createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
+  sellerName: varchar('seller_name', { length: 150 }),
+  receiptImageUrl: varchar('receipt_image_url', { length: 2000 }),
+  notes: varchar('notes', { length: 1000 }),
   createdAt: utcTimestamp('created_at').notNull(),
-  updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [check('shopping_lists_status_check', sql`${table.status} BETWEEN 1 AND 4`)])
-
-export const shoppingListItems = pgTable('shopping_list_items', {
-  id: serial('id').primaryKey(),
-  shoppingListId: integer('shopping_list_id').notNull().references(() => shoppingLists.id, { onDelete: 'cascade' }),
-  ingredientId: integer('ingredient_id').notNull().references(() => ingredients.id, { onDelete: 'restrict' }),
-  requiredQuantity: quantity('required_quantity').notNull(),
-  currentStockSnapshot: quantity('current_stock_snapshot').notNull(),
-  suggestedPurchaseQuantity: quantity('suggested_purchase_quantity').notNull(),
-  estimatedUnitCost: money('estimated_unit_cost').notNull().default(0),
-  notes: text('notes'),
-  isPurchased: boolean('is_purchased').notNull().default(false),
+  updatedAt: utcTimestamp('updated_at'),
 }, (table) => [
-  uniqueIndex('shopping_list_items_list_ingredient_uidx').on(table.shoppingListId, table.ingredientId),
-  check('shopping_list_items_quantities_check', sql`${table.requiredQuantity} > 0 AND ${table.currentStockSnapshot} >= 0 AND ${table.suggestedPurchaseQuantity} >= 0 AND ${table.estimatedUnitCost} >= 0`),
+  // Every read is "the purchases of one month", which is a range scan on this column.
+  index('purchases_date_idx').on(table.purchaseDate),
+  check('purchases_amount_check', sql`${table.amount} > 0`),
 ])
 
-export const financialAccounts = pgTable('financial_accounts', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 150 }).notNull(),
-  type: integer('type').notNull(),
-  bankName: varchar('bank_name', { length: 100 }),
-  cardNumberMasked: varchar('card_number_masked', { length: 30 }),
-  accountNumberMasked: varchar('account_number_masked', { length: 40 }),
-  ibanMasked: varchar('iban_masked', { length: 40 }),
-  openingBalance: money('opening_balance').notNull().default(0),
-  isActive: boolean('is_active').notNull().default(true),
-  notes: text('notes'),
-  createdAt: utcTimestamp('created_at').notNull(),
-  updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [
-  uniqueIndex('financial_accounts_name_uidx').on(table.name),
-  check('financial_accounts_type_check', sql`${table.type} BETWEEN 1 AND 5`),
-  check('financial_accounts_opening_balance_check', sql`${table.openingBalance} >= 0`),
-])
-
-export const posTerminals = pgTable('pos_terminals', {
-  id: serial('id').primaryKey(),
-  title: varchar('title', { length: 150 }).notNull(),
-  terminalNumber: varchar('terminal_number', { length: 100 }).notNull(),
-  merchantNumber: varchar('merchant_number', { length: 100 }),
-  financialAccountId: integer('financial_account_id').notNull().references(() => financialAccounts.id, { onDelete: 'restrict' }),
-  isActive: boolean('is_active').notNull().default(true),
-  notes: text('notes'),
-  createdAt: utcTimestamp('created_at').notNull(),
-  updatedAt: utcTimestamp('updated_at').notNull(),
-}, (table) => [uniqueIndex('pos_terminals_number_uidx').on(table.terminalNumber)])
-
-export const expenseCategories = pgTable('expense_categories', {
-  id: serial('id').primaryKey(),
-  name: varchar('name', { length: 120 }).notNull(),
-  isActive: boolean('is_active').notNull().default(true),
-  createdAt: utcTimestamp('created_at').notNull(),
-}, (table) => [uniqueIndex('expense_categories_name_uidx').on(table.name)])
-
+/**
+ * Order payments: that a customer paid for an order, by what means, and whether it went through.
+ *
+ * The customer sees this on their own order and the kitchen needs it when handing food over. It
+ * posts to nothing — the financial-account and POS-terminal columns went with the ledger they fed.
+ * `payment_method` still records that money arrived by POS, which is all the kitchen ever asked.
+ */
 export const payments = pgTable('payments', {
   id: serial('id').primaryKey(),
   orderId: integer('order_id').notNull().references(() => orders.id, { onDelete: 'restrict' }),
   paymentMethod: integer('payment_method').notNull(),
-  financialAccountId: integer('financial_account_id').notNull().references(() => financialAccounts.id, { onDelete: 'restrict' }),
-  posTerminalId: integer('pos_terminal_id').references(() => posTerminals.id, { onDelete: 'restrict' }),
   amount: money('amount').notNull(),
   status: integer('status').notNull().default(1),
   trackingNumber: varchar('tracking_number', { length: 100 }),
@@ -944,49 +736,6 @@ export const payments = pgTable('payments', {
   check('payments_amount_check', sql`${table.amount} > 0`),
   check('payments_method_check', sql`${table.paymentMethod} IN (1, 2, 3, 4)`),
   check('payments_status_check', sql`${table.status} BETWEEN 1 AND 7`),
-])
-
-export const financialTransactions = pgTable('financial_transactions', {
-  id: serial('id').primaryKey(),
-  transactionType: integer('transaction_type').notNull(),
-  financialAccountId: integer('financial_account_id').notNull().references(() => financialAccounts.id, { onDelete: 'restrict' }),
-  amount: money('amount').notNull(),
-  transactionDate: utcTimestamp('transaction_date').notNull(),
-  categoryId: integer('category_id').references(() => expenseCategories.id, { onDelete: 'restrict' }),
-  referenceType: varchar('reference_type', { length: 50 }).notNull(),
-  referenceId: integer('reference_id'),
-  transactionGroup: varchar('transaction_group', { length: 80 }),
-  description: text('description').notNull(),
-  createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
-  reversedTransactionId: integer('reversed_transaction_id'),
-  createdAt: utcTimestamp('created_at').notNull(),
-}, (table) => [
-  index('financial_transactions_account_date_idx').on(table.financialAccountId, table.transactionDate),
-  uniqueIndex('financial_transactions_reference_uidx').on(table.transactionType, table.referenceType, table.referenceId)
-    .where(sql`${table.referenceId} IS NOT NULL AND ${table.transactionType} IN (1, 2, 7, 8)`),
-  check('financial_transactions_type_check', sql`${table.transactionType} BETWEEN 1 AND 8`),
-  check('financial_transactions_amount_check', sql`${table.amount} <> 0`),
-  check('financial_transactions_sign_check', sql`
-    (${table.transactionType} IN (1, 3, 5) AND ${table.amount} > 0) OR
-    (${table.transactionType} IN (2, 4, 6, 7) AND ${table.amount} < 0) OR
-    ${table.transactionType} = 8`),
-])
-
-export const purchasePayments = pgTable('purchase_payments', {
-  id: serial('id').primaryKey(),
-  purchaseId: integer('purchase_id').notNull().references(() => purchases.id, { onDelete: 'restrict' }),
-  financialAccountId: integer('financial_account_id').notNull().references(() => financialAccounts.id, { onDelete: 'restrict' }),
-  amount: money('amount').notNull(),
-  paymentMethod: integer('payment_method').notNull(),
-  paidAt: utcTimestamp('paid_at').notNull(),
-  trackingNumber: varchar('tracking_number', { length: 100 }),
-  notes: text('notes'),
-  createdByUserId: integer('created_by_user_id').notNull().references(() => users.id, { onDelete: 'restrict' }),
-  createdAt: utcTimestamp('created_at').notNull(),
-}, (table) => [
-  index('purchase_payments_purchase_idx').on(table.purchaseId),
-  check('purchase_payments_amount_check', sql`${table.amount} > 0`),
-  check('purchase_payments_method_check', sql`${table.paymentMethod} BETWEEN 1 AND 4`),
 ])
 
 export const auditLogs = pgTable('audit_logs', {

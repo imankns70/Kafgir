@@ -73,19 +73,6 @@ const seedTags = [
   ['انتخاب سرآشپز', 'chef-choice', 'marketing'],
 ] as const
 
-const seedUnits = [
-  ['گرم', 'g'], ['کیلوگرم', 'kg'], ['میلی‌لیتر', 'ml'], ['لیتر', 'l'],
-  ['عدد', 'عدد'], ['بسته', 'بسته'], ['قوطی', 'قوطی'], ['بطری', 'بطری'],
-] as const
-const seedIngredientCategories = [
-  'مواد پروتئینی', 'برنج و غلات', 'حبوبات', 'سبزیجات', 'ادویه و چاشنی',
-  'روغن و افزودنی', 'بسته‌بندی', 'نوشیدنی', 'سایر',
-] as const
-const seedExpenseCategories = [
-  'مواد اولیه', 'بسته‌بندی', 'ارسال', 'تبلیغات', 'حقوق و دستمزد',
-  'آب، برق و گاز', 'اجاره', 'تعمیرات', 'تجهیزات', 'متفرقه',
-] as const
-
 /** Starting delivery windows. Plain editable defaults, not a business commitment. */
 const seedDeliverySlots = [
   ['ظهر', '12:00', '14:00'],
@@ -101,20 +88,6 @@ async function main() {
   const now = new Date()
 
   try {
-  for (const [name, symbol] of seedUnits) {
-    await sql`INSERT INTO units (name,symbol,is_active,created_at,updated_at)
-      VALUES (${name},${symbol},true,${now},${now})
-      ON CONFLICT (name) DO UPDATE SET symbol=EXCLUDED.symbol,is_active=true,updated_at=EXCLUDED.updated_at`
-  }
-  for (const name of seedIngredientCategories) {
-    await sql`INSERT INTO ingredient_categories (name,is_active,created_at,updated_at)
-      VALUES (${name},true,${now},${now})
-      ON CONFLICT (name) DO UPDATE SET is_active=true,updated_at=EXCLUDED.updated_at`
-  }
-  for (const name of seedExpenseCategories) {
-    await sql`INSERT INTO expense_categories (name,is_active,created_at)
-      VALUES (${name},true,${now}) ON CONFLICT (name) DO UPDATE SET is_active=true`
-  }
   // Starting delivery windows, seeded only into an empty table. Existing rows are the operator's,
   // so re-running the seed never resurrects a window they deleted or overwrites edited hours.
   const existingSlots = await sql<{ value: boolean }[]>`

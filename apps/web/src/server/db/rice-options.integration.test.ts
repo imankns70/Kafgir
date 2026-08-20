@@ -17,9 +17,6 @@ const anonymous = { userId: null, username: null, firstName: null, lastName: nul
 
 let sql: ReturnType<typeof postgres>
 let userId = 0
-let gramUnitId = 0
-let saffronIngredientId = 0
-let riceIngredientId = 0
 let categoryId = 0
 let menuId = 0
 let dishMenuItemId = 0
@@ -27,13 +24,6 @@ let plainMenuItemId = 0
 let riceMenuItemId = 0
 let standaloneRiceMenuItemId = 0
 let profileId = 0
-
-async function stockOf(ingredientId: number) {
-  const rows = await sql<{ stock: string }[]>`
-    SELECT COALESCE(SUM(quantity_in_base_unit),0)::text stock
-    FROM inventory_transactions WHERE ingredient_id=${ingredientId}`
-  return Number(rows[0]!.stock)
-}
 
 async function soldPortionsOf(menuItemId: number) {
   const rows = await sql<{ sold: number }[]>`
@@ -65,23 +55,6 @@ integration.sequential('optional Persian rice upgrade', () => {
     userId = (await sql<{ id: number }[]>`
       INSERT INTO users (username,normalized_username,full_name,is_active,created_at)
       VALUES (${`rice-${suffix}`},${`RICE-${suffix}`},'Rice integration',true,NOW()) RETURNING id`)[0]!.id
-    gramUnitId = (await sql<{ id: number }[]>`
-      INSERT INTO units (name,symbol,is_active,created_at,updated_at)
-      VALUES ('گرم',${`g-${suffix.slice(0, 6)}`},true,NOW(),NOW()) RETURNING id`)[0]!.id
-    const ingredient = async (name: string) => (await sql<{ id: number }[]>`
-      INSERT INTO ingredients
-        (name,base_unit_id,minimum_stock_level,is_inventory_tracked,is_active,created_at,updated_at)
-      VALUES (${name},${gramUnitId},0,true,true,NOW(),NOW()) RETURNING id`)[0]!.id
-    riceIngredientId = await ingredient(`برنج ایرانی ${suffix}`)
-    saffronIngredientId = await ingredient(`زعفران ${suffix}`)
-    for (const id of [riceIngredientId, saffronIngredientId]) {
-      await sql`
-        INSERT INTO inventory_transactions
-          (ingredient_id,transaction_type,quantity_in_base_unit,unit_cost,total_cost,reference_type,
-           transaction_group,transaction_date,created_by_user_id,created_at)
-        VALUES (${id},1,10000,1,10000,'seed',${`rice-seed-${suffix}-${id}`},NOW(),${userId},NOW())`
-    }
-
     categoryId = (await sql<{ id: number }[]>`
       INSERT INTO food_categories (title,slug,is_active,created_at,updated_at)
       VALUES (${`دسته ${suffix}`},${`cat-${suffix}`},true,NOW(),NOW()) RETURNING id`)[0]!.id
@@ -96,19 +69,6 @@ integration.sequential('optional Persian rice upgrade', () => {
     const plainFoodId = await food(`غذای ساده ${suffix}`, `plain-${suffix}`, false, false)
     const riceFoodId = await food(`برنج ایرانی ${suffix}`, `iranian-${suffix}`, false, true)
     const standaloneRiceFoodId = await food(`یک پرس برنج ایرانی ${suffix}`, `rice-side-${suffix}`, false, false)
-
-    // Each food consumes its own ingredients through an ordinary recipe.
-    const recipe = async (foodId: number, ingredientId: number, quantityInBaseUnit: string) => {
-      const recipeId = (await sql<{ id: number }[]>`
-        INSERT INTO recipes (food_id,yield_quantity,is_active,created_at,updated_at)
-        VALUES (${foodId},1,true,NOW(),NOW()) RETURNING id`)[0]!.id
-      await sql`
-        INSERT INTO recipe_items (recipe_id,ingredient_id,quantity_in_base_unit)
-        VALUES (${recipeId},${ingredientId},${quantityInBaseUnit}::numeric)`
-    }
-    await recipe(dishFoodId, saffronIngredientId, '2')
-    await recipe(riceFoodId, riceIngredientId, '250')
-    await recipe(standaloneRiceFoodId, riceIngredientId, '180')
 
     menuId = (await sql<{ id: number }[]>`
       INSERT INTO daily_menus (menu_date,is_open,created_at)
@@ -134,22 +94,14 @@ integration.sequential('optional Persian rice upgrade', () => {
     const orders = sql`SELECT id FROM orders WHERE customer_profile_id=${profileId}`
     await sql`DELETE FROM audit_logs WHERE user_id=${userId}`
     await sql`DELETE FROM notification_messages WHERE order_id IN (${orders})`
-    await sql`DELETE FROM order_inventory_consumptions WHERE order_id IN (${orders})`
     await sql`DELETE FROM order_status_histories WHERE order_id IN (${orders})`
     await sql`DELETE FROM order_items WHERE order_id IN (${orders})`
     await sql`DELETE FROM orders WHERE customer_profile_id=${profileId}`
     await sql`DELETE FROM customer_profiles WHERE id=${profileId}`
     await sql`DELETE FROM daily_menu_items WHERE daily_menu_id=${menuId}`
     await sql`DELETE FROM daily_menus WHERE id=${menuId}`
-    await sql`DELETE FROM recipe_items WHERE recipe_id IN
-      (SELECT id FROM recipes WHERE food_id IN (SELECT id FROM foods WHERE category_id=${categoryId}))`
-    await sql`DELETE FROM recipes WHERE food_id IN (SELECT id FROM foods WHERE category_id=${categoryId})`
     await sql`DELETE FROM foods WHERE category_id=${categoryId}`
     await sql`DELETE FROM food_categories WHERE id=${categoryId}`
-    await sql`DELETE FROM inventory_transactions WHERE ingredient_id IN
-      (${riceIngredientId},${saffronIngredientId})`
-    await sql`DELETE FROM ingredients WHERE id IN (${riceIngredientId},${saffronIngredientId})`
-    await sql`DELETE FROM units WHERE id=${gramUnitId}`
     await sql`DELETE FROM users WHERE id=${userId}`
     await closeDatabase()
     await sql.end()
@@ -170,8 +122,7 @@ integration.sequential('optional Persian rice upgrade', () => {
     expect(menu?.items.find((item) => item.id === standaloneRiceMenuItemId)?.price).toBe(150)
   })
 
-  it('orders and consumes the standalone Persian-rice portion as an ordinary food', async () => {
-    const riceBefore = await stockOf(riceIngredientId)
+  it('orders the standalone Persian-rice portion as an ordinary food', async () => {
     const order = await createOrder(orderRequest(standaloneRiceMenuItemId, false, 1), anonymous, true, userId)
     expect(order.items).toHaveLength(1)
     expect(order.items[0]?.dailyMenuItemId).toBe(standaloneRiceMenuItemId)
@@ -179,7 +130,6 @@ integration.sequential('optional Persian rice upgrade', () => {
 
     await updateOrderStatus(order.id, { newStatus: OrderStatus.Confirmed }, userId)
     expect(await soldPortionsOf(standaloneRiceMenuItemId)).toBe(1)
-    expect(await stockOf(riceIngredientId)).toBe(riceBefore - 180)
   })
 
   it('orders a rice-capable dish without the upgrade as a single line', async () => {
@@ -208,17 +158,17 @@ integration.sequential('optional Persian rice upgrade', () => {
     expect(order.totalAmount).toBe(155)
   })
 
-  it('consumes both foods from inventory when an upgraded order is confirmed', async () => {
-    const [riceBefore, saffronBefore] = await Promise.all([
-      stockOf(riceIngredientId), stockOf(saffronIngredientId),
-    ])
+  /**
+   * Confirming an order counts portions sold and nothing else. It used to also consume recipe
+   * ingredients from a stock ledger; that dependency is gone, and this is what proves the order
+   * lifecycle no longer reaches into anything but the menu.
+   */
+  it('counts portions for both lines when an upgraded order is confirmed', async () => {
     const order = await createOrder(orderRequest(dishMenuItemId, true, 1), anonymous, true, userId)
     await updateOrderStatus(order.id, { newStatus: OrderStatus.Confirmed }, userId)
 
     expect(await soldPortionsOf(dishMenuItemId)).toBe(1)
     expect(await soldPortionsOf(riceMenuItemId)).toBe(1)
-    expect(await stockOf(riceIngredientId)).toBe(riceBefore - 250)
-    expect(await stockOf(saffronIngredientId)).toBe(saffronBefore - 2)
   })
 
   it('keeps the dish orderable once the Persian rice sells out', async () => {
@@ -233,25 +183,13 @@ integration.sequential('optional Persian rice upgrade', () => {
     expect(plain.items).toHaveLength(1)
   })
 
-  it('returns capacity and stock for both lines when an upgraded order is cancelled', async () => {
+  it('returns capacity for both lines when an upgraded order is cancelled', async () => {
     await sql`UPDATE daily_menu_items SET capacity_portions = 4 WHERE id=${riceMenuItemId}`
-    const riceBefore = await stockOf(riceIngredientId)
     const order = await createOrder(orderRequest(dishMenuItemId, true, 1), anonymous, true, userId)
     await updateOrderStatus(order.id, { newStatus: OrderStatus.Confirmed }, userId)
     expect(await soldPortionsOf(riceMenuItemId)).toBe(3)
-    expect(await stockOf(riceIngredientId)).toBe(riceBefore - 250)
 
     await updateOrderStatus(order.id, { newStatus: OrderStatus.Cancelled }, userId)
     expect(await soldPortionsOf(riceMenuItemId)).toBe(2)
-    expect(await stockOf(riceIngredientId)).toBe(riceBefore)
-  })
-
-  it('confirms a sold order even when opening ingredient stock was not entered', async () => {
-    await sql`DELETE FROM inventory_transactions WHERE ingredient_id=${saffronIngredientId}`
-    const order = await createOrder(orderRequest(dishMenuItemId, false, 1), anonymous, true, userId)
-
-    await updateOrderStatus(order.id, { newStatus: OrderStatus.Confirmed }, userId)
-
-    expect(await stockOf(saffronIngredientId)).toBe(-2)
   })
 })

@@ -169,6 +169,13 @@
       "when": 1787211900000,
       "tag": "0023_courier_delivery_accounting",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787220000000,
+      "tag": "0024_simple_monthly_business",
+      "breakpoints": true
     }
   ]
 }

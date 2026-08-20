@@ -19,7 +19,6 @@ import { AppError, NotFoundError, UnauthorizedError } from '../errors'
 import { persianBusinessYear } from '../time'
 import type { TelegramIdentity } from '../telegram/validation'
 import { isAllowedOrderTransition, normalizePhone, optionalText } from '../domain/order-rules'
-import { consumeOrderInventory, reverseOrderInventory } from './v15-service'
 import { reserveDeliverySlot } from './delivery-slot-service'
 import { reserveCourierDay } from './courier-service'
 import {
@@ -712,7 +711,6 @@ export async function updateOrderStatus(id: number, request: UpdateOrderStatusRe
       for (const item of items) {
         await tx`UPDATE daily_menu_items SET sold_portions = sold_portions + ${item.quantity} WHERE id = ${item.id}`
       }
-      await consumeOrderInventory(tx, id, userId)
     }
     if (request.newStatus === OrderStatus.Cancelled &&
         [OrderStatus.Confirmed, OrderStatus.Preparing, OrderStatus.Ready].includes(order.status)) {
@@ -722,7 +720,6 @@ export async function updateOrderStatus(id: number, request: UpdateOrderStatusRe
         FROM order_items oi
         WHERE oi.order_id = ${id} AND oi.daily_menu_item_id = d.id
       `
-      await reverseOrderInventory(tx, id, userId)
     }
     await tx`
       UPDATE orders

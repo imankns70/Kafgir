@@ -21,7 +21,6 @@ import {
   type PaymentMethodSettingDto,
   type FoodTagWriteRequest,
   type FoodWriteRequest,
-  type IngredientDto,
   type AdminOrderDetailDto,
   type OrderDto,
   type OrderReportQuery,
@@ -32,12 +31,15 @@ import {
   formatMoney as money, formatNumber, isInvalidMoneyText, moneyInputText, parseMoney,
   persianDateWithLatinDigitsLocale,
 } from './number-format'
-import { FinancePage, IngredientsPage, InventoryPage, PaymentsPage, PurchasesPage, RecipesPage, ShoppingPage, SuppliersPage, V15ReportsPage } from './V15Pages'
+import { PaymentsPage } from './PaymentsPage'
+import { MonthsPage, PurchasesPage } from './BusinessPages'
+import { SiteAnalyticsPage } from './SiteAnalyticsPage'
 import { DeliveryDaysPage, DeliverySlotsPage } from './DeliveryPages'
 import { CourierAccountingPage, CourierDaysPage, CouriersPage } from './CourierPages'
+import { MonthTrend } from './BusinessPages'
 import { LogsPage } from './LogsPage'
 import { CustomerCommunicationPage } from './CustomerCommunicationPage'
-import { FoodTagGroupsPage, SupportSubjectsPage, UnitsPage } from './ReferenceDataPages'
+import { FoodTagGroupsPage, SupportSubjectsPage } from './ReferenceDataPages'
 import { DeliveryMethodsPage, PaymentMethodsPage } from './SettingsPages'
 import { CustomerReportPage } from './CustomerReportPage'
 import { CustomersPage } from './CustomersPage'
@@ -365,106 +367,70 @@ function PageFrame({ title, actions, children }: { title: string; actions?: Reac
   </section>
 }
 
+/**
+ * The first screen an operator opens.
+ *
+ * Two bands, in the order the questions actually arrive: what the kitchen still owes people today,
+ * then how the month is going. Website-visitor statistics used to sit underneath and are now their
+ * own destination — they were the largest block on the page and the least likely to change what
+ * anybody did next.
+ *
+ * Everything here comes from one aggregated call, so opening the dashboard is one round trip.
+ */
 function DashboardPage() {
   const [data, setData] = useState<AdminDashboardSummaryDto | null>(null)
-  const [operations, setOperations] = useState<Awaited<ReturnType<typeof adminApi.v15Dashboard>> | null>(null)
-  const [analytics, setAnalytics] = useState<CustomerAnalyticsTodayDto | null>(null)
-  const [analyticsError, setAnalyticsError] = useState<string | null>(null)
-  const [analyticsLoaded, setAnalyticsLoaded] = useState(false)
-  const analyticsLoading = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(async () => {
     setError(null)
-    try {
-      const [summary, operational] = await Promise.all([adminApi.dashboard(), adminApi.v15Dashboard()])
-      setData(summary); setOperations(operational)
-    } catch (reason) { setError(String(reason)) }
-  }, [])
-  const loadAnalytics = useCallback(async () => {
-    if (analyticsLoading.current || document.visibilityState !== 'visible') return
-    analyticsLoading.current = true
-    try {
-      setAnalytics(await adminApi.customerAnalytics())
-      setAnalyticsError(null)
-    } catch {
-      setAnalyticsError('به‌روزرسانی آمار کاربران انجام نشد؛ آخرین مقادیر معتبر نمایش داده می‌شوند.')
-    } finally {
-      analyticsLoading.current = false
-      setAnalyticsLoaded(true)
-    }
+    try { setData(await adminApi.dashboard()) }
+    catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
   }, [])
   useEffect(() => { void load() }, [load])
-  useEffect(() => {
-    void loadAnalytics()
-    const timer = window.setInterval(() => void loadAnalytics(), 30_000)
-    const onVisibility = () => { if (document.visibilityState === 'visible') void loadAnalytics() }
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => {
-      window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', onVisibility)
-    }
-  }, [loadAnalytics])
-  const cards = data ? [
-    ['کل سفارش‌ها', plainNumber(data.totalOrders)],
-    ['در انتظار تایید', plainNumber(data.pendingOrders)],
-    ['تایید شده', plainNumber(data.confirmedOrders)],
-    ['تحویل شده', plainNumber(data.deliveredOrders)],
-    ['لغو شده', plainNumber(data.cancelledOrders)],
-    ['تعداد پرس', plainNumber(data.totalPortions)],
-    ['فروش تایید شده', money(data.confirmedSales)],
-    ['فروش تحویل داده شده', money(data.deliveredSales)],
+
+  const today = data?.today
+  const month = data?.month
+  const todayCards: Array<[string, string]> = today ? [
+    ['سفارش‌های امروز', plainNumber(today.totalOrders)],
+    ['در انتظار تایید', plainNumber(today.pendingOrders)],
+    ['در جریان', plainNumber(today.activeOrders)],
+    ['تحویل‌شده', plainNumber(today.deliveredOrders)],
+    ['پرس امروز', plainNumber(today.totalPortions)],
+    ['فروش غذای امروز', money(today.foodSales)],
   ] : []
-  const analyticsCards: Array<[string, string, string, string]> = analytics ? [
-    ['unique-visitors', 'بازدیدکنندگان یکتای امروز', groupedNumber(analytics.uniqueVisitorsToday), 'تعداد بازدیدکنندگان یکتایی که از ابتدای امروز تا اکنون حداقل یک فعالیت در کفگیر داشته‌اند. برای شمارش بازدیدکننده، ورود به حساب کاربری الزامی نیست.'],
-    ['online-now', 'آنلاین الان', groupedNumber(analytics.onlineNow), 'تعداد بازدیدکنندگانی که در ۵ دقیقه اخیر در کفگیر فعال بوده‌اند. این عدد تقریبی است و بر اساس آخرین زمان فعالیت کاربر محاسبه می‌شود.'],
-    ['guest-visitors', 'مهمان‌های امروز', groupedNumber(analytics.guestVisitorsToday), 'تعداد بازدیدکنندگان یکتای امروز که در طول فعالیت امروز خود به حساب کاربری وارد نشده‌اند.'],
-    ['authenticated-users', 'کاربران واردشده امروز', groupedNumber(analytics.authenticatedUsersToday), 'تعداد کاربران یکتایی که امروز با حساب کاربری خود حداقل یک فعالیت در کفگیر داشته‌اند.'],
-    ['new-users', 'کاربران جدید', groupedNumber(analytics.newUsersToday), 'تعداد کاربران واردشده امروز که حساب کاربری آن‌ها نیز امروز ایجاد شده است.'],
-    ['returning-users', 'کاربران بازگشتی', groupedNumber(analytics.returningUsersToday), 'تعداد کاربران واردشده امروز که حساب کاربری آن‌ها قبل از امروز ایجاد شده است.'],
-    ['sessions', 'نشست‌های امروز', groupedNumber(analytics.sessionsToday), 'تعداد نشست‌های کاربری که امروز شروع شده‌اند. اگر کاربر بیش از ۳۰ دقیقه فعالیت نداشته باشد، فعالیت بعدی یک نشست جدید محسوب می‌شود.'],
-    ['conversion', 'نرخ تبدیل به سفارش', `${formatNumber(analytics.conversionRate, 1)}٪`, 'درصد بازدیدکنندگان یکتای امروز که حداقل یک سفارش ثبت کرده‌اند. تعداد سفارش‌ها ملاک نیست؛ تعداد بازدیدکنندگان سفارش‌دهنده محاسبه می‌شود.'],
+  const monthCards: Array<[string, string]> = month ? [
+    ['فروش غذا', money(month.foodSales)],
+    ['خریدها', money(month.purchases)],
+    ['فروش منهای خرید', money(month.salesMinusPurchases)],
+    ['نسبت خرید به فروش', month.purchaseToSalesPercent === null
+      ? '—' : `${formatNumber(month.purchaseToSalesPercent, 1)}٪`],
+    ['کارکرد پیک', money(month.courierCost)],
+    ['تعداد خرید', plainNumber(month.purchaseCount)],
   ] : []
+
   return <PageFrame
-    title="داشبورد امروز"
+    title="داشبورد"
     actions={<>
-      {data && <div className="panel menu-state menu-state-inline"><strong>سفارش‌گیری امروز</strong><StatusPill active={data.isTodayMenuOpen} /></div>}
-      <button onClick={() => { void load(); void loadAnalytics() }}>تازه‌سازی</button>
+      {today && <div className="panel menu-state menu-state-inline">
+        <strong>سفارش‌گیری امروز</strong><StatusPill active={today.isTodayMenuOpen} />
+      </div>}
+      <button onClick={() => void load()}>تازه‌سازی</button>
     </>}
   >
     <Message error={error} />
-    <div className="metric-grid">{cards.map(([label, value]) =>
-      <article className="metric" key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
-    {operations && <><div className="metric-grid">
-      {[
-        ['هزینه امروز', money(operations.todayExpense)],
-        ['پرداخت‌های تأییدنشده', plainNumber(operations.unverifiedPayments)],
-        ['موجودی‌های کم', plainNumber(operations.lowStockCount)],
-        ['خریدهای پرداخت‌نشده', plainNumber(operations.unpaidPurchases)],
-        ['سفارش‌های بدون دستور پخت', plainNumber(operations.missingRecipeOrders)],
-        ['ضایعات امروز', money(operations.todayWasteCost)],
-      ].map(([label, value]) => <article className="metric" key={label}><span>{label}</span><strong>{value}</strong></article>)}
-    </div></>}
-    <section className="customer-analytics-section" aria-labelledby="customer-analytics-title">
-      <div className="customer-analytics-heading">
-        <div><h2 id="customer-analytics-title">آمار کاربران امروز</h2><p>فعالیت مشتریان و مهمان‌های وب و مینی‌اپ</p></div>
-        {analyticsError && <span role="status">{analyticsError}</span>}
-      </div>
-      {analytics ? <div className="metric-grid analytics-metric-grid">{analyticsCards.map(([id, label, value, help]) => <article className={`metric analytics-metric ${id === 'online-now' ? 'online-metric' : ''}`} key={id}>
-        <div className="analytics-metric-title"><span>{label}</span><MetricHelp id={id} label={label} text={help} /></div>
-        <strong>{value}</strong>
-      </article>)}</div> : analyticsLoaded
-        ? <div className="message error" role="status">آمار کاربران فعلاً در دسترس نیست.</div>
-        : <div className="analytics-skeleton" aria-label="در حال دریافت آمار کاربران">{Array.from({ length: 8 }, (_, index) => <span key={index} />)}</div>}
+
+    <section className="dashboard-band" aria-labelledby="dashboard-today-title">
+      <h2 id="dashboard-today-title">امروز</h2>
+      <div className="metric-grid">{todayCards.map(([label, value]) =>
+        <article className="metric" key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
+    </section>
+
+    <section className="dashboard-band" aria-labelledby="dashboard-month-title">
+      <h2 id="dashboard-month-title">{month ? month.title : 'این ماه'}</h2>
+      <div className="metric-grid">{monthCards.map(([label, value]) =>
+        <article className="metric" key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
+      {data && <MonthTrend daily={data.monthDaily} />}
     </section>
   </PageFrame>
-}
-
-function MetricHelp({ id, label, text }: { id: string; label: string; text: string }) {
-  const tooltipId = `analytics-tooltip-${id}`
-  return <span className="metric-help">
-    <button type="button" aria-label={`روش محاسبه ${label}`} aria-describedby={tooltipId}>؟</button>
-    <span id={tooltipId} className="metric-help-tooltip" role="tooltip">{text}</span>
-  </span>
 }
 
 function StatusPill({ active }: { active: boolean }) {
@@ -901,7 +867,7 @@ function FoodsPage({ onCreate, onEdit, onPhotos, onTags }: {
           : food.allowsPersianRice ? 'قابل ارتقا به برنج ایرانی' : '—'
         return <tr key={food.id}><RowNumberCell offset={pagedFoods.rowOffset} index={index} /><td>{food.name}</td><td>{categories.find((category) => category.id === food.categoryId)?.title}</td><td>{food.description}</td><td><span className={`badge ${hasPhoto ? 'open' : 'closed'}`}>{hasPhoto ? 'دارد' : 'ندارد'}</span></td><td><span className={`badge ${food.isPersianRice || food.allowsPersianRice ? 'open' : 'closed'}`}>{riceRole}</span></td><td><StatusPill active={food.isActive} /></td><td className="actions"><button onClick={() => onEdit(food.id)}>ویرایش</button><button onClick={() => onTags(food.id)}>تگ‌ها</button><button onClick={() => onPhotos(food.id)}>عکس‌ها</button></td></tr>
       })}</tbody></table>
-      {pagedFoods.totalItems === 0 && <div className="v15-empty-state">{
+      {pagedFoods.totalItems === 0 && <div className="grid-empty-state">{
         pagedFoods.loading ? 'در حال بارگذاری…'
           : pagedFoods.filtered ? 'غذایی با این جستجو پیدا نشد.'
             : 'هنوز غذایی ثبت نشده است.'
@@ -1824,21 +1790,15 @@ export function App() {
     tags: <TagsPage />,
     menu: <DailyMenuPage />,
     report: <ReportPage />,
-    ingredients: <IngredientsPage />,
-    inventory: <InventoryPage />,
-    purchases: <PurchasesPage />,
-    suppliers: <SuppliersPage />,
-    recipes: <RecipesPage />,
-    finance: <FinancePage />,
-    shopping: <ShoppingPage />,
     payments: <PaymentsPage />,
-    'v15-reports': <V15ReportsPage />,
+    purchases: <PurchasesPage />,
+    months: <MonthsPage />,
     logs: <LogsPage />,
     'food-tag-groups': <FoodTagGroupsPage />,
     'support-subjects': <SupportSubjectsPage />,
-    units: <UnitsPage />,
     customers: <CustomersPage />,
     'customer-report': <CustomerReportPage />,
+    'site-analytics': <SiteAnalyticsPage />,
     'payment-methods': <PaymentMethodsPage />,
     'delivery-methods': <DeliveryMethodsPage />,
     'social-dashboard': <SocialDashboardPage />,

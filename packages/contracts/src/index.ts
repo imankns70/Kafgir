@@ -7,9 +7,10 @@ export * from './pagination.js'
 export * from './customer-report.js'
 export * from './customer-directory.js'
 import { isoDate, timeOfDay } from './delivery.js'
-import { PaymentStatus } from './v15.js'
-import { DeliveryMethod, OrderStatus, PaymentMethod } from './order-enums.js'
-export * from './v15.js'
+import { monthlyDailyPointSchema, monthlySummarySchema } from './business.js'
+import { DeliveryMethod, OrderStatus, PaymentMethod, PaymentStatus } from './order-enums.js'
+export * from './payment.js'
+export * from './business.js'
 export * from './delivery.js'
 export * from './courier.js'
 export * from './money.js'
@@ -704,22 +705,33 @@ export const adminLoginResponseSchema = z.object({
   roles: z.array(z.string()),
 })
 
-export const dashboardSummarySchema = z.object({
+/**
+ * The one screen an operator opens first.
+ *
+ * Two questions, in this order: what needs attention in the kitchen right now, and how is this month
+ * going. Website-visitor analytics deliberately live on their own page — they are interesting rather
+ * than urgent, and they used to occupy the space these numbers needed.
+ */
+export const dashboardTodaySchema = z.object({
   date: z.string(),
   totalOrders: z.number().int(),
   pendingOrders: z.number().int(),
-  confirmedOrders: z.number().int(),
-  preparingOrders: z.number().int(),
-  readyOrders: z.number().int(),
+  /** Confirmed, preparing or ready — the ones the kitchen still owes someone. */
+  activeOrders: z.number().int(),
   deliveredOrders: z.number().int(),
   cancelledOrders: z.number().int(),
-  activeOrders: z.number().int(),
   totalPortions: z.number().int(),
-  grossSales: z.number(),
-  confirmedSales: z.number(),
-  deliveredSales: z.number(),
+  /** Food only, excluding the delivery charge, so it compares with the monthly figure. */
+  foodSales: z.number(),
   todayMenuItems: z.number().int(),
   isTodayMenuOpen: z.boolean(),
+})
+
+export const dashboardSummarySchema = z.object({
+  today: dashboardTodaySchema,
+  month: monthlySummarySchema,
+  /** Daily food sales against daily purchases for the current month, for one compact chart. */
+  monthDaily: z.array(monthlyDailyPointSchema),
 })
 
 export const analyticsHeartbeatSchema = z.object({
@@ -792,6 +804,7 @@ export type UpdateOrderStatusRequest = z.infer<typeof updateOrderStatusSchema>
 export type AdminLoginRequest = z.infer<typeof adminLoginSchema>
 export type AdminLoginResponse = z.infer<typeof adminLoginResponseSchema>
 export type AdminDashboardSummaryDto = z.infer<typeof dashboardSummarySchema>
+export type AdminDashboardTodayDto = z.infer<typeof dashboardTodaySchema>
 export type AnalyticsHeartbeatRequest = z.infer<typeof analyticsHeartbeatSchema>
 export type AnalyticsHeartbeatResponse = z.infer<typeof analyticsHeartbeatResponseSchema>
 export type CustomerAnalyticsTodayDto = z.infer<typeof customerAnalyticsTodaySchema>

@@ -1,5 +1,46 @@
 # Decisions
 
+## 2026-08-20 — Delete the inventory and accounting architecture rather than hide it
+
+- The kitchen never operated stock ledgers, weighted-average costing, purchase approval or a
+  transaction ledger, so the data they produced was not trustworthy enough to base a decision on.
+  Keeping them behind an "advanced mode" would have preserved the maintenance cost and the illusion
+  that the numbers meant something.
+- Nothing is retained "for the future". A future financial need will be met by building for that
+  need, not by reviving abstractions chosen for a different one.
+- Recipes went with inventory. Their implementation existed to cost and consume ingredients; with no
+  ingredients there was nothing left of them. A cooking-instruction feature, if wanted, is a separate
+  and much smaller thing.
+
+## 2026-08-20 — A month is derived, never created
+
+- Reporting periods come from the Jalali calendar and the dates already on purchases and orders.
+  There is no period table and nothing to open or close, so a month can never be missing because
+  somebody forgot to create it.
+- Jalali months are converted once into half-open ISO ranges at the application boundary. SQL never
+  learns the Persian calendar, queries stay plain range scans on indexed date columns, and no
+  Persian-formatted date is ever stored.
+- "What month is it" resolves through the Asia/Tehran business day, matching order attribution.
+
+## 2026-08-20 — Compare food against purchases, and refuse to call the difference profit
+
+- Food sales are order subtotals. The customer's delivery charge passes through to a courier;
+  counting it as food revenue would flatter every comparison against ingredient spend.
+- Only Delivered orders count, which is the revenue rule the customer report already stated.
+- Courier pay is shown beside the comparison rather than inside it: it is a real cost but not a
+  purchase, and folding it in would make the purchase-to-sales ratio mean two things at once.
+- The difference is labelled «فروش منهای خرید». Salaries, rent, utilities, packaging and courier pay
+  are not all inside it, and an operator has no way to catch the word "profit" being wrong.
+- A month with no sales reports a null ratio, never Infinity or NaN.
+
+## 2026-08-20 — Order payment is not accounting
+
+- Customers still choose نقدی، کارت‌به‌کارت، آنلاین or پوز and the kitchen still sees whether an order
+  is paid. What was removed is what fed the ledger: the financial account, the POS terminal registry
+  and the transaction posting.
+- `payment_method` already answers "was this a POS payment?", so the terminal registry existed only to
+  map a payment onto an account and went with the accounts.
+
 ## 2026-08-20 — Customer delivery charge and courier payable are never one value
 
 - Model the two amounts as separate columns from the first version, even while they hold the same

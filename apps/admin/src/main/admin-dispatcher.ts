@@ -1,24 +1,13 @@
 import {
   createOrderSchema,
-  accountTransferSchema,
   dailyMenuItemWriteSchema,
-  financialAccountWriteSchema,
-  financialEntrySchema,
   foodCategoryWriteSchema,
   foodTagWriteSchema,
   foodTagGroupWriteSchema,
   foodWriteSchema,
-  ingredientWriteSchema,
-  inventoryAdjustmentSchema,
   purchaseWriteSchema,
   paymentStatusWriteSchema,
   paymentWriteSchema,
-  posTerminalWriteSchema,
-  purchasePaymentWriteSchema,
-  recipeWriteSchema,
-  shoppingListCreateSchema,
-  stockCountSchema,
-  supplierWriteSchema,
   updateDailyMenuItemSchema,
   updateDailyMenuSettingsSchema,
   updateOrderStatusSchema,
@@ -27,7 +16,6 @@ import {
   courierWriteSchema,
   courierDeliveryDayWriteSchema,
   courierSettlementWriteSchema,
-  wasteWriteSchema,
   socialChannelWriteSchema,
   socialPostWriteSchema,
   socialRuleWriteSchema,
@@ -40,7 +28,6 @@ import {
   supportSubjectWriteSchema,
   customerReportQuerySchema,
   customerDirectoryQuerySchema,
-  unitWriteSchema,
   paymentMethodSettingWriteSchema,
   deliveryMethodSettingWriteSchema,
   PaymentMethod,
@@ -55,68 +42,41 @@ import {
   setDeliveryDayOverride,
   setDeliveryTimeSlotActive,
   updateDeliveryTimeSlot,
-  adjustInventory,
-  confirmPurchase,
-  confirmStockCount,
-  createFinancialEntry,
   createFood,
   createFoodCategory,
   createFoodTag,
   createOrder,
-  createPurchase,
   createPayment,
-  createShoppingList,
-  cancelPurchase,
   getDashboard,
+  getMonthPurchases,
+  createPurchase,
+  updatePurchase,
+  deletePurchase,
+  listRecentMonths,
+  getMonthlyReport,
   getCustomerAnalyticsToday,
   getMenuByDate,
-  getRecipe,
-  listFinancialAccounts,
-  listExpenseCategories,
-  listFinancialTransactions,
   listFoodCategories,
   listFoods,
   listFoodsPaged,
   listFoodTags,
-  listIngredients,
-  listIngredientsPaged,
-  listInventoryMovements,
   listPayments,
   paymentBucketTotals,
   type PaymentBucket,
-  listPosTerminals,
-  listPurchases,
-  listShoppingLists,
-  listShoppingListsPaged,
-  listSuppliers,
-  listSuppliersPaged,
-  listUnits,
-  saveUnit,
-  managerialReports,
   getCustomerReport,
   searchCustomers,
   getCustomerDetail,
   refundPayment,
-  registerWaste,
-  registerPurchasePayment,
   removeMenuItem,
-  saveFinancialAccount,
-  savePosTerminal,
-  saveIngredient,
-  saveRecipe,
-  saveSupplier,
   searchOrdersPaged,
   setFoodActive,
-  shoppingRequirements,
   updateFood,
   updateFoodCategory,
   updateFoodTag,
   updateMenuItem,
   updateMenuSettings,
   updateOrderStatus,
-  v15Dashboard,
   changePaymentStatus,
-  transfer,
   closeDatabase,
   testDatabaseConnection,
   type AdminPrincipal,
@@ -218,7 +178,6 @@ export async function dispatchAdminOperation(
   const body = payloadRecord(payload)
   switch (operation) {
     case 'dashboard.today': return getDashboard()
-    case 'dashboard.v15': return v15Dashboard()
     case 'dashboard.analytics': return getCustomerAnalyticsToday()
     case 'foodCategories.list': return listFoodCategories(true)
     case 'foodCategories.create': return createFoodCategory(foodCategoryWriteSchema.parse(body.value))
@@ -336,80 +295,18 @@ export async function dispatchAdminOperation(
       )
     case 'support.reviews.reply':
       return replyToOrderReview(principal.userId, numberField(body, 'id'), supportMessageWriteSchema.parse(body.value))
-    case 'units.list': return listUnits()
-    case 'units.save':
-      return saveUnit(body.id == null ? null : numberField(body, 'id'), unitWriteSchema.parse(body.value))
-    case 'ingredients.list':
-      return wantsPaging(body)
-        ? listIngredientsPaged(searchArg(body), undefined, pageArg(body), sizeArg(body))
-        : listIngredients(searchArg(body))
-    case 'ingredients.create': return saveIngredient(null, ingredientWriteSchema.parse(body.value))
-    case 'ingredients.update':
-      return saveIngredient(numberField(body, 'id'), ingredientWriteSchema.parse(body.value))
-    case 'suppliers.list':
-      return wantsPaging(body)
-        ? listSuppliersPaged(searchArg(body), pageArg(body), sizeArg(body))
-        : listSuppliers(searchArg(body))
-    case 'suppliers.create': return createSupplierCompat(supplierWriteSchema.parse(body.value))
-    case 'suppliers.update':
-      return saveSupplier(numberField(body, 'id'), supplierWriteSchema.parse(body.value))
-    case 'purchases.list':
-      return listPurchases(body.status == null ? undefined : Number(body.status), body.page == null ? undefined : Number(body.page), body.pageSize == null ? undefined : Number(body.pageSize))
+    // Purchases: write one down, correct one, remove one, and read a month's worth.
+    case 'purchases.month':
+      return getMonthPurchases(numberField(body, 'year'), numberField(body, 'month'))
     case 'purchases.create':
-      return { id: await createPurchase(purchaseWriteSchema.parse(body.value), principal.userId) }
-    case 'purchases.confirm': return confirmPurchase(numberField(body, 'id'), principal.userId)
-    case 'purchases.cancel': return cancelPurchase(numberField(body, 'id'), principal.userId)
-    case 'purchases.pay':
-      return registerPurchasePayment(purchasePaymentWriteSchema.parse(body.value), principal.userId)
-    case 'inventory.movements':
-      return listInventoryMovements(
-        body.ingredientId === undefined ? undefined : Number(body.ingredientId),
-        body.page == null ? undefined : Number(body.page),
-        body.pageSize == null ? undefined : Number(body.pageSize),
-      )
-    case 'inventory.adjust':
-      return adjustInventory(inventoryAdjustmentSchema.parse(body.value), principal.userId)
-    case 'inventory.waste': return registerWaste(wasteWriteSchema.parse(body.value), principal.userId)
-    case 'inventory.count':
-      return confirmStockCount(stockCountSchema.parse(body.value), principal.userId)
-    case 'recipes.get': return getRecipe(numberField(body, 'foodId'))
-    case 'recipes.save':
-      return saveRecipe(
-        numberField(body, 'foodId'),
-        recipeWriteSchema.parse(body.value),
-        principal.userId,
-      )
-    case 'finance.accounts': return listFinancialAccounts()
-    case 'finance.expenseCategories': return listExpenseCategories()
-    case 'finance.createAccount':
-      return saveFinancialAccount(null, financialAccountWriteSchema.parse(body.value))
-    case 'finance.updateAccount':
-      return saveFinancialAccount(numberField(body, 'id'), financialAccountWriteSchema.parse(body.value))
-    case 'finance.transactions':
-      return listFinancialTransactions(
-        typeof body.from === 'string' ? body.from : undefined,
-        typeof body.to === 'string' ? body.to : undefined,
-        body.page == null ? undefined : Number(body.page), body.pageSize == null ? undefined : Number(body.pageSize))
-    case 'finance.createEntry':
-      return createFinancialEntry(
-        financialEntrySchema.parse(body.value),
-        body.kind === 'income' ? 'income' : 'expense',
-        principal.userId,
-      )
-    case 'finance.transfer':
-      return transfer(accountTransferSchema.parse(body.value), principal.userId)
-    case 'finance.posTerminals': return listPosTerminals()
-    case 'finance.createPosTerminal': return savePosTerminal(null, posTerminalWriteSchema.parse(body.value))
-    case 'finance.updatePosTerminal':
-      return savePosTerminal(numberField(body, 'id'), posTerminalWriteSchema.parse(body.value))
-    case 'shopping.list':
-      return wantsPaging(body)
-        ? listShoppingListsPaged(searchArg(body), pageArg(body), sizeArg(body))
-        : listShoppingLists(searchArg(body))
-    case 'shopping.requirements':
-      return shoppingRequirements(textField(body, 'from'), textField(body, 'to'))
-    case 'shopping.create':
-      return { id: await createShoppingList(shoppingListCreateSchema.parse(body.value), principal.userId) }
+      return createPurchase(purchaseWriteSchema.parse(body.value), principal.userId)
+    case 'purchases.update':
+      return updatePurchase(numberField(body, 'id'), purchaseWriteSchema.parse(body.value), principal.userId)
+    case 'purchases.delete':
+      return deletePurchase(numberField(body, 'id'), principal.userId)
+    case 'months.list': return listRecentMonths()
+    case 'months.get':
+      return getMonthlyReport(numberField(body, 'year'), numberField(body, 'month'))
     case 'payments.list':
       return listPayments(
         typeof body.bucket === 'string' ? body.bucket as PaymentBucket : undefined,
@@ -426,7 +323,6 @@ export async function dispatchAdminOperation(
         principal.userId,
       )
     case 'payments.refund': return refundPayment(numberField(body, 'id'), principal.userId)
-    case 'reports.v15': return managerialReports(textField(body, 'from'), textField(body, 'to'))
     case 'customers.search': return searchCustomers(customerDirectoryQuerySchema.parse(body.value))
     case 'customers.detail': return getCustomerDetail(numberField(body, 'id'))
     case 'reports.customers': {
@@ -470,10 +366,6 @@ export async function dispatchAdminOperation(
     case 'social.targets.retry':
       return retrySocialTarget(numberField(body, 'id'), resolveSocialCredential)
   }
-}
-
-async function createSupplierCompat(value: Parameters<typeof saveSupplier>[1]) {
-  await saveSupplier(null, value)
 }
 
 export { closeDatabase }

@@ -1,5 +1,44 @@
 # Project state
 
+## 2026-08-20 — Simplified purchasing, monthly reporting, and dashboard
+
+- The inventory, procurement and accounting architecture is removed, not hidden. Sixteen tables are
+  dropped: units, ingredient categories, ingredients, suppliers, purchase items, inventory
+  transactions, recipes and recipe items, order inventory consumptions, shopping lists and their
+  items, financial accounts, expense categories, financial transactions, purchase payments, and POS
+  terminals. `v15-service.ts` (992 lines), the `v15` contracts (263) and `V15Pages.tsx` (866) are gone.
+- A purchase is now one line: date, amount, title, optional seller, receipt and note. There is no
+  itemisation, no draft/confirm workflow, no payment allocation and no stock posting. Purchases are
+  editable; corrections are edits, with the trail in `audit_logs`.
+- Reporting is per Jalali month, derived from the purchase date and order snapshots. There is no
+  period table: a month exists because it happened. Conversion lives in
+  `packages/server-core/src/domain/jalali-month.ts` and produces half-open ISO ranges, so SQL stays on
+  ordinary dates and keeps using the existing indexes.
+- Food sales are `orders.subtotal_amount` of Delivered orders — food only, never the customer's
+  delivery charge, which would flatter every comparison against ingredient spend. Courier pay is
+  reported beside the comparison, never inside it. `salesMinusPurchases` is never called profit.
+- The purchase-to-sales ratio is null for a month with no sales, so no screen can print Infinity.
+- Order confirmation no longer consumes recipe ingredients or touches stock. The lifecycle now only
+  counts portions sold and returns them on cancellation.
+- Order payments survive with their accounting attachments removed: `payments` lost
+  `financial_account_id` and `pos_terminal_id` and posts to no ledger. `payment_method` still records
+  a POS payment, which is all the terminal registry was ever asked.
+- The Admin dashboard is two bands — today's operations, then the current Jalali month — plus one
+  daily sales-vs-purchases chart, served by a single aggregated call. Website-visitor analytics moved
+  to a dedicated «آمار کاربران سایت» page under فروش و مشتریان, reusing the same service and query.
+- Navigation shrank from seven groups to six: «انبار و تدارکات» is gone and «مالی» is four
+  destinations (خریدها، ماه‌ها، پرداخت‌های سفارش، کارکرد و تسویه پیک‌ها). The Electron renderer bundle
+  dropped from 1,280 kB to 1,170 kB.
+- Migration `0024_simple_monthly_business.sql` transforms `purchases` in place. Applied to
+  192.168.70.127/kafgir on 2026-08-20: all sixteen tables verified gone, six confirmed purchases
+  converted with supplier name and invoice number preserved, and orders, payments, couriers,
+  customers, menus and analytics untouched.
+- TypeScript passes for all four workspaces; contracts (52), server-core (274), Web (254) and Admin
+  (113) unit tests pass; Web and Electron production builds succeed. Order lifecycle, payments,
+  courier accounting and the dashboard were verified end to end against the live database with full
+  cleanup.
+- Detailed design: `.ai/docs/business-reporting.md`.
+
 ## 2026-08-20 — Delivery-fee visibility and courier accounting
 
 - Customer checkout now shows جمع غذاها، هزینه ارسال and مبلغ نهایی as three separate lines before

@@ -1,24 +1,30 @@
 import type { AdminOperation } from './admin-operations'
 
+/**
+ * Who may do what.
+ *
+ * The set shrank with the architecture: there is no inventory, procurement or accounting subsystem
+ * left to guard, so the permissions that guarded them are gone rather than left pointing at nothing.
+ * What remains splits along one line — running the kitchen, versus seeing and moving money.
+ */
+
 const kitchenOperations = new Set<AdminOperation>([
-  'dashboard.today', 'dashboard.v15', 'dashboard.analytics',
+  'dashboard.today', 'dashboard.analytics',
   'foodCategories.list', 'foodCategories.create', 'foodCategories.update',
   'foodTags.list', 'foodTags.create', 'foodTags.update',
-  // The kitchen owns catalog reference data: tag groups and measurement units back the food and
-  // ingredient records it maintains. Checkout configuration is deliberately not included.
+  // The kitchen owns catalog reference data: tag groups back the food records it maintains.
+  // Checkout configuration is deliberately not included.
   'foodTagGroups.list', 'foodTagGroups.create', 'foodTagGroups.update',
-  'units.save', 'supportSubjects.list',
+  'supportSubjects.list',
   'foods.list', 'foods.create', 'foods.update', 'foods.setActive',
   'menus.get', 'menus.settings', 'menus.addItem', 'menus.updateItem', 'menus.removeItem',
   'customers.lookup', 'orders.search', 'orders.get', 'orders.create', 'orders.updateStatus',
   'support.conversations.list', 'support.conversations.get', 'support.conversations.reply',
   'support.conversations.setClosed', 'support.reviews.list', 'support.reviews.setStatus', 'support.reviews.reply',
-  'units.list', 'ingredients.list', 'ingredients.create', 'ingredients.update',
-  'suppliers.list', 'suppliers.create', 'suppliers.update',
-  'purchases.list', 'purchases.create', 'purchases.confirm', 'purchases.cancel', 'purchases.pay',
-  'inventory.movements', 'inventory.adjust', 'inventory.waste', 'inventory.count',
-  'recipes.get', 'recipes.save', 'finance.accounts',
-  'shopping.list', 'shopping.requirements', 'shopping.create', 'reports.v15', 'logs.server',
+  'logs.server',
+  // The kitchen does the shopping, so it writes the purchase down and sees the month it lands in.
+  'purchases.month', 'purchases.create', 'purchases.update', 'purchases.delete',
+  'months.list', 'months.get',
   'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',
   // The kitchen sees who is delivering on a given day, but never the courier ledger.
   'couriers.list', 'courierDays.get',
@@ -28,14 +34,15 @@ const kitchenOperations = new Set<AdminOperation>([
 ])
 
 const orderOperations = new Set<AdminOperation>([
-  'dashboard.today', 'dashboard.v15', 'dashboard.analytics', 'menus.get',
+  'dashboard.today', 'dashboard.analytics', 'menus.get',
   // Manual order taking needs to know which methods are open to it, but not to change their terms.
   'paymentMethods.list', 'deliveryMethods.list', 'supportSubjects.list',
   'customers.lookup', 'orders.search', 'orders.get', 'orders.create', 'orders.updateStatus',
   'support.conversations.list', 'support.conversations.get', 'support.conversations.reply',
   'support.conversations.setClosed', 'support.reviews.list', 'support.reviews.setStatus', 'support.reviews.reply',
-  'finance.accounts', 'finance.posTerminals',
-  'payments.list', 'payments.totals', 'payments.create', 'payments.changeStatus', 'logs.server', 'reports.customers', 'customers.search', 'customers.detail',
+  'payments.list', 'payments.totals', 'payments.create', 'payments.changeStatus',
+  'logs.server', 'reports.customers', 'customers.search', 'customers.detail',
+  'purchases.month', 'months.list', 'months.get',
   'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',
   // Order managers run dispatch, so they assign each day's courier and read the resulting work and
   // settlement history. Recording a settlement is money leaving the business, and stays with Owner.

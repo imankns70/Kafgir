@@ -4,8 +4,6 @@ import type {
   FoodTagGroupWriteRequest,
   SupportSubjectDto,
   SupportSubjectWriteRequest,
-  UnitDto,
-  UnitWriteRequest,
 } from '@kafgir/contracts'
 import { adminApi } from './api'
 import {
@@ -27,7 +25,6 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : S
 
 const emptyGroup: FoodTagGroupWriteRequest = { code: '', title: '', displayOrder: 0, isActive: true }
 const emptySubject: SupportSubjectWriteRequest = { title: '', displayOrder: 0, isActive: true }
-const emptyUnit: UnitWriteRequest = { name: '', symbol: '', isActive: true }
 
 export function FoodTagGroupsPage() {
   const [rows, setRows] = useState<FoodTagGroupDto[]>([])
@@ -155,61 +152,4 @@ export function SupportSubjectsPage() {
     </table></div><Pager {...paged} /></>}
   </PageFrame>
 }
-
-export function UnitsPage() {
-  const [rows, setRows] = useState<UnitDto[]>([])
-  const [form, setForm] = useState<UnitWriteRequest>(emptyUnit)
-  const [editId, setEditId] = useState<number | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const paged = usePagination(rows)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try { setRows(await adminApi.units()); setError(null) }
-    catch (reason) { setError(errorText(reason)) }
-    finally { setLoading(false) }
-  }, [])
-  useEffect(() => { void load() }, [load])
-
-  const reset = () => { setEditId(null); setForm(emptyUnit) }
-  const save = async (event: FormEvent) => {
-    event.preventDefault()
-    setBusy(true)
-    try {
-      await adminApi.saveUnit(editId, form)
-      reset(); setError(null); await load()
-    } catch (reason) { setError(errorText(reason)) }
-    finally { setBusy(false) }
-  }
-
-  return <PageFrame
-    title="واحدهای اندازه‌گیری"
-    description="واحدهایی که مواد اولیه و اقلام خرید با آن‌ها شمرده می‌شوند."
-    actions={<button onClick={reset}>واحد جدید</button>}
-  >
-    <Message error={error} />
-    <form className="panel form-grid catalog-form" onSubmit={save}>
-      <label>نام<input value={form.name} required
-        onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-      <label>نماد<input value={form.symbol} required
-        onChange={(event) => setForm({ ...form, symbol: event.target.value })} /></label>
-      <label className="switch"><input type="checkbox" checked={form.isActive}
-        onChange={(event) => setForm({ ...form, isActive: event.target.checked })} />فعال</label>
-      <button className="primary" disabled={busy}>{editId ? 'ذخیره واحد' : 'افزودن واحد'}</button>
-      {editId && <button type="button" onClick={reset} disabled={busy}>انصراف</button>}
-    </form>
-    <ListState loading={loading} error={error} isEmpty={rows.length === 0} emptyText="هنوز واحدی ثبت نشده است." />
-    {rows.length > 0 && <><div className="panel table-wrap"><table>
-      <thead><tr><RowNumberHead /><th>نام</th><th>نماد</th><th>وضعیت</th><th /></tr></thead>
-      <tbody>{paged.visible.map((row, index) => <tr key={row.id}><RowNumberCell offset={paged.rowOffset} index={index} />
-        <td>{row.name}</td><td>{row.symbol}</td><td><StatusPill active={row.isActive} /></td>
-        <td><button onClick={() => {
-          setEditId(row.id)
-          setForm({ name: row.name, symbol: row.symbol, isActive: row.isActive })
-        }}>ویرایش</button></td>
-      </tr>)}</tbody>
-    </table></div><Pager {...paged} /></>}
-  </PageFrame>
-}
+
