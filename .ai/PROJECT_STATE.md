@@ -1,5 +1,16 @@
 # Project state
 
+## 2026-08-31 — Thermal customer receipt
+
+- Electron Admin now keeps the existing A4 invoice and adds a separate monochrome 80mm thermal
+  receipt for small customer printers. The compact receipt includes order/customer details, address,
+  fulfillment and payment method, line quantities and prices, delivery fee, final amount and note.
+- The renderer measures the receipt content before invoking print. The trusted IPC boundary validates
+  the requested layout, and Electron uses a custom 80mm page whose height follows the receipt within
+  safe bounds, avoiding a fixed long blank roll for ordinary orders.
+- Thermal printing uses text branding and high-contrast separators rather than raster logos or colored
+  surfaces, while A4 print behavior remains available as a separate action.
+
 ## 2026-08-20 — Simplified purchasing, monthly reporting, and dashboard
 
 - The inventory, procurement and accounting architecture is removed, not hidden. Sixteen tables are

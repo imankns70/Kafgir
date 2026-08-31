@@ -14,6 +14,7 @@ import type {
   AdminOperationRequest,
   SecureConnectionConfiguration,
 } from '../shared/admin-operations'
+import { parseInvoicePrintRequest, thermalPageHeightMicrons } from '../shared/invoice-print'
 import { dispatchAdminOperation } from './admin-dispatcher'
 import { desktopLogger, readDesktopLogs } from './logger'
 import {
@@ -210,14 +211,30 @@ function registerIpc() {
     assertTrustedSender(event)
     return readDesktopLogs(limit)
   })
-  ipcMain.handle('print:invoice', async (event) => {
+  ipcMain.handle('print:invoice', async (event, value: unknown) => {
     assertTrustedSender(event)
     if (!mainWindow || !principal) throw new Error('ابتدا وارد حساب مدیریت شوید.')
+    const request = parseInvoicePrintRequest(value)
+    const printOptions = request.layout === 'thermal'
+      ? {
+          silent: false,
+          printBackground: false,
+          color: false,
+          margins: { marginType: 'none' as const },
+          pageSize: {
+            width: 80_000,
+            height: thermalPageHeightMicrons(request.contentHeightPx),
+          },
+        }
+      : {
+          silent: false,
+          printBackground: true,
+          color: true,
+          margins: { marginType: 'custom' as const, top: 45, bottom: 45, left: 45, right: 45 },
+          pageSize: 'A4' as const,
+        }
     await new Promise<void>((resolvePrint, rejectPrint) => {
-      mainWindow!.webContents.print({
-        silent: false,
-        printBackground: true,
-      }, (success, failureReason) => {
+      mainWindow!.webContents.print(printOptions, (success, failureReason) => {
         if (success) resolvePrint()
         else rejectPrint(new Error(failureReason || 'باز کردن پنجره چاپ ممکن نشد.'))
       })

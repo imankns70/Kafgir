@@ -411,3 +411,4 @@
   unnecessarily tall page.
 - [ ] Before production rollout, apply migration `0021_striped_thunderbolt_ross.sql` and review the
   customer-visible methods, delivery fee and minimum order.
+- [x] Add a separate 80mm thermal customer receipt without replacing the existing A4 invoice.
