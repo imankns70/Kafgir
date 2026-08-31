@@ -68,6 +68,7 @@ import {
   useAsyncAction, usePagination, useServerPagedGrid,
 } from './admin-ui'
 import type { PagedResult } from '@kafgir/contracts'
+import type { InvoicePrintLayout } from '../../shared/invoice-print'
 
 const localAdmin: Record<'username' | 'password', string> = {
   username: 'admin',
@@ -286,15 +287,70 @@ function AdminOrderInvoice({ order }: { order: OrderDto }) {
   </article>
 }
 
+export function AdminThermalReceipt({ order }: { order: OrderDto }) {
+  const invoiceItems = buildInvoiceOrderLines(order.items)
+  return <article className="admin-thermal-receipt" aria-label={`رسید حرارتی سفارش ${order.orderNumber}`}>
+    <header className="thermal-receipt-header">
+      <strong>کفگیر</strong>
+      <span>رسید فروش غذای خانگی</span>
+      <bdi dir="ltr">#{order.orderNumber}</bdi>
+    </header>
+
+    <section className="thermal-receipt-meta">
+      <div><span>تاریخ</span><strong>{dateTime(order.createdAt)}</strong></div>
+      <div><span>مشتری</span><strong>{order.customerFullName}</strong></div>
+      <div><span>تماس</span><strong dir="ltr">{order.customerPhoneNumber}</strong></div>
+      <div><span>دریافت</span><strong>{deliveryMethodLabel[order.deliveryMethod]}</strong></div>
+      <div><span>تحویل</span><strong>{deliveryWindowLabel(order)}</strong></div>
+      <div><span>پرداخت</span><strong>{paymentMethodLabel[order.paymentMethod]}</strong></div>
+      {order.addressLine && <div className="thermal-receipt-address"><span>آدرس</span><strong>{order.addressLine}</strong></div>}
+    </section>
+
+    <section className="thermal-receipt-lines" aria-label="اقلام سفارش">
+      {invoiceItems.map((item, index) => <div className="thermal-receipt-line" key={item.key}>
+        <div>
+          <strong>{plainNumber(index + 1)}. {item.foodName}</strong>
+          <span>{plainNumber(item.quantity)} × {money(item.unitPrice)}</span>
+        </div>
+        <bdi>{money(item.totalPrice)}</bdi>
+      </div>)}
+    </section>
+
+    <section className="thermal-receipt-summary">
+      <div><span>جمع اقلام</span><strong>{money(order.subtotalAmount)}</strong></div>
+      <div><span>هزینه ارسال</span><strong>{money(order.deliveryFee)}</strong></div>
+      <div className="thermal-receipt-total"><span>مبلغ قابل پرداخت</span><strong>{money(order.totalAmount)}</strong></div>
+    </section>
+    {order.customerNote && <section className="thermal-receipt-note"><strong>یادداشت مشتری</strong><p>{order.customerNote}</p></section>}
+    <footer className="thermal-receipt-footer">
+      <strong>از خرید شما سپاسگزاریم</strong>
+      <span dir="ltr">09166450262 · 09163442440</span>
+    </footer>
+  </article>
+}
+
 function InvoiceDialog({ order, onClose }: { order: OrderDto; onClose: () => void }) {
-  const [isPrinting, setIsPrinting] = useState(false)
+  const [printingLayout, setPrintingLayout] = useState<InvoicePrintLayout | null>(null)
   const [printError, setPrintError] = useState<string | null>(null)
-  const printInvoice = async () => {
-    setIsPrinting(true)
+  const printInvoice = async (layout: InvoicePrintLayout) => {
+    setPrintingLayout(layout)
     setPrintError(null)
-    try { await window.kafgir.printInvoice() }
+    document.body.dataset.invoicePrintLayout = layout
+    try {
+      await new Promise<void>((resolveFrame) => window.requestAnimationFrame(() => resolveFrame()))
+      if (layout === 'thermal') {
+        const receipt = document.querySelector<HTMLElement>('.admin-thermal-receipt')
+        if (!receipt) throw new Error('قالب رسید حرارتی پیدا نشد.')
+        await window.kafgir.printInvoice({ layout, contentHeightPx: Math.ceil(receipt.scrollHeight) })
+      } else {
+        await window.kafgir.printInvoice({ layout })
+      }
+    }
     catch (reason) { setPrintError(reason instanceof Error ? reason.message : 'چاپ فاکتور ممکن نشد.') }
-    finally { setIsPrinting(false) }
+    finally {
+      delete document.body.dataset.invoicePrintLayout
+      setPrintingLayout(null)
+    }
   }
   return <div className="invoice-dialog" role="dialog" aria-modal="true" aria-label={`فاکتور سفارش ${order.orderNumber}`}>
     <button type="button" className="invoice-dialog-backdrop" aria-label="بستن فاکتور" onClick={onClose} />
@@ -302,11 +358,15 @@ function InvoiceDialog({ order, onClose }: { order: OrderDto; onClose: () => voi
       <div className="invoice-dialog-actions">
         {printError && <span className="invoice-print-error" role="alert">{printError}</span>}
         <button type="button" className="secondary-outline" onClick={onClose}>بستن</button>
-        <button type="button" className="primary" disabled={isPrinting} onClick={() => void printInvoice()}>
-          {isPrinting ? 'در حال باز کردن چاپ…' : 'چاپ یا ذخیره فاکتور'}
+        <button type="button" className="secondary-outline" disabled={printingLayout !== null} onClick={() => void printInvoice('thermal')}>
+          {printingLayout === 'thermal' ? 'در حال باز کردن چاپ…' : 'چاپ حرارتی ۸۰ میلی‌متر'}
+        </button>
+        <button type="button" className="primary" disabled={printingLayout !== null} onClick={() => void printInvoice('a4')}>
+          {printingLayout === 'a4' ? 'در حال باز کردن چاپ…' : 'چاپ یا ذخیره فاکتور A4'}
         </button>
       </div>
       <AdminOrderInvoice order={order} />
+      <AdminThermalReceipt order={order} />
     </div>
   </div>
 }

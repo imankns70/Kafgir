@@ -1,5 +1,14 @@
 # Decisions
 
+## 2026-08-31 — Thermal receipts are a separate print layout
+
+- Keep A4 and thermal output separate instead of shrinking the existing invoice. A narrow receipt has
+  different information density, line wrapping, color and paper-length constraints.
+- Use 80mm roll width with a 72mm safe content area, monochrome output and content-measured page
+  height. This matches the common small thermal-printer format while preserving readable Persian RTL.
+- Validate layout and measured height in Electron main before passing custom page dimensions to
+  `webContents.print`; renderer input is never trusted merely because it came through preload.
+
 ## 2026-08-20 — Delete the inventory and accounting architecture rather than hide it
 
 - The kitchen never operated stock ledgers, weighted-average costing, purchase approval or a
