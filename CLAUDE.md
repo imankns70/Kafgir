@@ -1,10 +1,9 @@
 ## Git workflow
 
-* Do not push feature work, small fixes, or iterative commits directly to `main`.
-* Keep related implementation commits on `development` until the work is tested and ready to release.
-* Promote tested work to `main` in one deliberate release merge/squash so Netlify creates far fewer production deploys.
-* Changes that do not affect the customer web app should stay off `main` until they are part of a deliberate release.
-* Before a release to `main`, run the relevant tests/build and make sure CI is green.
+* Use `main` as the repository's only long-lived branch.
+* Commit and push to `main` only after the relevant tests/build pass and the change is ready.
+* Do not create persistent feature or development branches unless the user explicitly requests one.
+* Keep commits cohesive so production deployment history remains understandable.
 * Do not discard uncommitted local work.
 * Before pull, merge, rebase, push, tag, or release operations, inspect:
 
