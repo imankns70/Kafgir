@@ -11,8 +11,10 @@ export const formatNumber = (value: string | number, maximumFractionDigits = 0):
  */
 export {
   formatAmount,
+  formatMoneyInputText,
   formatMoney,
   isInvalidMoneyText,
+  moneyToPersianWords,
   moneyInputText,
   normalizeMoneyText,
   parseMoney,

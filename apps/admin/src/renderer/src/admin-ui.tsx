@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { defaultPageSize, pageSizeOptions, type PagedResult } from '@kafgir/contracts'
 import {
-  formatNumber, isInvalidMoneyText, moneyInputText, normalizeMoneyText, parseMoney,
+  formatMoneyInputText, formatNumber, isInvalidMoneyText, moneyInputText, moneyToPersianWords,
+  normalizeMoneyText, parseMoney,
 } from './number-format'
 import { PersianDatePicker } from './PersianDatePicker'
 import { PersianTimePicker } from './PersianTimePicker'
@@ -119,12 +120,8 @@ export function TimeField({ label, value, onChange, allowClear }: {
 /**
  * The one money control in the admin.
  *
- * Grouping is applied on blur, not on every keystroke. Regrouping a React controlled input while it
- * is being typed into rewrites the value under the caret: inserting a digit in the middle of
- * «1,260,000» shifts every separator after it, the string the browser gets back differs from the one
- * it just rendered, and the caret snaps to the end. Formatting once the field is left gives the same
- * readable «1,260,000» with none of that, and focusing strips the separators back out so editing an
- * existing amount is ordinary text editing.
+ * Valid amounts are grouped while typing and repeated below the box in Persian words. Both are
+ * presentation only; caret restoration keeps editing a digit in the middle predictable.
  *
  * The caller holds the text and parses it with `parseMoney` when it submits. Nothing here ever does
  * arithmetic on the displayed string.
@@ -138,19 +135,41 @@ export function AmountField({ label, value, onChange, placeholder, hint }: {
   hint?: string
 }) {
   const id = useId()
+  const inputRef = useRef<HTMLInputElement | null>(null)
   const invalid = isInvalidMoneyText(value)
+  const parsed = parseMoney(value)
+  const words = value.trim() !== '' && parsed !== null ? moneyToPersianWords(parsed) : ''
+  const changeValue = (input: HTMLInputElement) => {
+    const raw = input.value
+    const formatted = formatMoneyInputText(raw)
+    const selectionStart = input.selectionStart
+    const digitsAfterCaret = selectionStart == null ? 0 : normalizeMoneyText(raw.slice(selectionStart)).length
+    onChange(formatted)
+
+    // Grouping inserts commas before the caret. Restore it by counting digits from the right so
+    // editing the middle of a large amount remains predictable instead of jumping to the end.
+    if (selectionStart != null && formatted !== raw) requestAnimationFrame(() => {
+      let nextCaret = formatted.length
+      let remainingDigits = digitsAfterCaret
+      while (nextCaret > 0 && remainingDigits > 0) {
+        nextCaret -= 1
+        if (/\d/u.test(formatted.charAt(nextCaret))) remainingDigits -= 1
+      }
+      inputRef.current?.setSelectionRange(nextCaret, nextCaret)
+    })
+  }
   return <div className="field admin-amount-field">
     <label htmlFor={id}>{label}</label>
     {/* `dir="ltr"` because digits and their separators read left-to-right even inside an RTL page. */}
     <input
+      ref={inputRef}
       id={id}
       inputMode="numeric"
       dir="ltr"
       value={value}
       placeholder={placeholder}
       aria-invalid={invalid || undefined}
-      onChange={(event) => onChange(event.target.value)}
-      onFocus={() => onChange(normalizeMoneyText(value))}
+      onChange={(event) => changeValue(event.currentTarget)}
       // Unusable text is left exactly as typed, so the operator can see and fix what they wrote
       // rather than watching it silently vanish or become zero.
       onBlur={() => {
@@ -158,6 +177,7 @@ export function AmountField({ label, value, onChange, placeholder, hint }: {
         if (parsed !== null) onChange(moneyInputText(parsed))
       }}
     />
+    {words && <small className="amount-in-words">{words}</small>}
     {hint && <small className="muted">{hint}</small>}
     {invalid && <small className="field-error" role="alert">مبلغ باید عددی صحیح به تومان باشد.</small>}
   </div>

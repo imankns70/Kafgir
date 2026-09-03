@@ -2,10 +2,13 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { OrderStatus, type CustomerDetailDto, type CustomerDirectoryPageDto, type CustomerDirectoryQuery } from '@kafgir/contracts'
 import { adminApi } from './api'
 import {
-  DateField, ListState, Message, PageFrame, Pager, RowNumberCell, RowNumberHead,
+  AmountField, DateField, ListState, Message, PageFrame, Pager, RowNumberCell, RowNumberHead,
   defaultPageSize, rowOffsetOf, useAsyncAction, usePagination,
 } from './admin-ui'
-import { formatMoney, formatNumber, formatPersianDate, formatPersianDateTime } from './number-format'
+import {
+  formatMoney, formatNumber, formatPersianDate, formatPersianDateTime,
+  isInvalidMoneyText, parseMoney,
+} from './number-format'
 
 /**
  * Look up a customer and read their history.
@@ -61,6 +64,7 @@ export function CustomersPage() {
   const [selected, setSelected] = useState<CustomerDetailDto | null>(null)
   const [openingId, setOpeningId] = useState<number | null>(null)
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [minSpentText, setMinSpentText] = useState('')
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const searchAction = useAsyncAction()
@@ -85,11 +89,16 @@ export function CustomersPage() {
 
   const submit = (event: FormEvent) => {
     event.preventDefault()
+    if (isInvalidMoneyText(minSpentText)) {
+      setError('حداقل مجموع خرید باید عددی صحیح و نامنفی به تومان باشد.')
+      return
+    }
     runSearch({ ...query, page: 1 })
   }
 
   const reset = () => {
     setSelected(null)
+    setMinSpentText('')
     runSearch(emptyQuery)
   }
 
@@ -161,8 +170,11 @@ export function CustomersPage() {
           onChange={(value) => patch({ joinedTo: value || null })} />
         <label>حداقل تعداد سفارش<input type="number" min="0" value={query.minOrders ?? ''}
           onChange={(event) => patch({ minOrders: numberOrNull(event.target.value) })} /></label>
-        <label>حداقل مجموع خرید<input inputMode="numeric" dir="ltr" value={query.minSpent ?? ''}
-          onChange={(event) => patch({ minSpent: numberOrNull(event.target.value) })} /></label>
+        <AmountField label="حداقل مجموع خرید (تومان)" value={minSpentText}
+          onChange={(value) => {
+            setMinSpentText(value)
+            patch({ minSpent: value.trim() === '' ? null : parseMoney(value) })
+          }} />
         <label>شهر<input value={query.city ?? ''}
           onChange={(event) => patch({ city: event.target.value || null })} /></label>
         {query.activity === 'lapsed' && <label>بدون سفارش از (روز)

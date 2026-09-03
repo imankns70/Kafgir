@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatAmount,
+  formatMoneyInputText,
   formatMoney,
   isInvalidMoneyText,
+  moneyToPersianWords,
   moneyInputText,
   normalizeMoneyText,
   parseMoney,
@@ -93,36 +95,43 @@ describe('parsing typed money', () => {
   })
 })
 
-/**
- * The money control formats on blur rather than on every keystroke, so a controlled input never has
- * its value rewritten under the caret. This walks that lifecycle without a DOM.
- */
-describe('the money-box lifecycle', () => {
-  const focus = (held: string) => normalizeMoneyText(held)
-  const blur = (held: string) => {
-    const parsed = parseMoney(held)
-    return parsed === null ? held : moneyInputText(parsed)
-  }
-
-  it('leaves the text alone while typing and groups it on blur', () => {
+describe('live money-box formatting', () => {
+  it('groups the value after every typed digit', () => {
     let held = ''
-    for (const key of '1260000') held += key
-    expect(held).toBe('1260000')
-    expect(blur(held)).toBe('1,260,000')
+    for (const key of '1260000') held = formatMoneyInputText(held + key)
+    expect(held).toBe('1,260,000')
   })
 
-  it('strips separators on focus so an existing amount is easy to edit', () => {
-    expect(focus('1,260,000')).toBe('1260000')
+  it('normalizes Persian and Arabic-Indic digits while grouping', () => {
+    expect(formatMoneyInputText('۱۲۶۰۰۰۰')).toBe('1,260,000')
+    expect(formatMoneyInputText('٧٠٠٠٠')).toBe('70,000')
   })
 
-  it('keeps unusable text visible instead of blanking or zeroing it', () => {
-    expect(blur('abc')).toBe('abc')
+  it('keeps empty and unusable text visible instead of inventing zero', () => {
+    expect(formatMoneyInputText('')).toBe('')
+    expect(formatMoneyInputText('abc')).toBe('abc')
   })
 
-  it('survives repeated focus and blur without drifting', () => {
-    let held = '۷۰٬۰۰۰'
-    for (let round = 0; round < 3; round += 1) held = blur(focus(held))
-    expect(held).toBe('70,000')
-    expect(parseMoney(held)).toBe(70_000)
+  it('is stable when an already grouped value is formatted again', () => {
+    expect(formatMoneyInputText(formatMoneyInputText('1260000'))).toBe('1,260,000')
+  })
+})
+
+describe('money in Persian words', () => {
+  it('renders the full Toman amount for the shared input caption', () => {
+    expect(moneyToPersianWords(0)).toBe('صفر تومان')
+    expect(moneyToPersianWords(70_000)).toBe('هفتاد هزار تومان')
+    expect(moneyToPersianWords(1_260_000)).toBe('یک میلیون و دویست و شصت هزار تومان')
+    expect(moneyToPersianWords(4_850_000)).toBe('چهار میلیون و هشتصد و پنجاه هزار تومان')
+  })
+
+  it('supports the full safe-integer scale used by money contracts', () => {
+    expect(moneyToPersianWords(1_000_000_000_000)).toBe('یک تریلیون تومان')
+    expect(moneyToPersianWords(1_000_000_000_000_000)).toBe('یک کوادریلیون تومان')
+  })
+
+  it('does not invent a caption for unusable numeric values', () => {
+    expect(moneyToPersianWords(-1)).toBe('')
+    expect(moneyToPersianWords(Number.NaN)).toBe('')
   })
 })

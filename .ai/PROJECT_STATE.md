@@ -1,5 +1,25 @@
 # Project state
 
+## 2026-09-03 — Live, shared money formatting
+
+- `@kafgir/contracts` now owns live money-entry formatting as well as parsing and display. Valid
+  Latin, Persian and Arabic-Indic digits are grouped with comma separators on every edit; empty and
+  invalid text remain distinguishable from an intentional zero.
+- Electron Admin's shared `AmountField` applies that formatter while preserving the caret during
+  middle-of-value edits. Daily-menu prices and discounts, purchases, customer payments, delivery
+  settings, courier daily fees/payables and courier settlements therefore share identical entry
+  behavior. The customer-directory minimum-spend filter was migrated from a raw numeric input to
+  the same field.
+- Every valid, non-empty `AmountField` also shows its live Persian wording below the input (for
+  example `1,260,000` as «یک میلیون و دویست و شصت هزار تومان»). The conversion now belongs to the
+  shared money contract rather than the daily-menu page, supports zero through safe-integer money
+  values, and leaves empty or invalid text without a misleading wording.
+- Money display remains centralized through `formatMoney`/`formatAmount` in the contracts package;
+  the Admin and Web audits found their monetary result cells and summaries already using it.
+- Verification: contracts 55/55 tests, Admin 117/117 tests, Admin and Web TypeScript checks, Electron
+  production build and Next.js production build all pass. Web database integration suites remain
+  guarded/skipped when their test database is not configured.
+
 ## 2026-08-31 — Thermal customer receipt
 
 - Electron Admin now keeps the existing A4 invoice and adds a separate monochrome 80mm thermal

@@ -412,3 +412,6 @@
 - [ ] Before production rollout, apply migration `0021_striped_thunderbolt_ross.sql` and review the
   customer-visible methods, delivery fee and minimum order.
 - [x] Add a separate 80mm thermal customer receipt without replacing the existing A4 invoice.
+- [x] Centralize live money-entry grouping and Persian amount wording, migrate the customer
+  minimum-spend filter to the shared amount field, and verify monetary entry/display across Admin
+  and Web.

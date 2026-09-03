@@ -62,8 +62,62 @@ export const isInvalidMoneyText = (value: string): boolean =>
   value.trim() !== '' && parseMoney(value) === null
 
 /**
- * What a money box shows when it is not being edited. Null renders empty, so an unset fee stays
- * visibly unset instead of reading as a deliberate zero.
+ * Canonical text for a numeric money value. Null renders empty, so an unset fee stays visibly unset
+ * instead of reading as a deliberate zero.
  */
 export const moneyInputText = (value: number | null | undefined): string =>
   value == null ? '' : formatAmount(value)
+
+/**
+ * Groups a money box while it is being edited.
+ *
+ * Valid digits are normalized and grouped immediately. Invalid text is deliberately preserved so
+ * the shared field can show a validation error instead of silently deleting what the operator
+ * typed. An empty box remains empty and therefore distinct from an intentional zero.
+ */
+export const formatMoneyInputText = (value: string): string => {
+  if (value.trim() === '') return ''
+  const parsed = parseMoney(value)
+  return parsed === null ? value : moneyInputText(parsed)
+}
+
+const persianOnes = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه']
+const persianTeens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده']
+const persianTens = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود']
+const persianHundreds = ['', 'صد', 'دویست', 'سیصد', 'چهارصد', 'پانصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد']
+const persianScales = ['', 'هزار', 'میلیون', 'میلیارد', 'تریلیون', 'کوادریلیون']
+const joinPersianParts = (parts: string[]) => parts.filter(Boolean).join(' و ')
+
+const underThousandToPersianWords = (value: number): string => {
+  const hundred = Math.floor(value / 100)
+  const rest = value % 100
+  const parts = [persianHundreds[hundred] ?? '']
+  if (rest >= 10 && rest < 20) parts.push(persianTeens[rest - 10] ?? '')
+  else {
+    parts.push(persianTens[Math.floor(rest / 10)] ?? '')
+    parts.push(persianOnes[rest % 10] ?? '')
+  }
+  return joinPersianParts(parts)
+}
+
+/** «یک میلیون و دویست و شصت هزار تومان» — the readable caption below money inputs. */
+export const moneyToPersianWords = (value: number): string => {
+  if (!Number.isSafeInteger(value) || value < 0) return ''
+  if (value === 0) return 'صفر تومان'
+
+  const groups: string[] = []
+  let remaining = value
+  let scale = 0
+  while (remaining > 0) {
+    const group = remaining % 1000
+    if (group > 0) {
+      groups.unshift([
+        underThousandToPersianWords(group),
+        persianScales[scale] ?? '',
+      ].filter(Boolean).join(' '))
+    }
+    remaining = Math.floor(remaining / 1000)
+    scale += 1
+  }
+  return `${joinPersianParts(groups)} تومان`
+}

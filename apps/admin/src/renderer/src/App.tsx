@@ -106,36 +106,6 @@ const integerDigits = (value: string) => asciiDigits(value).replace(/\D/g, '')
 function ButtonLoading({ label }: { label: string }) {
   return <span className="button-loading" role="status" aria-live="polite"><span className="button-loading-mark" aria-hidden="true"><i /></span><span>{label}</span></span>
 }
-const persianOnes = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه']
-const persianTeens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده']
-const persianTens = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود']
-const persianHundreds = ['', 'صد', 'دویست', 'سیصد', 'چهارصد', 'پانصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد']
-const persianScales = ['', 'هزار', 'میلیون', 'میلیارد']
-const joinPersianParts = (parts: string[]) => parts.filter(Boolean).join(' و ')
-const underThousandToWords = (value: number): string => {
-  const hundred = Math.floor(value / 100)
-  const rest = value % 100
-  const parts = [persianHundreds[hundred] ?? '']
-  if (rest >= 10 && rest < 20) parts.push(persianTeens[rest - 10] ?? '')
-  else {
-    parts.push(persianTens[Math.floor(rest / 10)] ?? '')
-    parts.push(persianOnes[rest % 10] ?? '')
-  }
-  return joinPersianParts(parts)
-}
-const numberToPersianWords = (value: number): string => {
-  if (!Number.isFinite(value) || value <= 0) return 'صفر تومان'
-  const groups: string[] = []
-  let remaining = Math.floor(value)
-  let scale = 0
-  while (remaining > 0) {
-    const group = remaining % 1000
-    if (group > 0) groups.unshift(joinPersianParts([underThousandToWords(group), persianScales[scale] ?? '']))
-    remaining = Math.floor(remaining / 1000)
-    scale += 1
-  }
-  return `${joinPersianParts(groups)} تومان`
-}
 const dateTime = (value: string) => {
   const date = new Date(value)
   const timeText = new Intl.DateTimeFormat(persianDateWithLatinDigitsLocale, {
@@ -1367,7 +1337,6 @@ function DailyMenuPage() {
         <small>{selectedFood?.isPersianRice ? 'قیمت این ردیف باید مابه‌التفاوت ارتقا به برنج ایرانی باشد، نه قیمت یک پرس کامل برنج.' : selectedFood?.allowsPersianRice ? 'مشتری می‌تواند به این غذا برنج ایرانی اضافه کند؛ «برنج ایرانی» را هم به منوی امروز اضافه کنید.' : ''}</small></label>
       <div className="menu-price-field">
         <AmountField label="قیمت امروز (تومان)" value={priceText} onChange={setPriceText} placeholder="240,000" />
-        <small className="price-help">{numberToPersianWords(price)}</small>
       </div>
       <label>ظرفیت پرس<input type="number" min="0" value={capacity} onChange={(event) => setCapacity(Number(event.target.value))} /><small /></label>
       <div className={`menu-discount-control ${discountEnabled ? 'active' : ''}`}>

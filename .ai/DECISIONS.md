@@ -878,3 +878,17 @@
   height merely because the grid has more rows.
 - Contextual secondary work, such as one courier's settlement history, opens in a bounded dialog so
   the primary grid stays in place and the operator does not lose context.
+
+## 2026-09-03 — Money is grouped during entry through one shared formatter
+
+- All monetary text entry uses the contracts-owned formatter. Valid input is normalized and grouped
+  immediately, while invalid text remains visible for validation and an empty value never becomes
+  zero implicitly.
+- `AmountField` is the Electron renderer boundary for monetary entry and preserves the logical caret
+  position when commas are inserted. Feature pages must not implement independent blur-only or raw
+  numeric money fields.
+- The same field owns the live Persian amount wording below monetary inputs. Feature pages must not
+  duplicate their own number-to-words implementation; empty and invalid values intentionally have
+  no wording, while an explicit zero reads «صفر تومان».
+- Money stays a number after parsing and is formatted only at input/display boundaries. Counts,
+  quantities, percentages, order numbers and identifiers continue to use their own formatters.

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatMoney,
+  formatMoneyInputText,
   formatNumber,
   formatPersianDate,
   formatPersianDateTime,
+  moneyToPersianWords,
   parseMoney,
   persianDateWithLatinDigitsLocale,
 } from './number-format'
@@ -62,6 +64,8 @@ describe('admin number formatting', () => {
 describe('admin money helpers come from the shared contract', () => {
   it('prints and reads back the same amounts the rest of Kafgir does', () => {
     expect(formatMoney(1_260_000)).toBe('1,260,000 تومان')
+    expect(formatMoneyInputText('1260000')).toBe('1,260,000')
+    expect(moneyToPersianWords(1_260_000)).toBe('یک میلیون و دویست و شصت هزار تومان')
     expect(parseMoney('1,260,000')).toBe(1_260_000)
     expect(parseMoney('۷۰,۰۰۰')).toBe(70_000)
   })
