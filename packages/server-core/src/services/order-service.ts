@@ -235,14 +235,26 @@ export async function createOrder(
       deliveryFee: number
       minimumOrderAmount: number
       requiresCourier: boolean
+      supportsExpress: boolean
+      expressFee: number
     }[]>`
       SELECT CASE WHEN ${allowMissingTelegramIdentity}
         THEN is_manual_enabled ELSE is_customer_enabled END AS enabled,
         delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount",
-        requires_courier AS "requiresCourier"
+        requires_courier AS "requiresCourier",
+        supports_express AS "supportsExpress", express_fee::float8 AS "expressFee"
       FROM delivery_method_settings WHERE method = ${request.deliveryMethod} LIMIT 1
     `
     if (!deliverySettings[0]?.enabled) throw new AppError('روش دریافت انتخاب‌شده در حال حاضر فعال نیست.')
+    // Express replaces the window rather than accompanying it, and the surcharge is read from server
+    // state so a client cannot ask to be served immediately for free.
+    const isExpress = Boolean(request.isExpress)
+    if (isExpress && !deliverySettings[0].supportsExpress) {
+      throw new AppError('ارسال فوری برای این روش دریافت فعال نیست.')
+    }
+    if (isExpress && request.deliveryTimeSlotId != null) {
+      throw new AppError('برای ارسال فوری بازه زمانی انتخاب نمی‌شود.')
+    }
     const customer = await resolveCustomer(tx, identity, fullName, phoneNumber, now, authenticatedUserId)
     let customerAddressId = request.customerAddressId ?? null
     let city = optionalText(request.city) ?? defaultCity
@@ -418,25 +430,31 @@ export async function createOrder(
     if (subtotal < deliverySettings[0].minimumOrderAmount) {
       throw new AppError(`حداقل مبلغ سفارش برای این روش دریافت ${formatToman(deliverySettings[0].minimumOrderAmount)} است.`)
     }
-    const total = subtotal + deliveryFee
+    // The express surcharge rides inside `delivery_fee`, so the order's money check still balances
+    // and every receipt keeps reading غذا + ارسال = پرداختی. `express_fee` records the part of that
+    // charge which was the surcharge.
+    const expressFee = isExpress ? deliverySettings[0].expressFee : 0
+    const chargedDeliveryFee = deliveryFee + expressFee
+    const total = subtotal + chargedDeliveryFee
     const orderRows = await tx<{ id: number }[]>`
       INSERT INTO orders
         (order_number, customer_profile_id, customer_address_id, delivery_full_name,
          delivery_phone_number, delivery_city, delivery_address_line,
          status, payment_method, delivery_method, subtotal_amount, delivery_fee,
          total_amount, customer_note, delivery_date, delivery_time_slot_id,
-         delivery_time_slot_title, delivery_start_time, delivery_end_time,
+         delivery_time_slot_title, delivery_start_time, delivery_end_time, is_express, express_fee,
          courier_id, courier_name_snapshot, courier_delivery_day_id, courier_payable_amount,
          created_at, analytics_visitor_id, analytics_session_id)
       VALUES
         (${orderNumber}, ${customer.profileId}, ${customerAddressId}, ${fullName},
          ${phoneNumber}, ${city}, ${addressLine}, ${OrderStatus.PendingConfirmation},
-         ${request.paymentMethod}, ${request.deliveryMethod}, ${subtotal}, ${deliveryFee},
+         ${request.paymentMethod}, ${request.deliveryMethod}, ${subtotal}, ${chargedDeliveryFee},
          ${total}, ${optionalText(request.customerNote)},
-         ${deliverySnapshot ? deliveryDate : null}::date, ${deliverySnapshot?.slotId ?? null},
+         ${deliverySnapshot || isExpress ? deliveryDate : null}::date, ${deliverySnapshot?.slotId ?? null},
          ${deliverySnapshot?.title ?? null},
          ${deliverySnapshot?.startTime ?? null}::time,
          ${deliverySnapshot?.endTime ?? null}::time,
+         ${isExpress}, ${expressFee},
          ${courierDay?.courierId ?? null}, ${courierDay?.courierName ?? null},
          ${courierDay?.courierDeliveryDayId ?? null}, ${courierDay?.courierPayablePerOrder ?? null},
          ${nowSql},
@@ -485,7 +503,7 @@ export async function createOrder(
           deliveryMethod: request.deliveryMethod,
           paymentMethod: request.paymentMethod,
           subtotalAmount: subtotal,
-          deliveryFee,
+          deliveryFee: chargedDeliveryFee,
           totalAmount: total,
           items: orderLines.map(({ menuItem, quantity }) => ({
             foodName: menuItem.name,

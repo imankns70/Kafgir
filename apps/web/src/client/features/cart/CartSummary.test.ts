@@ -31,13 +31,14 @@ describe('empty-cart confirmation', () => {
 })
 
 describe('cart item presentation', () => {
-  it('pairs the detail action with the remove button in the item action row', () => {
+  it('pairs the detail and remove actions in the corner opposite the food name', () => {
     const html = renderToStaticMarkup(createElement(CartSummary, {
       items: [{ ...item(1), slug: 'food-1' }],
       onQuantityChange: vi.fn(),
     }))
 
-    expect(html).toMatch(/cart-name[\s\S]*cart-unit-price[\s\S]*cart-item-actions[\s\S]*cart-item-buttons[\s\S]*cart-detail-button[\s\S]*cart-remove-button/)
+    // Name and price, then the paired item actions, then quantity and the line total beneath them.
+    expect(html).toMatch(/cart-name[\s\S]*cart-unit-price[\s\S]*cart-item-buttons[\s\S]*cart-detail-button[\s\S]*cart-remove-button[\s\S]*cart-item-actions[\s\S]*quantity-controls[\s\S]*cart-line-total/)
   })
 
   it('keeps the item list in its own scroll area, with the total outside it', () => {

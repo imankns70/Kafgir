@@ -111,6 +111,19 @@ describe('customer order history presentation', () => {
     expect(html).not.toContain('شماره مرجع')
   })
 
+  it('shows a failure that arrives after the list has already loaded', () => {
+    // Opening one order used to fail silently: the error block only rendered when the whole list was
+    // missing, so pressing «جزئیات سفارش» looked like nothing happened at all.
+    const page: CustomerOrdersPageDto = { items: [activeSummary], page: 1, pageSize: 10, totalItems: 1, totalPages: 1 }
+    const html = renderToStaticMarkup(createElement(CustomerOrdersList, {
+      orders: page, error: 'دریافت سفارش ممکن نشد.', onRetry: () => undefined,
+      onOpen: () => undefined, onReview: () => undefined, onPage: () => undefined, onBrowse: () => undefined,
+    }))
+    expect(html).toContain('customer-orders-inline-error')
+    expect(html).toContain('دریافت سفارش ممکن نشد.')
+    expect(html).toContain('customer-order-card')
+  })
+
   it('shows a useful empty state', () => {
     const html = renderToStaticMarkup(createElement(CustomerOrdersList, {
       orders: { items: [], page: 1, pageSize: 10, totalItems: 0, totalPages: 0 },

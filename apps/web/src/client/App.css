@@ -959,6 +959,14 @@ select:disabled {
   font-weight: 700;
 }
 
+/* The courier charge next to the basket total: on a phone the payment screen carrying the same
+   figures is three steps away, and «جمع اقلام» alone reads as the amount to pay. */
+.cart-delivery-cost { display: grid; gap: 6px; margin-block-start: 8px; padding: 0 4px; font-size: var(--kafgir-type-body-sm); }
+.cart-delivery-cost > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--kafgir-color-text-secondary); }
+.cart-delivery-cost strong { color: var(--kafgir-color-text-primary); }
+.cart-delivery-cost-final { padding-block-start: 6px; border-block-start: 1px dashed var(--kafgir-color-border); }
+.cart-delivery-cost-final strong { color: var(--kafgir-color-primary); }
+
 .cart-sync-panel {
   grid-column: 1 / -1;
   display: grid;
@@ -994,7 +1002,6 @@ select:disabled {
   column-gap: 10px;
   row-gap: 6px;
 }
-.cart-item-actions { grid-column: 1 / -1; }
 
 .cart-row-invalid {
   margin-inline: -10px;
@@ -1010,14 +1017,14 @@ select:disabled {
 .cart-unit-price .price-discount-meta { order:2 }
 .cart-unit-price > small { order:3 }
 .cart-item-warning { display: inline-flex; align-items: center; gap: 5px; color: var(--kafgir-color-error); font-size: var(--kafgir-type-caption); font-weight: 700; }
-/* One control row per item: quantity at the start, «جزئیات» and «حذف» paired at the end so the two
-   item actions always sit together and share the same height. */
-.cart-item-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.cart-item-buttons { display: flex; align-items: center; gap: 6px; margin-inline-start: auto; }
+/* «جزئیات» and «حذف» pair in the corner opposite the food name; quantity and the line total share
+   the row beneath, so the two kinds of control never sit in one undifferentiated strip. */
+.cart-item-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; grid-column: 1 / -1; }
+.cart-item-buttons { display: flex; align-items: start; justify-content: end; gap: 6px; }
 .cart-detail-button,
 .cart-remove-button { flex:none;min-height:36px;gap:5px;padding:6px 12px;font-size:var(--kafgir-type-body-sm) }
 .cart-detail-button { text-decoration:none }
-.cart-line-total { display: grid; justify-items: end; gap: 2px; color: var(--kafgir-color-primary); font-weight: 700; white-space: nowrap; }
+.cart-line-total { display: grid; justify-items: end; gap: 2px; margin-inline-start: auto; color: var(--kafgir-color-primary); font-weight: 700; white-space: nowrap; }
 .cart-line-total small { max-width: 160px; color: var(--kafgir-color-error); font-size: .68rem; font-weight: 500; line-height: 1.45; text-align: end; white-space: normal; }
 /* The cart panel is narrow even on desktop, so an icon | text | actions row let the buttons claim
    `auto` width and squeezed the message down to one word per line. Stack the blocks instead and let
@@ -1118,6 +1125,47 @@ select:disabled {
 .status-info { color: var(--kafgir-color-info); background: var(--kafgir-color-info-soft); }
 .status-success { color: var(--kafgir-color-success); background: var(--kafgir-color-success-soft); }
 .status-error { color: var(--kafgir-color-error); background: var(--kafgir-color-error-soft); }
+
+/* Add-to-cart confirmation. It rises from the bottom edge, sits above the tab bar, and never covers
+   the control the customer just used. Touch can flick it away downwards. */
+.cart-toast {
+  position: fixed;
+  z-index: var(--kafgir-z-navigation);
+  inset-inline: auto 0;
+  inset-inline-start: 0;
+  inset-block-end: calc(12px + env(safe-area-inset-bottom));
+  display: grid;
+  gap: 10px;
+  width: min(420px, calc(100% - 24px));
+  margin-inline: auto;
+  border: 1px solid color-mix(in srgb, var(--kafgir-color-primary) 30%, var(--kafgir-color-border));
+  border-radius: var(--kafgir-radius-lg);
+  padding: 10px 12px 12px;
+  background: var(--kafgir-color-surface-elevated);
+  box-shadow: var(--kafgir-shadow-navigation);
+  touch-action: pan-x;
+  animation: cart-toast-rise var(--kafgir-motion-normal) var(--kafgir-ease) both;
+  transition: transform var(--kafgir-motion-fast) var(--kafgir-ease);
+}
+@keyframes cart-toast-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+.cart-toast-grip { justify-self: center; width: 38px; height: 4px; border-radius: 999px; background: var(--kafgir-color-border-strong); }
+.cart-toast-body { display: flex; align-items: center; gap: 10px; }
+.cart-toast-thumb { flex: none; width: 52px; height: 52px; overflow: hidden; border-radius: var(--kafgir-radius-md); }
+.cart-toast-thumb img, .cart-toast-thumb .food-image, .cart-toast-thumb .food-placeholder { width: 100%; height: 100%; min-height: 0; padding: 0; object-fit: cover; }
+.cart-toast-thumb .food-placeholder-art { width: 40px; height: 26px; }
+.cart-toast-thumb .food-placeholder-copy { display: none; }
+.cart-toast-copy { display: grid; gap: 2px; min-width: 0; }
+.cart-toast-copy strong { display: inline-flex; align-items: center; gap: 5px; color: var(--kafgir-color-success); font-size: var(--kafgir-type-caption); }
+.cart-toast-name { overflow: hidden; color: var(--kafgir-color-text-primary); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.cart-toast-copy small { color: var(--kafgir-color-text-secondary); font-size: var(--kafgir-type-caption); }
+.cart-toast-close { flex: none; align-self: start; width: 30px; height: 30px; display: grid; place-items: center; border: 0; border-radius: 50%; color: var(--kafgir-color-text-muted); background: transparent; }
+.cart-toast-action { justify-content: center; width: 100%; min-height: 42px; gap: 6px; }
+@media (max-width: 639px) {
+  .cart-toast { inset-block-end: calc(90px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cart-toast { animation: none; transition: none; }
+}
 
 .mobile-bottom-nav { display: none; }
 
@@ -1290,12 +1338,12 @@ select:disabled {
 .check-field input { width:18px;height:18px;accent-color:var(--kafgir-color-primary) }
 .profile-logout { width:100%;margin-block-end:var(--kafgir-space-4) }
 .customer-orders-panel { position:sticky;inset-block-start:112px }
-.customer-order-card { display:grid;gap:8px;width:100%;border:1px solid var(--kafgir-color-border);border-radius:var(--kafgir-radius-md);padding:13px;color:var(--kafgir-color-text-primary);background:var(--kafgir-color-surface-elevated);text-align:start }
+/* The card is defined in full further down. What is left here is only what that definition does not
+   cover: blanket `>div` and `p` rules from the previous card design used to win on specificity over
+   the newer per-block classes, which is what flattened the review summary into one clipped line as
+   soon as a rating was saved. */
 .customer-order-card:hover { border-color:var(--kafgir-color-primary);box-shadow:var(--kafgir-shadow-card) }
-.customer-order-card>div { display:flex;align-items:center;justify-content:space-between;gap:10px }
 .customer-order-card .status-badge { margin:0 }
-.customer-order-card p { overflow:hidden;margin:0;color:var(--kafgir-color-text-secondary);font-size:var(--kafgir-type-body-sm);text-overflow:ellipsis;white-space:nowrap }
-.customer-order-card>div:last-child span { color:var(--kafgir-color-text-muted);font-size:var(--kafgir-type-caption) }
 .pagination-actions { margin-block-start:14px }
 .pagination-actions .outline-button { min-height:38px;padding:6px 11px }
 .customer-order-detail { max-width:820px;margin-inline:auto }
@@ -1397,63 +1445,83 @@ select:disabled {
 .checkout-step-block { display: contents; }
 .checkout-steps,
 .checkout-wizard-actions { display: none; }
+/* The bar that carries the submit button is the exception: on desktop it dissolves so its button
+   stays exactly where it was in the form. */
+.checkout-submit-actions { display: contents; }
 
 @media (max-width: 639px) {
   .checkout-page[data-wizard-step="cart"] .checkout-form,
   .checkout-page[data-wizard-step="cart"] .checkout-step-block:not([data-step="cart"]),
   .checkout-page[data-wizard-step="delivery"] .checkout-step-block:not([data-step="delivery"]),
+  .checkout-page[data-wizard-step="time"] .checkout-step-block:not([data-step="time"]),
   .checkout-page[data-wizard-step="payment"] .checkout-step-block:not([data-step="payment"]) { display: none; }
 
+  /* Chevrons rather than separate pills: each segment points left, the direction the customer is
+     travelling in an RTL page, so the bar reads as «here → next» instead of three equal tabs. The
+     row starts at the right edge, where the first step is. */
   .checkout-steps {
     display: flex;
-    align-items: center;
-    gap: 6px;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0;
     margin: 0 0 14px;
     padding: 0;
     list-style: none;
   }
   .checkout-step { flex: 1 1 0; min-width: 0; }
+  .checkout-step + .checkout-step { margin-inline-start: -11px; }
   .checkout-step > button {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 5px;
     width: 100%;
-    min-height: 40px;
-    border: 1px solid var(--kafgir-color-border);
-    border-radius: var(--kafgir-radius-md);
-    padding: 6px 8px;
+    min-height: 38px;
+    border: 0;
+    padding: 6px 14px 6px 18px;
     color: var(--kafgir-color-text-secondary);
     background: var(--kafgir-color-surface);
     font-size: var(--kafgir-type-caption);
     font-weight: 700;
+    /* Point on the left edge, matching notch on the right, so neighbours interlock. */
+    clip-path: polygon(11px 0, 100% 0, calc(100% - 11px) 50%, 100% 100%, 11px 100%, 0 50%);
   }
+  .checkout-step:first-child > button { padding-inline-start: 14px; clip-path: polygon(0 0, 100% 0, calc(100% - 11px) 50%, 100% 100%, 0 100%); }
   /* A finished step is the only one that can be tapped, so it is the only one that looks tappable. */
-  .checkout-step.is-done > button {
-    color: var(--kafgir-color-primary);
-    border-color: color-mix(in srgb, var(--kafgir-color-primary) 45%, var(--kafgir-color-border));
-    background: var(--kafgir-color-primary-soft);
-  }
-  .checkout-step.is-current > button {
-    color: var(--kafgir-color-text-on-primary);
-    border-color: var(--kafgir-color-primary);
-    background: var(--kafgir-color-primary);
-  }
+  .checkout-step.is-done > button { color: var(--kafgir-color-primary); background: var(--kafgir-color-primary-soft); }
+  .checkout-step.is-current > button { color: var(--kafgir-color-text-on-primary); background: var(--kafgir-color-primary); }
   .checkout-step-number {
     display: inline-grid;
     flex: none;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     place-items: center;
     border-radius: 50%;
     background: color-mix(in srgb, currentColor 16%, transparent);
-    font-size: .72rem;
+    font-size: .7rem;
   }
   .checkout-step-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .checkout-wizard-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; margin-block-start: 14px; }
+  /* The step's own action bar stays on the bottom edge of the screen, above the app's tab bar, so
+     «ادامه» is reachable without scrolling to the end of a long step. */
+  .checkout-wizard-actions {
+    position: sticky;
+    z-index: 2;
+    inset-block-end: calc(84px + env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px;
+    margin-block-start: 14px;
+    border: 1px solid var(--kafgir-color-border);
+    border-radius: var(--kafgir-radius-md);
+    padding: 8px;
+    background: var(--kafgir-color-surface-glass);
+    box-shadow: var(--kafgir-shadow-navigation);
+    backdrop-filter: blur(12px);
+  }
   .checkout-wizard-actions button { min-height: 46px; }
   .checkout-wizard-actions .full-width { grid-column: 1 / -1; }
+  .checkout-submit-actions .full-width { grid-column: auto; }
   .checkout-step-block[data-step="cart"] .checkout-wizard-actions { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -1463,6 +1531,27 @@ select:disabled {
 @media (max-width: 639px) { .checkout-desktop-only { display: none; } }
 @media (min-width: 640px) { .checkout-mobile-only { display: none; } }
 .checkout-step-heading { margin-block-start: 0; }
+
+/* Express delivery. A card rather than a bare checkbox, because it changes the price and removes a
+   whole step, so it needs room to say what it costs and what it promises. */
+.express-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--kafgir-color-border);
+  border-radius: var(--kafgir-radius-md);
+  padding: 12px;
+  background: var(--kafgir-color-surface);
+  cursor: pointer;
+}
+.express-option.is-selected {
+  border-color: var(--kafgir-color-primary);
+  background: var(--kafgir-color-primary-soft);
+}
+.express-option input { flex: none; margin-block-start: 3px; }
+.express-option-copy { display: grid; gap: 3px; min-width: 0; }
+.express-option-copy strong { display: inline-flex; align-items: center; gap: 6px; color: var(--kafgir-color-text-primary); }
+.express-option-copy small { color: var(--kafgir-color-text-secondary); font-size: var(--kafgir-type-caption); line-height: 1.8; }
 
 @media (max-width: 639px) {
   body { font-size: .875rem; }
@@ -1544,7 +1633,10 @@ select:disabled {
   .page-actions { align-items: center; }
   .page-actions .outline-button { min-height: 40px; padding: 7px 10px; font-size: .78rem; }
   .cart-item-actions { display:flex;flex-wrap:wrap;width:auto }
-  .cart-detail-button,.cart-remove-button { justify-content:center }
+  /* The action pair shares the top row with the food name, so on a phone it is kept as small as it
+     can be while still carrying its labels. */
+  .cart-detail-button,.cart-remove-button { justify-content:center;min-height:32px;gap:4px;padding:4px 8px;font-size:.72rem }
+  .cart-item-buttons { gap:5px }
   .cart-sync-panel { grid-template-columns: auto minmax(0, 1fr); }
   .cart-sync-panel > button { grid-column: 1 / -1; width: 100%; }
   /* The container already stacks; on phones give each button its own full-width row too, so the
@@ -1856,6 +1948,9 @@ select:disabled {
 .order-review-summary p { grid-column:1/-1;margin:0;color:var(--kafgir-color-text-secondary);font-size:var(--kafgir-type-body-sm) }
 .review-stars { display:inline-flex;direction:ltr;gap:2px;color:var(--kafgir-color-border-strong) }
 .review-stars .selected { color:var(--kafgir-color-accent);fill:currentColor }
+.customer-orders-inline-error { display:flex;align-items:center;gap:8px;margin-block-end:12px;border:1px solid color-mix(in srgb,var(--kafgir-color-error) 40%,var(--kafgir-color-border));border-radius:var(--kafgir-radius-md);padding:10px 12px;color:var(--kafgir-color-error);background:var(--kafgir-color-error-soft);font-size:var(--kafgir-type-body-sm);font-weight:700 }
+.customer-orders-inline-error > span { flex:1;min-width:0 }
+.customer-orders-inline-error button { flex:none;min-height:34px;padding:5px 10px }
 .customer-orders-empty,.customer-orders-error { display:grid;justify-items:center;gap:8px;padding:32px 16px;text-align:center }
 .customer-orders-empty .empty-icon,.customer-orders-error .empty-icon { display:grid;width:64px;height:64px;place-items:center;border-radius:50%;color:var(--kafgir-color-secondary);background:var(--kafgir-color-secondary-soft) }
 .customer-orders-error .empty-icon { color:var(--kafgir-color-error);background:var(--kafgir-color-error-soft) }

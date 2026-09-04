@@ -156,6 +156,8 @@
     animation: active-order-fade-in var(--kafgir-motion-normal) ease both;
   }
 
+  /* Two resting sizes, set by the drag grip. Height rather than max-height, so the sheet can be
+     pulled between them and the body scrolls inside whatever size the customer chose. */
   .active-order-sheet {
     position: fixed;
     z-index: 90;
@@ -164,10 +166,13 @@
     left: 0;
     display: block;
     width: min(100%, 540px);
-    max-height: min(86dvh, 760px);
+    height: 55dvh;
+    max-height: 94dvh;
     margin-inline: auto;
     padding: 8px 16px calc(20px + env(safe-area-inset-bottom, 0px));
     overflow-y: auto;
+    overscroll-behavior: contain;
+    transition: height var(--kafgir-motion-normal) var(--kafgir-ease);
     border: 1px solid var(--kafgir-color-border);
     border-bottom: 0;
     border-radius: 26px 26px 0 0;
@@ -177,12 +182,35 @@
     animation: active-order-sheet-up 240ms var(--kafgir-ease) both;
   }
 
+  .active-order-sheet[data-snap='full'] { height: 90dvh; }
+  /* While a finger is on the grip the height comes from the inline style, so no transition may
+     compete with it. */
+  .active-order-sheet[data-dragging] { transition: none; }
+
   .active-order-sheet-handle {
+    display: block;
+    width: 64px;
+    height: 22px;
+    margin: 0 auto 8px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    touch-action: none;
+    cursor: grab;
+  }
+  .active-order-sheet-handle::before {
+    content: '';
+    display: block;
     width: 44px;
     height: 5px;
-    margin: 2px auto 12px;
+    margin: 8px auto 0;
     border-radius: var(--kafgir-radius-pill);
     background: var(--kafgir-color-border-strong);
+  }
+  .active-order-sheet-handle:active { cursor: grabbing; }
+  .active-order-sheet-header { touch-action: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .active-order-sheet { transition: none; }
   }
 
   .active-order-sheet-header {

@@ -120,6 +120,14 @@ export function CustomerOrdersList({ orders, onOpen, onReview, onPage, onBrowse,
   </div>
 
   return <>
+    {/* A failure that arrives after the list has loaded — opening one order, most often — used to be
+        swallowed here, because the error block above only renders when the list itself is missing.
+        The customer pressed «جزئیات سفارش» and nothing whatsoever happened. */}
+    {error && <div className="customer-orders-inline-error" role="alert">
+      <Icon name="info" size="sm" />
+      <span>{error}</span>
+      {onRetry && <button type="button" className="outline-button" onClick={onRetry}>تلاش دوباره</button>}
+    </div>}
     <div className="customer-order-list">
       {orders.items.map((order) => {
         const active = !finalStatuses.has(order.status)

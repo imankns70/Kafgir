@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from './design-system/Icon'
+import { useBottomSheetDrag } from './design-system/useBottomSheetDrag'
 import {
   confirmCustomerOrderDelivered,
   getActiveCustomerOrders,
@@ -56,6 +57,8 @@ export function ActiveOrderTracker() {
   const [isMobile, setIsMobile] = useState(false)
   const [orders, setOrders] = useState<CustomerOrderSummaryDto[]>([])
   const [expanded, setExpanded] = useState(false)
+  const closeSheet = useCallback(() => setExpanded(false), [])
+  const { sheetProps, gripProps } = useBottomSheetDrag({ isOpen: expanded, onClose: closeSheet })
   const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
   const [deliveryConfirmId, setDeliveryConfirmId] = useState<number | null>(null)
   const [confirmingId, setConfirmingId] = useState<number | null>(null)
@@ -252,9 +255,11 @@ export function ActiveOrderTracker() {
 
     {expanded && selectedOrder && <>
       <button type="button" className="active-order-sheet-backdrop" aria-label="بستن وضعیت سفارش" onClick={() => setExpanded(false)} />
-      <section className="active-order-sheet" role="dialog" aria-modal="true" aria-labelledby="active-order-title">
-        <div className="active-order-sheet-handle" aria-hidden="true" />
-        <header className="active-order-sheet-header">
+      <section className="active-order-sheet" role="dialog" aria-modal="true" aria-labelledby="active-order-title" {...sheetProps}>
+        {/* The grip is the drag target: pull up to enlarge, down to shrink, further down to close.
+            A plain tap toggles the two sizes for anyone who cannot drag. */}
+        <button type="button" className="active-order-sheet-handle" aria-label="تغییر اندازه پنجره سفارش" {...gripProps} />
+        <header className="active-order-sheet-header" onPointerDown={gripProps.onPointerDown} onPointerMove={gripProps.onPointerMove} onPointerUp={gripProps.onPointerUp} onPointerCancel={gripProps.onPointerCancel}>
           <div>
             <span>{orders.length > 1 ? 'سفارش‌های در جریان' : 'سفارش جاری'}</span>
             <h2 id="active-order-title">{orders.length > 1

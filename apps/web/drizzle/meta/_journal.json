@@ -176,6 +176,13 @@
       "when": 1787220000000,
       "tag": "0024_simple_monthly_business",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788540000000,
+      "tag": "0025_express_delivery",
+      "breakpoints": true
     }
   ]
 }

@@ -317,8 +317,14 @@ export function FoodDetailPage({ slug, initialCatalog }: Props) {
         </div>
 
         <div className="food-detail-info-grid">
-          <FoodInfoSection title="توضیح کوتاه" value={initialCatalog.shortDescription} />
-          <FoodInfoSection title="توضیح کامل" value={initialCatalog.fullDescription} />
+          {/* The two descriptions are one piece of writing to a reader — a lead line and the text
+              that follows it — so they share a box instead of repeating the same heading twice. */}
+          <section className="panel food-copy-section food-description-section">
+            <h2>معرفی غذا</h2>
+            {initialCatalog.shortDescription && <p className="food-description-lead">{initialCatalog.shortDescription}</p>}
+            {initialCatalog.fullDescription && <p>{initialCatalog.fullDescription}</p>}
+            {!initialCatalog.shortDescription && !initialCatalog.fullDescription && <p className="muted">ثبت نشده</p>}
+          </section>
           <FoodInfoSection title="مقدار و محتویات هر پرس" value={initialCatalog.portionDescription} />
           <FoodInfoSection title="مواد حساسیت زا" value={initialCatalog.allergyInformation} />
         </div>
@@ -327,8 +333,9 @@ export function FoodDetailPage({ slug, initialCatalog }: Props) {
         {food
           ? <section className="panel current-menu-box">
               <div><PriceDisplay price={food.price} originalPrice={food.originalPrice} discountPercentage={food.discountPercentage} label="قیمت امروز" /><span>{food.availabilityReason}</span></div>
-              <div><span>{formatNumber(food.remainingCapacity)} پرس باقی‌مانده</span>
-                {food.orderDeadline && <small>مهلت سفارش: {new Intl.DateTimeFormat('fa-IR-u-nu-latn', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(new Date(food.orderDeadline))}</small>}</div>
+              {food.orderDeadline && <div>
+                <small>مهلت سفارش: {new Intl.DateTimeFormat('fa-IR-u-nu-latn', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(new Date(food.orderDeadline))}</small>
+              </div>}
             </section>
           : <section className="panel current-menu-box" aria-live="polite">
               <div><strong>{loading ? 'در حال بررسی منوی روز…' : 'اطلاعات منوی روز دریافت نشد.'}</strong></div>

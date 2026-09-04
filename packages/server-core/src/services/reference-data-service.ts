@@ -192,7 +192,8 @@ export async function listDeliveryMethodSettings(
     SELECT method, title, description, is_customer_enabled AS "isCustomerEnabled",
            is_manual_enabled AS "isManualEnabled", display_order AS "displayOrder",
            delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount",
-           requires_courier AS "requiresCourier"
+           requires_courier AS "requiresCourier", supports_express AS "supportsExpress",
+           express_fee::float8 AS "expressFee", express_estimated_minutes AS "expressEstimatedMinutes"
     FROM delivery_method_settings
     WHERE ${audience === 'all'} OR
       (${audience === 'customer'} AND is_customer_enabled) OR
@@ -210,12 +211,15 @@ export async function updateDeliveryMethodSetting(
     UPDATE delivery_method_settings SET title = ${input.title}, description = ${input.description ?? null},
       is_customer_enabled = ${input.isCustomerEnabled}, is_manual_enabled = ${input.isManualEnabled},
       display_order = ${input.displayOrder}, delivery_fee = ${input.deliveryFee},
-      minimum_order_amount = ${input.minimumOrderAmount}, updated_at = NOW()
+      minimum_order_amount = ${input.minimumOrderAmount},
+      supports_express = ${input.supportsExpress}, express_fee = ${input.expressFee},
+      express_estimated_minutes = ${input.expressEstimatedMinutes}, updated_at = NOW()
     WHERE method = ${method}
     RETURNING method, title, description, is_customer_enabled AS "isCustomerEnabled",
               is_manual_enabled AS "isManualEnabled", display_order AS "displayOrder",
               delivery_fee::float8 AS "deliveryFee", minimum_order_amount::float8 AS "minimumOrderAmount",
-              requires_courier AS "requiresCourier"
+              requires_courier AS "requiresCourier", supports_express AS "supportsExpress",
+              express_fee::float8 AS "expressFee", express_estimated_minutes AS "expressEstimatedMinutes"
   `
   if (!rows[0]) throw new NotFoundError('روش دریافت پیدا نشد.')
   return rows[0]

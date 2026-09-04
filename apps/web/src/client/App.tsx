@@ -5,6 +5,7 @@ import './App.css'
 import { BrandLogo } from './design-system/BrandLogo'
 import { Icon } from './design-system/Icon'
 import { CartPage } from './features/cart/CartPage'
+import { CartAddedToast, type CartAddition } from "./features/cart/CartAddedToast"
 import { ContactPage } from './features/contact/ContactPage'
 import { MenuPage } from './features/menu/MenuPage'
 import { OrderSuccess } from './features/orders/OrderSuccess'
@@ -32,11 +33,12 @@ function App() {
   const [order, setOrder] = useState<OrderDto | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [menuError, setMenuError] = useState<string | null>(null)
-  const [shouldScrollToCategories, setShouldScrollToCategories] = useState(false)
+  const [focusOrders, setFocusOrders] = useState(false)
   const [cartMessages, setCartMessages] = useState<string[]>([])
   const [isCheckingCart, setIsCheckingCart] = useState(false)
   const [isCartVerified, setIsCartVerified] = useState(false)
   const [isCustomerAuthenticated, setIsCustomerAuthenticated] = useState(false)
+  const [cartAddition, setCartAddition] = useState<CartAddition | null>(null)
   const cartRef = useRef(cart)
 
   const updateCart = useCallback((updater: CartItem[] | ((current: CartItem[]) => CartItem[])) => {
@@ -153,28 +155,14 @@ function App() {
         setPage('menu')
       }), [page])
 
-  useEffect(() => {
-    if (page !== 'menu' || !shouldScrollToCategories) return
-
-    const animationFrame = window.requestAnimationFrame(() => {
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-      document.getElementById('menu-categories')?.scrollIntoView({
-        block: 'start',
-        behavior: prefersReducedMotion ? 'auto' : 'smooth',
-      })
-      setShouldScrollToCategories(false)
-    })
-
-    return () => window.cancelAnimationFrame(animationFrame)
-  }, [page, shouldScrollToCategories])
-
   // The same dish with and without the Persian upgrade are two independent cart lines.
   const addToCart = (item: DailyMenuItemDto, withPersianRice = false) => {
     setCartMessages([])
     setIsCartVerified(true)
     const rice = withPersianRice && item.allowsPersianRice ? menu?.persianRice ?? null : null
     const upgraded = rice != null
-    updateCart((current) => {
+    {
+      const current = cartRef.current
       const remaining = upgraded
         ? Math.min(item.remainingPortions, rice.remainingPortions)
         : item.remainingPortions
@@ -196,13 +184,27 @@ function App() {
         availabilityMessage: null,
       }
       const existing = current.find(sameLine)
-      if (existing) {
-        return current.map((cartItem) => sameLine(cartItem)
+      const next = existing
+        ? current.map((cartItem) => sameLine(cartItem)
           ? { ...cartItem, ...refreshed, quantity: Math.min(cartItem.quantity + 1, remaining) }
           : cartItem)
+        : [...current, { dailyMenuItemId: item.id, ...refreshed, quantity: 1 }]
+      updateCart(next)
+      // Confirm the add where the customer is looking, rather than leaving them to check the cart
+      // badge in the header.
+      const line = next.find(sameLine)
+      if (line) {
+        setCartAddition({
+          key: Date.now(),
+          foodName: item.foodName,
+          imageUrl: item.imageUrl ?? null,
+          withPersianRice: upgraded,
+          quantity: line.quantity,
+          lineTotal: (line.unitPrice + (line.persianRicePrice ?? 0)) * line.quantity,
+          cartCount: next.length,
+        })
       }
-      return [...current, { dailyMenuItemId: item.id, ...refreshed, quantity: 1 }]
-    })
+    }
   }
 
   const updateQuantity = (id: number, quantity: number, withPersianRice = false) => {
@@ -222,13 +224,14 @@ function App() {
   }
 
   const openCart = () => {
+    setCartAddition(null)
     setPage('cart')
     void loadMenu(true)
   }
 
-  const showCategories = () => {
-    setShouldScrollToCategories(true)
-    setPage('menu')
+  const openOrders = () => {
+    setFocusOrders(true)
+    setPage('profile')
   }
 
   return (
@@ -270,7 +273,7 @@ function App() {
       {page === 'success' && order && (
         <OrderSuccess order={order} onBack={() => { setOrder(null); setPage('menu') }} />
       )}
-      {page === 'profile' && <ProfilePage onBack={() => setPage('menu')} onAuthenticationChange={setIsCustomerAuthenticated} />}
+      {page === 'profile' && <ProfilePage onBack={() => { setFocusOrders(false); setPage('menu') }} onAuthenticationChange={setIsCustomerAuthenticated} focusOrders={focusOrders} />}
       {page === 'contact' && <ContactPage onBack={() => setPage('menu')} onAccount={() => setPage('profile')} />}
 
       {page !== 'success' && (
@@ -279,9 +282,12 @@ function App() {
             <Icon name="home" size="lg" />
             <span>خانه</span>
           </button>
-          <button onClick={showCategories} aria-label="دسته‌ها">
-            <Icon name="categories" size="lg" />
-            <span>دسته‌ها</span>
+          {/* Categories are chips on the home page itself; the tab bar is better spent on order
+              tracking, which is what a customer opens the app for after checking out. */}
+          <button className={page === 'profile' ? 'active' : ''} onClick={openOrders} aria-label="سفارش‌های من"
+            aria-current={page === 'profile' ? 'page' : undefined}>
+            <Icon name="orders" size="lg" />
+            <span>سفارش‌ها</span>
           </button>
           <button className={page === 'cart' ? 'active' : ''} onClick={openCart} aria-label="سبد خرید" aria-current={page === 'cart' ? 'page' : undefined}>
             <span className="nav-icon-wrap"><Icon name="cart" size="lg" />{cart.length > 0 && <span className="nav-count">{cart.length}</span>}</span>
@@ -298,6 +304,7 @@ function App() {
         </nav>
       )}
       {/* App-wide: a delivered order should surface wherever the customer happens to be. */}
+      <CartAddedToast addition={page === 'menu' ? cartAddition : null} onOpenCart={openCart} onDismiss={() => setCartAddition(null)} />
       <PostDeliveryReviewPrompt isAuthenticated={isCustomerAuthenticated} />
     </div>
   )

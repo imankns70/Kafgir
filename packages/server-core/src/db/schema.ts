@@ -471,6 +471,14 @@ export const orders = pgTable('orders', {
   deliveryTimeSlotTitle: varchar('delivery_time_slot_title', { length: 100 }),
   deliveryStartTime: time('delivery_start_time'),
   deliveryEndTime: time('delivery_end_time'),
+  /**
+   * Express delivery: the customer asked to be served as soon as possible instead of booking a
+   * window, so such an order carries no slot. `expressFee` is the surcharge that was in force at
+   * creation and is already included in `deliveryFee`; it is kept apart only so reporting can tell
+   * the two charges from each other, which is why the money check below still balances.
+   */
+  isExpress: boolean('is_express').notNull().default(false),
+  expressFee: money('express_fee').notNull().default(0),
   // Courier dispatch and accounting snapshot, taken from one consistent `courier_delivery_days` row
   // at creation time. Editing that row afterwards — a different courier, a different rate, mid-day —
   // cannot reach an order that was already placed, which is the whole point of copying the values.
@@ -677,11 +685,21 @@ export const deliveryMethodSettings = pgTable('delivery_method_settings', {
   minimumOrderAmount: money('minimum_order_amount').notNull().default(0),
   // Fixed per method by what the code does, not by operator choice; the write contract omits it.
   requiresCourier: boolean('requires_courier').notNull().default(false),
+  /**
+   * Express is an add-on to a method rather than a method of its own: the same courier and the same
+   * address, delivered as soon as possible instead of inside a booked window. The surcharge and the
+   * promised minutes are what the customer is shown before choosing it.
+   */
+  supportsExpress: boolean('supports_express').notNull().default(false),
+  expressFee: money('express_fee').notNull().default(0),
+  expressEstimatedMinutes: integer('express_estimated_minutes'),
   updatedAt: utcTimestamp('updated_at').notNull(),
 }, (table) => [
   check('delivery_method_settings_method_check', sql`${table.method} IN (1, 2)`),
   check('delivery_method_settings_amounts_check',
-    sql`${table.deliveryFee} >= 0 AND ${table.minimumOrderAmount} >= 0`),
+    sql`${table.deliveryFee} >= 0 AND ${table.minimumOrderAmount} >= 0 AND ${table.expressFee} >= 0`),
+  check('delivery_method_settings_express_check',
+    sql`${table.expressEstimatedMinutes} IS NULL OR ${table.expressEstimatedMinutes} > 0`),
   index('delivery_method_settings_order_idx').on(table.displayOrder),
 ])
 

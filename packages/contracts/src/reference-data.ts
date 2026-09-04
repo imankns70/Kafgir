@@ -34,6 +34,15 @@ export const deliveryMethodSettingSchema = z.object({
    * from having two competing sources of truth.
    */
   requiresCourier: z.boolean(),
+  /**
+   * Express is an add-on to this method, not a method of its own: same courier, same address,
+   * delivered as soon as possible instead of inside a booked window. `expressFee` is charged on top
+   * of the ordinary delivery charge, and `expressEstimatedMinutes` is the promise the customer is
+   * shown in place of a window.
+   */
+  supportsExpress: z.boolean(),
+  expressFee: z.number().nonnegative(),
+  expressEstimatedMinutes: z.number().int().positive().nullable(),
 })
 
 export const deliveryMethodSettingWriteSchema = deliveryMethodSettingSchema.omit({

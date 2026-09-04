@@ -1,17 +1,48 @@
 # Project state
 
+## 2026-09-04 — Express delivery, add-to-cart confirmation and order-history fixes
+
+- Express delivery is an add-on to a delivery method rather than a method of its own:
+  `delivery_method_settings` carries `supports_express`, `express_fee` and
+  `express_estimated_minutes`, and an express order books no window. The surcharge is written into
+  `orders.delivery_fee` so the order money check still balances, with `orders.express_fee`
+  recording the surcharge separately for reporting. Choosing it on checkout removes the window step
+  from the phone wizard entirely. Requires migration `0025_express_delivery`.
+- Adding a food to the basket now raises a confirmation card naming the food, the quantity now in the
+  basket and its price, with the cart as its one action. It dismisses itself and can be swiped away.
+- The mobile tab bar trades «دسته‌ها», which duplicates chips already on the home page, for
+  «سفارش‌ها», which lands on the order history.
+- The bottom sheet for the active order can be dragged between two sizes and flicked away, through a
+  shared `useBottomSheetDrag` hook other sheets can adopt.
+- Customer-facing category chips list only categories today's menu can fill; Admin still sees every
+  active category so a food can be assigned to an empty one.
+- Food detail merges the short and full descriptions into one «معرفی غذا» box and no longer shows the
+  remaining portion count.
+- Order details worked for no one: the payments query still joined `financial_accounts` and
+  `pos_terminals`, both dropped with the accounting architecture, so every request failed with a SQL
+  error. The join is gone and `providerName` is now always null, since the data behind it no longer
+  exists. The failure was also invisible, because the order list only rendered an error when the list
+  itself was missing — an error that arrives after the list has loaded now shows above it.
+- Saving a rating no longer breaks the order card: blanket `>div`/`p` rules left from an older card
+  design outranked the newer per-block classes and flattened the review summary into one clipped line.
+
+
 ## 2026-09-03 — Checkout as a phone wizard, live delivery windows, compact cart
 
-- Customer checkout is one page on desktop and a three-step wizard on phones (سبد → تحویل → پرداخت).
-  Every block is always rendered; `data-wizard-step` on the page plus `display: contents` step
-  wrappers let CSS alone decide what is on screen, so the desktop layout and the form's state are
-  untouched by the wizard. The desktop page is unchanged down to field order, which is why the two
-  method selects exist twice — a paired row for desktop and one field per step for phones, both
-  bound to the same state. Only completed steps are reachable from the step bar, «ادامه» validates
-  the delivery step, and a submission rejected for a delivery-step reason returns to that step.
+- Customer checkout is one page on desktop and a four-step wizard on phones
+  (سبد → تحویل → زمان → پرداخت). Every block is always rendered; `data-wizard-step` on the page plus
+  `display: contents` step wrappers let CSS alone decide what is on screen, so the desktop layout and
+  the form's state are untouched by the wizard. The desktop page is unchanged down to field order,
+  which is why the two method selects exist twice — a paired row for desktop and one field per step
+  for phones, both bound to the same state. The step bar is a row of left-pointing chevrons starting
+  at the right edge; only completed steps are tappable, each step's «ادامه» validates that step, and
+  a submission rejected for an earlier step's reason returns to it. Every step's action bar, the
+  final submit button included, is pinned to the bottom of the screen above the tab bar.
 - The cart item list has its own bounded scroll area, so the total and the checkout form stay
-  reachable however long the basket is. Each item shows quantity, «جزئیات» and «حذف» on one control
-  row, and the panel header carries the item count.
+  reachable however long the basket is. «جزئیات» and «حذف» pair in the corner opposite the food name,
+  with quantity and the line total on the row beneath, and the panel header carries the item count.
+  On phones the panel also shows the courier charge and the final amount, which otherwise are only
+  visible three steps later.
 - The delivery-window picker refreshes on the same 15-second cadence as the cart (visibility-gated,
   plus on focus and after a rejected submission), so a window that closes, fills or is reopened by
   the operator changes state while checkout stays open.

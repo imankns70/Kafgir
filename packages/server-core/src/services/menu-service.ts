@@ -146,11 +146,17 @@ export async function getMenuByDate(menuDate: string, customerVisible = false): 
       AND (${customerVisible} = false OR (f.is_active = true AND c.is_active = true))
     ORDER BY i.id
   `,
+    /** Customer views drop empty categories; Admin keeps them, so a food can be assigned to one. */
     sqlClient<DailyMenuDto['categories']>`
-      SELECT id, title, slug, icon, display_order AS "displayOrder"
-      FROM food_categories
-      WHERE is_active = true
-      ORDER BY display_order, id
+      SELECT c.id, c.title, c.slug, c.icon, c.display_order AS "displayOrder"
+      FROM food_categories c
+      WHERE c.is_active = true
+        AND (${customerVisible} = false OR EXISTS (
+          SELECT 1 FROM daily_menu_items i
+          JOIN foods f ON f.id = i.food_id
+          WHERE i.daily_menu_id = ${menu.id} AND f.category_id = c.id AND f.is_active = true
+        ))
+      ORDER BY c.display_order, c.id
     `,
     getPersianRice(menu.id),
   ])
@@ -321,11 +327,21 @@ export async function getPublicMenuPageByDate(
              (SELECT COUNT(*)::int FROM filtered) AS "totalItems"
       FROM page
     `,
+    /**
+     * Only categories today's menu can actually fill. A chip that filters the list down to nothing
+     * reads as a broken shop, so this applies the same visibility rule as the item query: the food
+     * and its category both active, and the food on this day's menu.
+     */
     sqlClient<DailyMenuDto['categories']>`
-      SELECT id, title, slug, icon, display_order AS "displayOrder"
-      FROM food_categories
-      WHERE is_active = true
-      ORDER BY display_order, id
+      SELECT c.id, c.title, c.slug, c.icon, c.display_order AS "displayOrder"
+      FROM food_categories c
+      WHERE c.is_active = true
+        AND EXISTS (
+          SELECT 1 FROM daily_menu_items i
+          JOIN foods f ON f.id = i.food_id
+          WHERE i.daily_menu_id = ${menu.id} AND f.category_id = c.id AND f.is_active = true
+        )
+      ORDER BY c.display_order, c.id
     `,
     includeDiscountItems ? getDiscountItems(menu.id) : Promise.resolve([]),
     getPersianRice(menu.id),

@@ -13,11 +13,12 @@ import { formatNumber } from '../../utils/format'
  * nothing depends on the browser reporting a width to React. The step only ever changes on phones,
  * because the controls that change it are hidden on wider screens.
  */
-export type CheckoutStep = 'cart' | 'delivery' | 'payment'
+export type CheckoutStep = 'cart' | 'delivery' | 'time' | 'payment'
 
-const checkoutSteps: { id: CheckoutStep; title: string }[] = [
+const allCheckoutSteps: { id: CheckoutStep; title: string }[] = [
   { id: 'cart', title: 'سبد' },
   { id: 'delivery', title: 'تحویل' },
+  { id: 'time', title: 'زمان' },
   { id: 'payment', title: 'پرداخت' },
 ]
 
@@ -35,6 +36,13 @@ type Props = {
 
 export function CartPage({ items, messages, isChecking, isVerified, onRefresh, onQuantityChange, onBack, onSuccess, onAuthenticationChange }: Props) {
   const [step, setStep] = useState<CheckoutStep>('cart')
+  // The courier charge is fetched and interpreted by the checkout form; the cart step only displays
+  // what the form resolved, so a phone customer sees the real cost before leaving the basket.
+  const [deliveryCost, setDeliveryCost] = useState<{ fee: number | null; isLoading: boolean }>({ fee: null, isLoading: true })
+  // Express delivery is served as soon as possible, so it has no window to book and the step bar
+  // loses that step entirely rather than showing one the customer cannot use.
+  const [isExpress, setIsExpress] = useState(false)
+  const checkoutSteps = allCheckoutSteps.filter((candidate) => candidate.id !== 'time' || !isExpress)
   const requiresAttention = !isChecking && (!isVerified || messages.length > 0)
   const stepIndex = checkoutSteps.findIndex((candidate) => candidate.id === step)
 
@@ -49,6 +57,12 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
   useEffect(() => {
     if (items.length === 0) setStep('cart')
   }, [items.length])
+
+  // Turning express on while standing on the window step would strand the customer on a step that no
+  // longer exists.
+  useEffect(() => {
+    if (isExpress && step === 'time') setStep('payment')
+  }, [isExpress, step])
 
   return <main className="checkout-page" data-wizard-step={step}>
     <div className="page-actions"><div><span className="eyebrow"><Icon name="confirm" size="sm" /> مرحله نهایی</span><h1 className="section-title">ثبت سفارش</h1></div><button className="checkout-back-link" onClick={onBack}>ادامه خرید <Icon name="back" size="sm" /></button></div>
@@ -74,7 +88,7 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
         </div>
         <button type="button" onClick={onRefresh} disabled={isChecking}>{isChecking ? <ButtonLoading label="در حال بررسی موجودی…" /> : <><Icon name="refresh" size="sm" /> به‌روزرسانی موجودی</>}</button>
       </section>}
-      <CartSummary items={items} onQuantityChange={onQuantityChange} />
+      <CartSummary items={items} onQuantityChange={onQuantityChange} deliveryCost={deliveryCost} />
       <div className="checkout-wizard-actions">
         <button type="button" className="primary-button full-width" disabled={items.length === 0} onClick={() => setStep('delivery')}>
           ادامه به اطلاعات تحویل <Icon name="back" size="sm" />
@@ -82,6 +96,7 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
       </div>
     </div>
     <CheckoutForm items={items} isCartVerified={isVerified} isCheckingCart={isChecking} onRefreshCart={onRefresh} onSuccess={onSuccess}
-      onAuthenticationChange={onAuthenticationChange} wizardStep={step} onWizardStepChange={setStep} />
+      onAuthenticationChange={onAuthenticationChange} wizardStep={step} onWizardStepChange={setStep} onDeliveryCostChange={setDeliveryCost}
+      onExpressChange={setIsExpress} />
   </main>
 }

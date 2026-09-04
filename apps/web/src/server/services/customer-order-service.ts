@@ -1,5 +1,4 @@
 import {
-  PaymentMethod,
   OrderStatus,
   type CustomerOrderDetailDto,
   type CustomerOrdersPageDto,
@@ -159,17 +158,16 @@ export async function getCustomerOrderDetail(userId: number, orderId: number): P
       createdAt: DbDate
       paidAt: DbDate | null
     }>>`
+      -- financial_accounts and pos_terminals were dropped with the accounting architecture, and with
+      -- them the payment's account and terminal columns. This query still joined them, so every
+      -- request for an order's details failed with a SQL error and «جزئیات سفارش» did nothing at
+      -- all. There is no provider name left to report; the field stays in the contract, and the
+      -- detail view already hides it when it is null.
       SELECT p.payment_method AS "paymentMethod", p.status, p.amount::float8 AS amount,
-             CASE
-               WHEN p.payment_method = ${PaymentMethod.Online} THEN COALESCE(a.bank_name, a.name)
-               WHEN p.payment_method = ${PaymentMethod.Pos} THEN pt.title
-               ELSE NULL
-             END AS "providerName",
+             NULL::text AS "providerName",
              p.tracking_number AS "trackingNumber", p.reference_number AS "referenceNumber",
              p.paid_at AS "paidAt", p.created_at AS "createdAt"
       FROM payments p
-      JOIN financial_accounts a ON a.id = p.financial_account_id
-      LEFT JOIN pos_terminals pt ON pt.id = p.pos_terminal_id
       WHERE p.order_id = ${orderId} ORDER BY p.created_at DESC, p.id DESC`,
     sqlClient<Array<Omit<OrderReviewDto, 'createdAt' | 'updatedAt'> & {
       createdAt: DbDate

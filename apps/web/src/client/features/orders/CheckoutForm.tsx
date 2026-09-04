@@ -38,7 +38,7 @@ const asciiDigits = (value: string) => value
   .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
   .replace(/\D/g, '')
 
-export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshCart, onSuccess, onAuthenticationChange, wizardStep, onWizardStepChange }: {
+export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshCart, onSuccess, onAuthenticationChange, wizardStep, onWizardStepChange, onDeliveryCostChange, onExpressChange }: {
   items: CartItem[]
   isCartVerified: boolean
   isCheckingCart: boolean
@@ -49,6 +49,11 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
    *  on phones and all of them on desktop, so the form never loses state between steps. */
   wizardStep?: CheckoutStep
   onWizardStepChange?: (step: CheckoutStep) => void
+  /** Reports the courier charge upward so the cart step can show it too; the form stays the one
+   *  place that fetches and interprets pricing. */
+  onDeliveryCostChange?: (cost: { fee: number | null; isLoading: boolean }) => void
+  /** Express removes the window step, so the step bar has to know about it. */
+  onExpressChange?: (isExpress: boolean) => void
 }) {
   const [form, setForm] = useState(initialForm)
   const [savedAddresses, setSavedAddresses] = useState<CustomerAddressDto[]>([])
@@ -59,6 +64,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   // Bumped when the server refuses an order, so the window picker re-reads availability instead of
   // leaving the customer to press the button again on a window that has already closed or filled.
   const [slotRefreshSignal, setSlotRefreshSignal] = useState(0)
+  const [isExpress, setIsExpress] = useState(false)
   const [pricing, setPricing] = useState<DeliveryPricingDto | null>(null)
   const [isLoadingPricing, setIsLoadingPricing] = useState(true)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
@@ -86,6 +92,11 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   // Both methods book a window from the same set; only the wording differs, because the window a
   // courier delivers in is the window a pickup customer collects in.
   const isPickup = form.deliveryMethod === DeliveryMethod.Pickup
+  // Express and a delivery window are alternatives, never both: an express order is served as soon
+  // as possible, so there is no window to book and the window step drops out of the wizard.
+  const expressAvailable = Boolean(selectedDelivery?.supportsExpress)
+  const expressChosen = expressAvailable && isExpress
+  const expressFee = expressChosen ? selectedDelivery?.expressFee ?? 0 : 0
   const selectedPayment = orderOptions?.paymentMethods.find((item) => item.method === form.paymentMethod)
   const cartSubtotal = items.reduce((sum, item) =>
     sum + (item.unitPrice + (item.withPersianRice ? item.persianRicePrice ?? 0 : 0)) * item.quantity, 0)
@@ -95,7 +106,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   const selectedPricing = pricing?.methods.find((item) => item.method === form.deliveryMethod) ?? null
   const deliveryFee = selectedPricing?.customerDeliveryFee ?? null
   const isDeliveryUnpriced = Boolean(selectedPricing && deliveryFee === null)
-  const finalTotal = cartSubtotal + (deliveryFee ?? 0)
+  const finalTotal = cartSubtotal + (deliveryFee ?? 0) + expressFee
 
   const applyProfile = useCallback((profile: CustomerProfileDto, requireConfirmedPhone: boolean) => {
     setCustomerProfile(profile)
@@ -180,6 +191,21 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   }, [deliveryDate])
 
   useEffect(() => {
+    if (!expressAvailable && isExpress) setIsExpress(false)
+  }, [expressAvailable, isExpress])
+
+  useEffect(() => { onExpressChange?.(expressChosen) }, [expressChosen, onExpressChange])
+
+  // Choosing express releases any window already picked, so a stale selection cannot be submitted.
+  useEffect(() => {
+    if (expressChosen) setDeliveryTimeSlotId(null)
+  }, [expressChosen])
+
+  useEffect(() => {
+    onDeliveryCostChange?.({ fee: deliveryFee, isLoading: isLoadingPricing })
+  }, [deliveryFee, isLoadingPricing, onDeliveryCostChange])
+
+  useEffect(() => {
     if (resendSeconds <= 0) return
     const timer = window.setInterval(() => setResendSeconds((current) => Math.max(0, current - 1)), 1_000)
     return () => window.clearInterval(timer)
@@ -239,26 +265,27 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     if (!form.fullName.trim()) return 'نام و نام خانوادگی الزامی است.'
     if (!form.phoneNumber.trim()) return 'شماره موبایل الزامی است.'
     if (form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && !form.addressLine.trim()) return 'آدرس برای ارسال سفارش الزامی است.'
-    // Server revalidates this atomically; the check here only saves the customer a round trip.
-    if (deliveryTimeSlotId == null) return 'برای ادامه، یک بازه زمانی تحویل انتخاب کنید.'
     return null
   }
 
-  const goToPaymentStep = () => {
-    const stepError = deliveryStepError()
+  /** The window step. Server revalidates atomically; this only saves the customer a round trip. */
+  const timeStepError = () =>
+    expressChosen || deliveryTimeSlotId != null ? null : 'برای ادامه، یک بازه زمانی تحویل انتخاب کنید.'
+
+  const advanceTo = (next: CheckoutStep, stepError: string | null) => {
     setError(stepError)
-    if (!stepError) onWizardStepChange?.('payment')
+    if (!stepError) onWizardStepChange?.(next)
   }
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
-    const stepError = deliveryStepError()
-    if (stepError) {
-      // On a phone the offending field is on the previous screen, so say what is wrong and go back
-      // to where it can be fixed.
-      onWizardStepChange?.('delivery')
-      return setError(stepError)
+    // On a phone the offending field is on an earlier screen, so say what is wrong and go back to
+    // where it can be fixed.
+    const earlierStepError = deliveryStepError() ?? timeStepError()
+    if (earlierStepError) {
+      onWizardStepChange?.(deliveryStepError() ? 'delivery' : 'time')
+      return setError(earlierStepError)
     }
     if (items.length === 0) return setError('حداقل یک غذا به سبد خرید اضافه کنید.')
     if (!selectedDelivery || !selectedPayment) return setError('روش پرداخت یا دریافت معتبری انتخاب نشده است.')
@@ -302,7 +329,8 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         : 'تحویل حضوری',
       customerNote: form.customerNote.trim() || null,
       deliveryMethod: form.deliveryMethod, paymentMethod: form.paymentMethod,
-      deliveryTimeSlotId,
+      deliveryTimeSlotId: expressChosen ? null : deliveryTimeSlotId,
+      isExpress: expressChosen,
       items: items.map((item) => ({ dailyMenuItemId: item.dailyMenuItemId, withPersianRice: Boolean(item.withPersianRice), quantity: item.quantity })),
     }
     setIsSubmitting(true)
@@ -422,11 +450,34 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         onSelect={setSelectedAddressId}
       />}
       {form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && <label className="field">آدرس<textarea value={form.addressLine} onChange={(e) => setField('addressLine', e.target.value)} /></label>}
-      <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} onDateResolved={setDeliveryDate} refreshSignal={slotRefreshSignal} isPickup={isPickup} />
+      {/* Choosing express removes the window step rather than disabling a control inside it: the two
+          are alternatives, and an order that is on its way now has no window to be in. */}
+      {expressAvailable && <label className={`express-option ${expressChosen ? 'is-selected' : ''}`}>
+        <input type="checkbox" checked={expressChosen} onChange={(event) => setIsExpress(event.target.checked)} />
+        <span className="express-option-copy">
+          <strong><Icon name="clock" size="sm" /> ارسال فوری</strong>
+          <small>
+            {selectedDelivery?.expressEstimatedMinutes
+              ? `تحویل تا حدود ${formatNumber(selectedDelivery.expressEstimatedMinutes)} دقیقه دیگر، بدون انتخاب بازه`
+              : 'در سریع‌ترین زمان ممکن، بدون انتخاب بازه'}
+            {(selectedDelivery?.expressFee ?? 0) > 0 && ` — ${formatMoney(selectedDelivery!.expressFee)} هزینه اضافه`}
+          </small>
+        </span>
+      </label>}
       {wizardStep === 'delivery' && error && <div className="form-error" role="alert">{error}</div>}
       <div className="checkout-wizard-actions">
         <button type="button" className="outline-button" onClick={() => onWizardStepChange?.('cart')}>مرحله قبل</button>
-        <button type="button" className="primary-button" onClick={goToPaymentStep}>ادامه به پرداخت <Icon name="back" size="sm" /></button>
+        <button type="button" className="primary-button" onClick={() => advanceTo(expressChosen ? 'payment' : 'time', deliveryStepError())}>{expressChosen ? 'ادامه به پرداخت' : 'ادامه به زمان تحویل'} <Icon name="back" size="sm" /></button>
+      </div>
+    </div>
+
+    <div className="checkout-step-block" data-step="time">
+      <h2 className="section-title checkout-step-heading checkout-mobile-only">زمان تحویل</h2>
+      <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} onDateResolved={setDeliveryDate} refreshSignal={slotRefreshSignal} isPickup={isPickup} />
+      {wizardStep === 'time' && error && <div className="form-error" role="alert">{error}</div>}
+      <div className="checkout-wizard-actions">
+        <button type="button" className="outline-button" onClick={() => onWizardStepChange?.('delivery')}>مرحله قبل</button>
+        <button type="button" className="primary-button" onClick={() => advanceTo('payment', timeStepError())}>ادامه به پرداخت <Icon name="back" size="sm" /></button>
       </div>
     </div>
 
@@ -443,6 +494,10 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
             ? 'در حال محاسبه…'
             : deliveryFee === null ? 'مشخص نشده' : formatMoney(deliveryFee)}</strong>
         </div>
+        {expressChosen && <div>
+          <span>ارسال فوری</span>
+          <strong>{formatMoney(expressFee)}</strong>
+        </div>}
         <div className="checkout-totals-final">
           <span>مبلغ نهایی</span>
           <strong>{isLoadingPricing || deliveryFee === null ? '—' : formatMoney(finalTotal)}</strong>
@@ -452,12 +507,14 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         {selectedPricing?.unavailableMessage ?? 'هزینه ارسال برای این روز مشخص نشده است.'}
       </div>}
 
-      {wizardStep !== 'delivery' && error && <div className="form-error" role="alert">{error}</div>}
-      <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || isLoadingOptions || isLoadingPricing || isDeliveryUnpriced || showLogin || !isCartVerified || Boolean(cartIssue) || isBelowMinimum || !selectedDelivery || !selectedPayment || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting
+      {wizardStep !== 'delivery' && wizardStep !== 'time' && error && <div className="form-error" role="alert">{error}</div>}
+      {/* The final action shares the pinned bar with «مرحله قبل» on a phone. On desktop the bar is
+          `display: contents`, so the submit button stays an ordinary last child of the form. */}
+      <div className="checkout-wizard-actions checkout-submit-actions">
+      <button type="button" className="outline-button checkout-mobile-only" onClick={() => onWizardStepChange?.(expressChosen ? 'delivery' : 'time')}>مرحله قبل</button>
+      <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || isLoadingOptions || isLoadingPricing || isDeliveryUnpriced || showLogin || !isCartVerified || Boolean(cartIssue) || isBelowMinimum || !selectedDelivery || !selectedPayment || items.length === 0 || (!expressChosen && deliveryTimeSlotId == null)}>{isSubmitting
         ? <ButtonLoading label={form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} />
         : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
-      <div className="checkout-wizard-actions">
-        <button type="button" className="outline-button full-width" onClick={() => onWizardStepChange?.('delivery')}>بازگشت به اطلاعات تحویل</button>
       </div>
     </div>
   </form>

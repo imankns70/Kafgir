@@ -118,7 +118,7 @@ export function PaymentMethodsPage() {
 export function DeliveryMethodsPage() {
   const [rows, setRows] = useState<DeliveryMethodSettingDto[]>([])
   const [drafts, setDrafts] = useState<Record<number, DeliveryMethodSettingDto>>({})
-  const [amounts, setAmounts] = useState<Record<number, { fee: string; minimum: string }>>({})
+  const [amounts, setAmounts] = useState<Record<number, { fee: string; minimum: string; express: string }>>({})
   const [loading, setLoading] = useState(true)
   const [savingMethod, setSavingMethod] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -132,6 +132,7 @@ export function DeliveryMethodsPage() {
       setDrafts(Object.fromEntries(data.map((item) => [item.method, item])))
       setAmounts(Object.fromEntries(data.map((item) => [item.method, {
         fee: amountText(item.deliveryFee), minimum: amountText(item.minimumOrderAmount),
+        express: amountText(item.expressFee),
       }])))
       setError(null)
     } catch (reason) { setError(errorText(reason)) }
@@ -148,6 +149,7 @@ export function DeliveryMethodsPage() {
   const invalidAmount = (method: number) => {
     const entry = amounts[method]
     return !entry || parseMoney(entry.fee) === null || parseMoney(entry.minimum) === null
+      || parseMoney(entry.express) === null
   }
 
   const save = async (method: number) => {
@@ -156,8 +158,9 @@ export function DeliveryMethodsPage() {
     if (!draft || !entry) return
     const deliveryFee = parseMoney(entry.fee)
     const minimumOrderAmount = parseMoney(entry.minimum)
-    if (deliveryFee === null || minimumOrderAmount === null) {
-      setError('هزینه ارسال و حداقل سفارش باید عددی نامنفی باشند.')
+    const expressFee = parseMoney(entry.express)
+    if (deliveryFee === null || minimumOrderAmount === null || expressFee === null) {
+      setError('هزینه ارسال، حداقل سفارش و هزینه ارسال فوری باید عددی نامنفی باشند.')
       return
     }
     setSavingMethod(method); setNotice(null)
@@ -166,6 +169,8 @@ export function DeliveryMethodsPage() {
         title: draft.title, description: draft.description,
         isCustomerEnabled: draft.isCustomerEnabled, isManualEnabled: draft.isManualEnabled,
         displayOrder: draft.displayOrder, deliveryFee, minimumOrderAmount,
+        supportsExpress: draft.supportsExpress, expressFee,
+        expressEstimatedMinutes: draft.expressEstimatedMinutes,
       })
       setError(null); setNotice(`«${draft.title}» ذخیره شد.`)
       await load()
@@ -184,10 +189,11 @@ export function DeliveryMethodsPage() {
     <ListState loading={loading} error={error} isEmpty={rows.length === 0} emptyText="روشی پیکربندی نشده است." />
     <div className="settings-method-grid">{rows.map((row) => {
       const draft = drafts[row.method] ?? row
-      const entry = amounts[row.method] ?? { fee: '0', minimum: '0' }
+      const entry = amounts[row.method] ?? { fee: '0', minimum: '0', express: '0' }
       const amountsValid = !invalidAmount(row.method)
       const dirty = isDirty(row.method) ||
-        parseMoney(entry.fee) !== row.deliveryFee || parseMoney(entry.minimum) !== row.minimumOrderAmount
+        parseMoney(entry.fee) !== row.deliveryFee || parseMoney(entry.minimum) !== row.minimumOrderAmount ||
+        parseMoney(entry.express) !== row.expressFee
       return <article className="panel settings-method-card" key={row.method}>
         <label>عنوان<input value={draft.title}
           onChange={(event) => patch(row.method, { title: event.target.value })} /></label>
@@ -210,6 +216,23 @@ export function DeliveryMethodsPage() {
           }))} />
         <label>ترتیب<input type="number" min="0" value={draft.displayOrder}
           onChange={(event) => patch(row.method, { displayOrder: Number(event.target.value) })} /></label>
+        {/* Express is an add-on to this method, not a method of its own: the customer forgoes the
+            delivery window and pays the surcharge to be served as soon as possible. */}
+        <label className="switch"><input type="checkbox" checked={draft.supportsExpress}
+          onChange={(event) => patch(row.method, { supportsExpress: event.target.checked })} /> ارسال فوری فعال باشد</label>
+        {draft.supportsExpress && <>
+          <AmountField label="هزینه ارسال فوری (تومان)" value={entry.express}
+            onChange={(value) => setAmounts((current) => ({
+              ...current, [row.method]: { ...entry, express: value },
+            }))} />
+          <label>زمان تقریبی تحویل فوری (دقیقه)<input type="number" min="1" value={draft.expressEstimatedMinutes ?? ''}
+            onChange={(event) => patch(row.method, {
+              expressEstimatedMinutes: event.target.value ? Number(event.target.value) : null,
+            })} /></label>
+          <p className="settings-method-note">
+            سفارش فوری بازه زمانی نمی‌گیرد؛ هزینه فوری به هزینه ارسال همان روز اضافه می‌شود.
+          </p>
+        </>}
         <ChannelFields
           isCustomerEnabled={draft.isCustomerEnabled}
           isManualEnabled={draft.isManualEnabled}

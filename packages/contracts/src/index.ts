@@ -253,6 +253,12 @@ export const createOrderSchema = z.object({
   // items belong to, so a client cannot pair today's food with tomorrow's delivery. Optional so that
   // Electron manual orders, which are taken by phone, can still be created without one.
   deliveryTimeSlotId: z.number().int().positive().nullable().optional(),
+  /**
+   * Express delivery replaces the window: an express order books no slot and pays the surcharge.
+   * Optional rather than defaulted, so every existing caller — Electron manual orders included —
+   * keeps compiling and an absent flag means an ordinary delivery.
+   */
+  isExpress: z.boolean().optional(),
   items: z.array(createOrderItemSchema).min(1),
 })
 

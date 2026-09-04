@@ -24,7 +24,6 @@ let firstProfileId = 0
 let pendingOrderId = 0
 let deliveredOrderId = 0
 let cancelledOrderId = 0
-let financialAccountId = 0
 
 integration('customer authentication, order ownership and reviews', () => {
   beforeAll(async () => {
@@ -96,20 +95,15 @@ integration('customer authentication, order ownership and reviews', () => {
         (${deliveredOrderId}, ${OrderStatus.Confirmed}, ${OrderStatus.Delivered}, 'تحویل به مشتری', NOW() - INTERVAL '48 hour')
     `
 
-    const accounts = await sql<{ id: number }[]>`
-      INSERT INTO financial_accounts
-        (name, type, bank_name, opening_balance, is_active, created_at, updated_at)
-      VALUES (${`gateway-${suffix}`}, 2, 'درگاه آزمایشی', 0, true, NOW(), NOW())
-      RETURNING id
-    `
-    financialAccountId = accounts[0]!.id
+    // Payments no longer reference a financial account: that table went with the accounting
+    // architecture, and a payment now stands on its own.
     await sql`
       INSERT INTO payments
-        (order_id, payment_method, financial_account_id, amount, status,
+        (order_id, payment_method, amount, status,
          tracking_number, reference_number, receipt_image_url, description,
          paid_at, created_at, updated_at)
       VALUES
-        (${deliveredOrderId}, ${PaymentMethod.Online}, ${financialAccountId}, 485000,
+        (${deliveredOrderId}, ${PaymentMethod.Online}, 485000,
          ${PaymentStatus.Paid}, 'TRACK-SAFE', 'REF-SAFE', 'https://private.invalid/receipt.jpg',
          'internal gateway payload must stay private', NOW() - INTERVAL '2 day', NOW() - INTERVAL '2 day', NOW())
     `
@@ -121,7 +115,6 @@ integration('customer authentication, order ownership and reviews', () => {
     if (pendingOrderId || deliveredOrderId || cancelledOrderId) {
       await sql`DELETE FROM orders WHERE id IN (${pendingOrderId}, ${deliveredOrderId}, ${cancelledOrderId})`
     }
-    if (financialAccountId) await sql`DELETE FROM financial_accounts WHERE id = ${financialAccountId}`
     if (firstUserId || secondUserId) await sql`DELETE FROM users WHERE id IN (${firstUserId}, ${secondUserId})`
     await sql.end()
   })

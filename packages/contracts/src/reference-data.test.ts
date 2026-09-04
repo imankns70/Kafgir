@@ -37,9 +37,13 @@ describe('reference data contracts', () => {
         method: DeliveryMethod.Delivery, title: 'ارسال', description: 'ارسال به آدرس مشتری',
         isCustomerEnabled: true, isManualEnabled: true, displayOrder: 10,
         deliveryFee: 50_000, minimumOrderAmount: 300_000, requiresCourier: true,
+        supportsExpress: true, expressFee: 30_000, expressEstimatedMinutes: 45,
       }],
     })
-    expect(options.deliveryMethods[0]).toMatchObject({ deliveryFee: 50_000, minimumOrderAmount: 300_000 })
+    expect(options.deliveryMethods[0]).toMatchObject({
+      deliveryFee: 50_000, minimumOrderAmount: 300_000,
+      supportsExpress: true, expressFee: 30_000, expressEstimatedMinutes: 45,
+    })
   })
 
   /**
@@ -51,6 +55,7 @@ describe('reference data contracts', () => {
     const parsed = deliveryMethodSettingWriteSchema.parse({
       title: 'ارسال', description: null, isCustomerEnabled: true, isManualEnabled: true,
       displayOrder: 10, deliveryFee: 0, minimumOrderAmount: 0, requiresCourier: false,
+      supportsExpress: false, expressFee: 0, expressEstimatedMinutes: null,
     })
     expect(parsed).not.toHaveProperty('requiresCourier')
   })
