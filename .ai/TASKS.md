@@ -1,5 +1,11 @@
 # Tasks
 
+## 2026-09-04 express checkout validation
+
+- [x] Allow express customer orders to reach the shared order service without a delivery-window ID.
+- [x] Preserve the required-window rejection for standard customer delivery.
+- [x] Add route-level regression coverage for both cases.
+
 ## 2026-08-20 simplified purchasing, monthly reporting, and dashboard
 
 - [x] Remove the inventory, procurement and accounting architecture end to end: schema, services,

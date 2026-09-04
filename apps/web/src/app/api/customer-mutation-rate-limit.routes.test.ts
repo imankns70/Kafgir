@@ -215,6 +215,31 @@ describe('customer mutation route wiring', () => {
     expect(orderServiceMocks.createOrder).not.toHaveBeenCalled()
   })
 
+  it('allows an express customer order without a delivery window', async () => {
+    const requestBody = {
+      fullName: 'مشتری تست',
+      phoneNumber: '09121234567',
+      city: 'اندیمشک',
+      addressLine: 'نشانی کامل مشتری',
+      paymentMethod: 1,
+      deliveryMethod: 2,
+      isExpress: true,
+      items: [{ dailyMenuItemId: 1, quantity: 1, withPersianRice: false }],
+    }
+
+    const response = await createOrder(jsonRequest('/api/orders', 'POST', requestBody))
+
+    expect(response.status).toBe(201)
+    expect(orderServiceMocks.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ isExpress: true }),
+      expect.any(Object),
+      false,
+      42,
+      false,
+      undefined,
+    )
+  })
+
   it('protects review and delivery confirmation with the shared feedback policy', async () => {
     const context = { params: Promise.resolve({ id: '9' }) }
     const responses = await Promise.all([

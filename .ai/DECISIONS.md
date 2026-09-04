@@ -1,5 +1,11 @@
 # Decisions
 
+## 2026-09-04 — Express delivery has no delivery-window requirement
+
+- Keep the HTTP boundary strict for standard customer orders, but exempt `isExpress=true` from the
+  required-slot check. The shared order service remains authoritative for express support and rejects
+  an express request that also names a slot.
+
 ## 2026-08-31 — Thermal receipts are a separate print layout
 
 - Keep A4 and thermal output separate instead of shrinking the existing invoice. A narrow receipt has

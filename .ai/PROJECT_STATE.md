@@ -1,5 +1,11 @@
 # Project state
 
+## 2026-09-04 — Express checkout route validation fix
+
+- The customer order HTTP route now requires a delivery window only for standard delivery. Express
+  orders intentionally submit no window and proceed to the shared transactional service, which still
+  validates express availability, delivery-method support and the incompatible slot combination.
+
 ## 2026-09-04 — Monthly plan, express in the time step, order-status fixes
 
 - The mobile tab bar carries «برنامه ماه» instead of order history, which «حساب من» already reaches.

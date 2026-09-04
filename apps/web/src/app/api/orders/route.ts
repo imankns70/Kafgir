@@ -35,10 +35,10 @@ export async function POST(request: Request) {
       ? customerRateLimitIdentity(customer.userId)
       : telegramRateLimitIdentity(telegram.identity!.userId!)
     await enforceCustomerMutationIdentity('order', rateIdentity)
-    // The window is optional in the shared contract only because Electron takes phone orders without
-    // one. A customer checkout must always name it: otherwise dropping the field from the request is
-    // by itself enough to skip the cutoff and capacity rules the picker enforces in the browser.
-    if (body.deliveryTimeSlotId == null) {
+    // Standard customer delivery must name a window so omitting the field cannot bypass its cutoff
+    // and capacity rules. Express delivery deliberately has no window and is validated transactionally
+    // by the shared order service.
+    if (!body.isExpress && body.deliveryTimeSlotId == null) {
       throw new AppError('برای ثبت سفارش، یک بازه زمانی تحویل انتخاب کنید.')
     }
     const identity = telegram.identity ?? {
