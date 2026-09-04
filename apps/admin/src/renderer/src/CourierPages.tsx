@@ -31,6 +31,13 @@ import {
 
 const errorText = (reason: unknown) => reason instanceof Error ? reason.message : String(reason)
 
+const workDateLabel = (account: CourierAccountSummaryDto) => {
+  if (!account.firstWorkDate || !account.lastWorkDate) return '—'
+  const first = persianDay(account.firstWorkDate)
+  const last = persianDay(account.lastWorkDate)
+  return account.firstWorkDate === account.lastWorkDate ? first : `${first} تا ${last}`
+}
+
 const today = () => new Intl.DateTimeFormat('en-CA-u-nu-latn', {
   timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit',
 }).format(new Date())
@@ -363,13 +370,14 @@ export function CourierAccountingPage() {
         ? <p className="muted">هنوز پیکی ثبت نشده است.</p>
         : <><table>
             <thead><tr><RowNumberHead />
-              <th>نام</th><th>وضعیت</th><th>تحویل موفق</th><th>کارکرد</th><th>تسویه‌شده</th><th>مانده</th><th>عملیات</th>
+              <th>نام</th><th>وضعیت</th><th>تاریخ کارکرد</th><th>تحویل موفق</th><th>کارکرد</th><th>تسویه‌شده</th><th>مانده</th><th>عملیات</th>
             </tr></thead>
             <tbody>
               {paged.visible.map((account, index) => <tr key={account.courierId}>
                 <RowNumberCell offset={paged.rowOffset} index={index} />
                 <td>{account.fullName}</td>
                 <td><StatusPill active={account.isActive} /></td>
+                <td>{workDateLabel(account)}</td>
                 <td>{count(account.deliveredOrders)}</td>
                 <td>{money(account.earnedAmount)}</td>
                 <td>{money(account.settledAmount)}</td>

@@ -17,6 +17,26 @@
 
 ## Resolved
 
+### 2026-09-03 — Checkout delivery windows froze at the state they had when the page opened
+
+- **Symptoms:** A window whose cutoff passed while checkout stayed open remained selectable, and the
+  order was only refused at submission. The reverse also happened: a window the operator enabled, or
+  one that freed capacity, stayed greyed out with «مهلت سفارش … به پایان رسیده» until the customer
+  navigated away and back.
+- **Root cause:** `DeliverySlotPicker` fetched `/api/delivery-slots` once on mount with no polling,
+  focus or visibility refresh, while the cart, menu and food prices all refresh every 15 seconds.
+  Measured on an open cart page: 3 cart-snapshot requests and 0 delivery-slot requests in 23 seconds.
+  Its effect that drops a selection which is no longer available could therefore never fire, and a
+  rejected submission refreshed only the cart.
+- **Fix:** Refresh the window list on the same 15-second cadence as the cart, gated on tab visibility
+  plus a focus listener, as a background reload that keeps the current list on screen; re-read it
+  after a rejected submission through a signal from `CheckoutForm`.
+- **Verification:** Availability rules and the server query were confirmed correct against the live
+  database (today all past cutoff, tomorrow all open, past date all closed). In the browser a window
+  flipped from disabled to enabled and back within one refresh interval without a reload, and the
+  stale selection was cleared automatically. 152 Web client and domain tests and web TypeScript
+  validation pass.
+
 ### 2026-08-20 — Daily courier pricing and similar Admin pages required excessive vertical scrolling
 
 - **Symptoms:** The courier-day screen stacked an expanded guide, date control, editor, repeated

@@ -31,12 +31,23 @@ describe('empty-cart confirmation', () => {
 })
 
 describe('cart item presentation', () => {
-  it('renders the food detail action inside the item heading', () => {
+  it('pairs the detail action with the remove button in the item action row', () => {
     const html = renderToStaticMarkup(createElement(CartSummary, {
       items: [{ ...item(1), slug: 'food-1' }],
       onQuantityChange: vi.fn(),
     }))
 
-    expect(html).toMatch(/cart-item-heading[\s\S]*cart-name[\s\S]*cart-detail-button[\s\S]*cart-unit-price/)
+    expect(html).toMatch(/cart-name[\s\S]*cart-unit-price[\s\S]*cart-item-actions[\s\S]*cart-item-buttons[\s\S]*cart-detail-button[\s\S]*cart-remove-button/)
+  })
+
+  it('keeps the item list in its own scroll area, with the total outside it', () => {
+    const html = renderToStaticMarkup(createElement(CartSummary, {
+      items: [item(1), item(2), item(3)],
+      onQuantityChange: vi.fn(),
+    }))
+
+    expect(html).toMatch(/cart-item-count[\s\S]*cart-items[\s\S]*cart-row[\s\S]*cart-total/)
+    // The total must not sit inside the scrolling list, or it scrolls away with the foods.
+    expect(html.slice(html.indexOf('cart-total'))).not.toContain('cart-row')
   })
 })

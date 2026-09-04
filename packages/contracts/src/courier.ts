@@ -99,6 +99,9 @@ export const courierAccountSummarySchema = z.object({
   isActive: z.boolean(),
   /** Orders whose current status is Delivered and that carry a courier payable snapshot. */
   deliveredOrders: z.number().int().nonnegative(),
+  /** Inclusive delivery-date range of the orders counted as work; null before the first delivery. */
+  firstWorkDate: isoDate.nullable(),
+  lastWorkDate: isoDate.nullable(),
   earnedAmount: z.number().nonnegative(),
   settledAmount: z.number().nonnegative(),
   outstandingAmount: z.number(),

@@ -218,6 +218,8 @@ integration.sequential('courier delivery pricing and accounting', () => {
     const delivered = await courierAccountSummary(aliId)
     expect(delivered.earnedAmount).toBe(start.earnedAmount + 70_000)
     expect(delivered.deliveredOrders).toBe(start.deliveredOrders + 1)
+    expect(delivered.firstWorkDate).toBe(menuDate)
+    expect(delivered.lastWorkDate).toBe(menuDate)
   })
 
   it('earns nothing for a cancelled order', async () => {

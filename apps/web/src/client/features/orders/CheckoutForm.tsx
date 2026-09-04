@@ -13,6 +13,7 @@ import { Icon } from '../../design-system/Icon'
 import { ButtonLoading } from '../../design-system/ButtonLoading'
 import { DeliverySlotPicker } from './DeliverySlotPicker'
 import { SavedAddressPicker } from './SavedAddressPicker'
+import type { CheckoutStep } from '../cart/CartPage'
 import { formatMoney, formatNumber } from '../../utils/format'
 import {
   DeliveryMethod,
@@ -37,13 +38,17 @@ const asciiDigits = (value: string) => value
   .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
   .replace(/\D/g, '')
 
-export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshCart, onSuccess, onAuthenticationChange }: {
+export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshCart, onSuccess, onAuthenticationChange, wizardStep, onWizardStepChange }: {
   items: CartItem[]
   isCartVerified: boolean
   isCheckingCart: boolean
   onRefreshCart: () => void
   onSuccess: (order: OrderDto) => void
   onAuthenticationChange: (authenticated: boolean) => void
+  /** Which wizard step the page is on. Every field is always rendered; CSS shows the current step
+   *  on phones and all of them on desktop, so the form never loses state between steps. */
+  wizardStep?: CheckoutStep
+  onWizardStepChange?: (step: CheckoutStep) => void
 }) {
   const [form, setForm] = useState(initialForm)
   const [savedAddresses, setSavedAddresses] = useState<CustomerAddressDto[]>([])
@@ -51,6 +56,9 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   const [error, setError] = useState<string | null>(null)
   const [deliveryTimeSlotId, setDeliveryTimeSlotId] = useState<number | null>(null)
   const [deliveryDate, setDeliveryDate] = useState<string | null>(null)
+  // Bumped when the server refuses an order, so the window picker re-reads availability instead of
+  // leaving the customer to press the button again on a window that has already closed or filled.
+  const [slotRefreshSignal, setSlotRefreshSignal] = useState(0)
   const [pricing, setPricing] = useState<DeliveryPricingDto | null>(null)
   const [isLoadingPricing, setIsLoadingPricing] = useState(true)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
@@ -75,6 +83,9 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((current) => ({ ...current, [key]: value }))
   const selectedSavedAddress = savedAddresses.find((address) => address.id.toString() === selectedAddressId)
   const selectedDelivery = orderOptions?.deliveryMethods.find((item) => item.method === form.deliveryMethod)
+  // Both methods book a window from the same set; only the wording differs, because the window a
+  // courier delivers in is the window a pickup customer collects in.
+  const isPickup = form.deliveryMethod === DeliveryMethod.Pickup
   const selectedPayment = orderOptions?.paymentMethods.find((item) => item.method === form.paymentMethod)
   const cartSubtotal = items.reduce((sum, item) =>
     sum + (item.unitPrice + (item.withPersianRice ? item.persianRicePrice ?? 0 : 0)) * item.quantity, 0)
@@ -219,12 +230,36 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     }
   }
 
+  /**
+   * Everything the delivery step is responsible for. One definition serves both the wizard's
+   * «ادامه» button and the final submission, so a phone customer can never step past a field that
+   * would stop the order two screens later.
+   */
+  const deliveryStepError = () => {
+    if (!form.fullName.trim()) return 'نام و نام خانوادگی الزامی است.'
+    if (!form.phoneNumber.trim()) return 'شماره موبایل الزامی است.'
+    if (form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && !form.addressLine.trim()) return 'آدرس برای ارسال سفارش الزامی است.'
+    // Server revalidates this atomically; the check here only saves the customer a round trip.
+    if (deliveryTimeSlotId == null) return 'برای ادامه، یک بازه زمانی تحویل انتخاب کنید.'
+    return null
+  }
+
+  const goToPaymentStep = () => {
+    const stepError = deliveryStepError()
+    setError(stepError)
+    if (!stepError) onWizardStepChange?.('payment')
+  }
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
-    if (!form.fullName.trim()) return setError('نام و نام خانوادگی الزامی است.')
-    if (!form.phoneNumber.trim()) return setError('شماره موبایل الزامی است.')
-    if (form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && !form.addressLine.trim()) return setError('آدرس برای ارسال سفارش الزامی است.')
+    const stepError = deliveryStepError()
+    if (stepError) {
+      // On a phone the offending field is on the previous screen, so say what is wrong and go back
+      // to where it can be fixed.
+      onWizardStepChange?.('delivery')
+      return setError(stepError)
+    }
     if (items.length === 0) return setError('حداقل یک غذا به سبد خرید اضافه کنید.')
     if (!selectedDelivery || !selectedPayment) return setError('روش پرداخت یا دریافت معتبری انتخاب نشده است.')
     if (isBelowMinimum) return setError(`حداقل مبلغ سفارش برای این روش ${formatMoney(selectedDelivery.minimumOrderAmount)} است.`)
@@ -234,8 +269,6 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     if (isCheckingCart) return setError('لطفاً تا پایان بررسی موجودی صبر کنید.')
     if (!isCartVerified) return setError('پیش از ثبت سفارش، موجودی سبد را دوباره بررسی کنید.')
     if (cartIssue) return setError(cartIssue)
-    // Server revalidates this atomically; the check here only saves the customer a round trip.
-    if (deliveryTimeSlotId == null) return setError('برای ادامه، یک بازه زمانی تحویل انتخاب کنید.')
     if (items.some((item) => item.quantity <= 0)) return setError('تعداد یکی از غذاها معتبر نیست.')
     if (authentication === 'checking') return setError('لطفاً تا پایان بررسی وضعیت ورود صبر کنید.')
     if (authentication !== 'authenticated') {
@@ -277,12 +310,17 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'ثبت سفارش ناموفق بود.')
       onRefreshCart()
+      setSlotRefreshSignal((signal) => signal + 1)
     }
     finally { setIsSubmitting(false) }
   }
 
-  return <form className="panel form-grid" onSubmit={submit} noValidate>
-    <h2 className="section-title">اطلاعات تحویل</h2>
+  return <form className="panel form-grid checkout-form" onSubmit={submit} noValidate>
+    {/* Desktop shows the whole form under one title; the wizard names each step instead. Account
+        state and the login gate belong to no single step — the gate can open from the identity card
+        in one step and from the final submission in another — so they stay outside the step blocks
+        and remain on screen throughout. */}
+    <h2 className="section-title checkout-desktop-only">اطلاعات تحویل</h2>
     {isLoadingProfile && <p className="muted">در حال بررسی اطلاعات قبلی شما…</p>}
     {profileMessage && <div className="form-hint">{profileMessage}</div>}
     {authenticationMessage && <div className="checkout-auth-success" role="status"><Icon name="confirm" size="sm" />{authenticationMessage}</div>}
@@ -346,9 +384,19 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         {loginPurpose === 'link' ? 'فعلاً بدون اتصال ادامه می‌دهم' : 'فعلاً نه؛ بازگشت به سبد'}
       </button>
     </section>}
-    <label className="field">نام و نام خانوادگی<input value={form.fullName} onChange={(e) => setField('fullName', e.target.value)} autoComplete="name" /></label>
-    <label className="field">شماره موبایل{authentication === 'guest' ? ' (برای ورود و پیگیری سفارش)' : ''}<input className="ltr-value" dir="ltr" value={form.phoneNumber} onChange={(e) => setField('phoneNumber', e.target.value)} inputMode="tel" autoComplete="tel" readOnly={authenticationMethod === 'phone'} /></label>
-    <div className="form-grid two-columns">
+    <div className="checkout-step-block" data-step="delivery">
+      <h2 className="section-title checkout-step-heading checkout-mobile-only">اطلاعات تحویل</h2>
+      <label className="field">نام و نام خانوادگی<input value={form.fullName} onChange={(e) => setField('fullName', e.target.value)} autoComplete="name" /></label>
+      <label className="field">شماره موبایل{authentication === 'guest' ? ' (برای ورود و پیگیری سفارش)' : ''}<input className="ltr-value" dir="ltr" value={form.phoneNumber} onChange={(e) => setField('phoneNumber', e.target.value)} inputMode="tel" autoComplete="tel" readOnly={authenticationMethod === 'phone'} /></label>
+      {/* The two method selects share one row on desktop but belong to different wizard steps, so
+          each is rendered twice: the paired row for desktop and a single field for its own step.
+          They read and write the same state, and only one copy is ever displayed. */}
+      <label className="field checkout-mobile-only">روش دریافت<select value={form.deliveryMethod} onChange={(e) => setField('deliveryMethod', Number(e.target.value) as DeliveryMethod)}>
+        {orderOptions?.deliveryMethods.map((item) => <option key={item.method} value={item.method}>{item.title}</option>)}
+      </select></label>
+    </div>
+
+    <div className="form-grid two-columns checkout-desktop-only">
       <label className="field">روش دریافت<select value={form.deliveryMethod} onChange={(e) => setField('deliveryMethod', Number(e.target.value) as DeliveryMethod)}>
         {orderOptions?.deliveryMethods.map((item) => <option key={item.method} value={item.method}>{item.title}</option>)}
       </select></label>
@@ -356,40 +404,61 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         {orderOptions?.paymentMethods.map((item) => <option key={item.method} value={item.method}>{item.title}</option>)}
       </select></label>
     </div>
-    <div className="form-hint">{selectedPayment?.description}</div>
-    {isBelowMinimum && <div className="form-error" role="alert">حداقل مبلغ سفارش برای این روش {formatMoney(selectedDelivery!.minimumOrderAmount)} است.</div>}
-    {form.deliveryMethod === DeliveryMethod.Delivery && savedAddresses.length > 0 && <SavedAddressPicker
-      addresses={savedAddresses}
-      selectedAddressId={selectedAddressId}
-      newAddressValue={newAddressValue}
-      onSelect={setSelectedAddressId}
-    />}
-    {form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && <label className="field">آدرس<textarea value={form.addressLine} onChange={(e) => setField('addressLine', e.target.value)} /></label>}
-    <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} onDateResolved={setDeliveryDate} />
-    <label className="field">توضیح سفارش<textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
 
-    {/* The delivery charge is shown as its own line, never folded into the total: the customer should
-        be able to read غذا + ارسال = پرداختی without doing arithmetic to find the difference. */}
-    <section className="checkout-totals" aria-label="خلاصه مبلغ سفارش">
-      <div><span>جمع غذاها</span><strong>{formatMoney(cartSubtotal)}</strong></div>
-      <div>
-        <span>هزینه ارسال</span>
-        <strong>{isLoadingPricing
-          ? 'در حال محاسبه…'
-          : deliveryFee === null ? 'مشخص نشده' : formatMoney(deliveryFee)}</strong>
-      </div>
-      <div className="checkout-totals-final">
-        <span>مبلغ نهایی</span>
-        <strong>{isLoadingPricing || deliveryFee === null ? '—' : formatMoney(finalTotal)}</strong>
-      </div>
-    </section>
-    {isDeliveryUnpriced && <div className="form-error" role="alert">
-      {selectedPricing?.unavailableMessage ?? 'هزینه ارسال برای این روز مشخص نشده است.'}
-    </div>}
+    <div className="checkout-step-block" data-step="payment">
+      <h2 className="section-title checkout-step-heading checkout-mobile-only">پرداخت و تایید</h2>
+      <label className="field checkout-mobile-only">روش پرداخت<select value={form.paymentMethod} onChange={(e) => setField('paymentMethod', Number(e.target.value) as PaymentMethod)}>
+        {orderOptions?.paymentMethods.map((item) => <option key={item.method} value={item.method}>{item.title}</option>)}
+      </select></label>
+      <div className="form-hint">{selectedPayment?.description}</div>
+      {isBelowMinimum && <div className="form-error" role="alert">حداقل مبلغ سفارش برای این روش {formatMoney(selectedDelivery!.minimumOrderAmount)} است.</div>}
+    </div>
 
-    {error && <div className="form-error" role="alert">{error}</div>}
-    <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || isLoadingOptions || isLoadingPricing || isDeliveryUnpriced || showLogin || !isCartVerified || Boolean(cartIssue) || isBelowMinimum || !selectedDelivery || !selectedPayment || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting
-      ? <ButtonLoading label={form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} />
-      : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
+    <div className="checkout-step-block" data-step="delivery">
+      {form.deliveryMethod === DeliveryMethod.Delivery && savedAddresses.length > 0 && <SavedAddressPicker
+        addresses={savedAddresses}
+        selectedAddressId={selectedAddressId}
+        newAddressValue={newAddressValue}
+        onSelect={setSelectedAddressId}
+      />}
+      {form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && <label className="field">آدرس<textarea value={form.addressLine} onChange={(e) => setField('addressLine', e.target.value)} /></label>}
+      <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} onDateResolved={setDeliveryDate} refreshSignal={slotRefreshSignal} isPickup={isPickup} />
+      {wizardStep === 'delivery' && error && <div className="form-error" role="alert">{error}</div>}
+      <div className="checkout-wizard-actions">
+        <button type="button" className="outline-button" onClick={() => onWizardStepChange?.('cart')}>مرحله قبل</button>
+        <button type="button" className="primary-button" onClick={goToPaymentStep}>ادامه به پرداخت <Icon name="back" size="sm" /></button>
+      </div>
+    </div>
+
+    <div className="checkout-step-block" data-step="payment">
+      <label className="field">توضیح سفارش<textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
+
+      {/* The delivery charge is shown as its own line, never folded into the total: the customer should
+          be able to read غذا + ارسال = پرداختی without doing arithmetic to find the difference. */}
+      <section className="checkout-totals" aria-label="خلاصه مبلغ سفارش">
+        <div><span>جمع غذاها</span><strong>{formatMoney(cartSubtotal)}</strong></div>
+        <div>
+          <span>هزینه ارسال</span>
+          <strong>{isLoadingPricing
+            ? 'در حال محاسبه…'
+            : deliveryFee === null ? 'مشخص نشده' : formatMoney(deliveryFee)}</strong>
+        </div>
+        <div className="checkout-totals-final">
+          <span>مبلغ نهایی</span>
+          <strong>{isLoadingPricing || deliveryFee === null ? '—' : formatMoney(finalTotal)}</strong>
+        </div>
+      </section>
+      {isDeliveryUnpriced && <div className="form-error" role="alert">
+        {selectedPricing?.unavailableMessage ?? 'هزینه ارسال برای این روز مشخص نشده است.'}
+      </div>}
+
+      {wizardStep !== 'delivery' && error && <div className="form-error" role="alert">{error}</div>}
+      <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || isLoadingOptions || isLoadingPricing || isDeliveryUnpriced || showLogin || !isCartVerified || Boolean(cartIssue) || isBelowMinimum || !selectedDelivery || !selectedPayment || items.length === 0 || deliveryTimeSlotId == null}>{isSubmitting
+        ? <ButtonLoading label={form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} />
+        : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>
+      <div className="checkout-wizard-actions">
+        <button type="button" className="outline-button full-width" onClick={() => onWizardStepChange?.('delivery')}>بازگشت به اطلاعات تحویل</button>
+      </div>
+    </div>
   </form>
 }

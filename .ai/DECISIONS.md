@@ -79,6 +79,9 @@
 - Derive the outstanding balance (earned − settled) on every read instead of storing a running total,
   and keep settlements append-only so paying a courier never rewrites what an order says was earned.
 - Refuse a settlement above the outstanding balance: there is no advance or credit model for couriers.
+- Courier account rows are cumulative, so their date column is an inclusive work range derived with
+  `MIN`/`MAX` over Delivered orders' `delivery_date`; presenting one arbitrary date as the row's work
+  date would misrepresent a balance earned across several days.
 
 ## 2026-08-20 — An unpriced delivery day blocks the order
 
@@ -890,5 +893,8 @@
 - The same field owns the live Persian amount wording below monetary inputs. Feature pages must not
   duplicate their own number-to-words implementation; empty and invalid values intentionally have
   no wording, while an explicit zero reads «صفر تومان».
+- Money wording occupies a stable reserved row. Mixed compact forms align controls from the top and
+  align their actions to the input baseline; dynamic help text must not be allowed to move adjacent
+  controls when an operator starts typing.
 - Money stays a number after parsing and is formatted only at input/display boundaries. Counts,
   quantities, percentages, order numbers and identifiers continue to use their own formatters.

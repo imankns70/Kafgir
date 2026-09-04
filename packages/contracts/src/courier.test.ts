@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  courierAccountSummarySchema,
   courierDeliveryDayWriteSchema,
   courierSettlementWriteSchema,
   courierWriteSchema,
@@ -39,6 +40,23 @@ describe('courier contracts', () => {
   it('requires a settlement to be a positive amount', () => {
     expect(courierSettlementWriteSchema.parse({ courierId: 1, amount: 500_000 }).amount).toBe(500_000)
     expect(() => courierSettlementWriteSchema.parse({ courierId: 1, amount: 0 })).toThrow()
+  })
+
+  it('carries the inclusive work-date range on an account summary', () => {
+    const summary = courierAccountSummarySchema.parse({
+      courierId: 1,
+      fullName: 'علی رضایی',
+      mobile: '09121234567',
+      isActive: true,
+      deliveredOrders: 4,
+      firstWorkDate: '2026-08-21',
+      lastWorkDate: '2026-08-24',
+      earnedAmount: 280_000,
+      settledAmount: 70_000,
+      outstandingAmount: 210_000,
+    })
+    expect(summary.firstWorkDate).toBe('2026-08-21')
+    expect(summary.lastWorkDate).toBe('2026-08-24')
   })
 })
 

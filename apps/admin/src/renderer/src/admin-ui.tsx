@@ -177,7 +177,10 @@ export function AmountField({ label, value, onChange, placeholder, hint }: {
         if (parsed !== null) onChange(moneyInputText(parsed))
       }}
     />
-    {words && <small className="amount-in-words">{words}</small>}
+    {/* Keep this row even while empty so entering the first digit cannot resize or shift the form. */}
+    <small className={`amount-in-words${words ? '' : ' empty'}`} aria-hidden={!words}>
+      {words || '\u00a0'}
+    </small>
     {hint && <small className="muted">{hint}</small>}
     {invalid && <small className="field-error" role="alert">مبلغ باید عددی صحیح به تومان باشد.</small>}
   </div>

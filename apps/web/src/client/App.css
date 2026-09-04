@@ -914,15 +914,43 @@ select:disabled {
 .checkout-back-link:hover { color:var(--kafgir-color-text-on-secondary);border-color:var(--kafgir-color-secondary);background:var(--kafgir-color-secondary) }
 .checkout-back-link:active { color:var(--kafgir-color-text-on-secondary);border-color:var(--kafgir-color-secondary-pressed);background:var(--kafgir-color-secondary-pressed);transform:translateY(1px) }
 
-.cart-row { padding: 14px 0; border-block-end: 1px solid var(--kafgir-color-border); }
+/* The item list owns its own scroll so the panel height stops growing with the basket: the total and
+   the first fields of the checkout form stay reachable without scrolling past every food. The inline
+   margin/padding pair keeps rows aligned with the panel while leaving room for the scrollbar and for
+   the negative inset an invalid row draws. */
+.cart-items {
+  max-height: min(40vh, 400px);
+  margin-inline: -12px;
+  padding-inline: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--kafgir-color-primary) 45%, transparent) transparent;
+}
+.cart-items::-webkit-scrollbar { width: 6px; }
+.cart-items::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--kafgir-color-primary) 45%, transparent);
+}
+.cart-item-count {
+  margin-inline-start: 8px;
+  border-radius: 999px;
+  padding: 2px 9px;
+  color: var(--kafgir-color-primary);
+  background: var(--kafgir-color-primary-soft);
+  font-size: var(--kafgir-type-caption);
+  font-weight: 700;
+}
+.cart-row { padding: 10px 0; border-block-end: 1px solid var(--kafgir-color-border); }
 .cart-row:last-of-type { border-block-end: 0; }
 .cart-name { color: var(--kafgir-color-text-primary); font-weight: 700; }
-.quantity-controls { display: flex; align-items: center; gap: 8px; direction: ltr; }
-.quantity-button { min-width: 38px; min-height: 38px; padding: 6px; border-radius: var(--kafgir-radius-sm); }
+.quantity-controls { display: flex; align-items: center; gap: 6px; direction: ltr; }
+.quantity-button { min-width: 36px; min-height: 36px; padding: 6px; border-radius: var(--kafgir-radius-sm); }
 
 .cart-total {
-  margin-block-start: 8px;
-  padding: 14px;
+  margin-block-start: 6px;
+  padding: 11px 14px;
   border: 1px solid var(--kafgir-color-primary);
   border-radius: var(--kafgir-radius-md);
   color: var(--kafgir-color-text-primary);
@@ -957,14 +985,16 @@ select:disabled {
 .cart-sync-icon { display: inline-grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: var(--kafgir-color-warning); background: var(--kafgir-color-surface); }
 
 /* The cart panel is ~425px even on desktop, so squeezing name, price, quantity controls, remove and
-   total onto one row left the info column at ~90px and wrapped it to shreds. Give the info its own
-   full-width row and let the controls and total share the one below. */
+   total onto one row left the info column at ~90px and wrapped it to shreds. Two rows instead:
+   name/price beside the line total, then a single control row underneath. */
 .cart-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
+  column-gap: 10px;
+  row-gap: 6px;
 }
-.cart-item-info { grid-column: 1 / -1; }
+.cart-item-actions { grid-column: 1 / -1; }
 
 .cart-row-invalid {
   margin-inline: -10px;
@@ -974,18 +1004,19 @@ select:disabled {
   background: color-mix(in srgb, var(--kafgir-color-error-soft) 70%, var(--kafgir-color-surface));
 }
 
-.cart-item-info { display: grid; gap: 3px; min-width: 0; }
-.cart-item-heading { display:flex;align-items:start;justify-content:space-between;gap:10px;min-width:0 }
-.cart-item-heading .cart-name { min-width:0;overflow-wrap:anywhere }
+.cart-item-info { display: grid; gap: 2px; min-width: 0; }
+.cart-item-info .cart-name { min-width:0;overflow-wrap:anywhere }
 .cart-unit-price { display:flex;align-items:center;flex-wrap:wrap;gap:5px }
 .cart-unit-price .price-discount-meta { order:2 }
 .cart-unit-price > small { order:3 }
 .cart-item-warning { display: inline-flex; align-items: center; gap: 5px; color: var(--kafgir-color-error); font-size: var(--kafgir-type-caption); font-weight: 700; }
-.cart-item-actions { display: flex; align-items: center; gap: 8px; }
-.cart-detail-button { flex:none;min-height:34px;gap:5px;padding:5px 9px;text-decoration:none }
-/* Carries `primary-button` in the markup, so it is the same filled control as «ورود و ثبت سفارش».
-   Only the icon/label gap is tightened for this short button. */
-.cart-remove-button { gap: 5px; }
+/* One control row per item: quantity at the start, «جزئیات» and «حذف» paired at the end so the two
+   item actions always sit together and share the same height. */
+.cart-item-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cart-item-buttons { display: flex; align-items: center; gap: 6px; margin-inline-start: auto; }
+.cart-detail-button,
+.cart-remove-button { flex:none;min-height:36px;gap:5px;padding:6px 12px;font-size:var(--kafgir-type-body-sm) }
+.cart-detail-button { text-decoration:none }
 .cart-line-total { display: grid; justify-items: end; gap: 2px; color: var(--kafgir-color-primary); font-weight: 700; white-space: nowrap; }
 .cart-line-total small { max-width: 160px; color: var(--kafgir-color-error); font-size: .68rem; font-weight: 500; line-height: 1.45; text-align: end; white-space: normal; }
 /* The cart panel is narrow even on desktop, so an icon | text | actions row let the buttons claim
@@ -1359,6 +1390,80 @@ select:disabled {
   .checkout-page .panel { margin-block-end: 0; }
 }
 
+/* Checkout is one page on desktop and a three-step wizard on phones. `display: contents` means the
+   step wrappers add no box of their own — the cart panel, the form and every field stay direct
+   children of their original grid — so the desktop layout is exactly what it was, and only the
+   phone breakpoint turns the wrappers into something that can be hidden a step at a time. */
+.checkout-step-block { display: contents; }
+.checkout-steps,
+.checkout-wizard-actions { display: none; }
+
+@media (max-width: 639px) {
+  .checkout-page[data-wizard-step="cart"] .checkout-form,
+  .checkout-page[data-wizard-step="cart"] .checkout-step-block:not([data-step="cart"]),
+  .checkout-page[data-wizard-step="delivery"] .checkout-step-block:not([data-step="delivery"]),
+  .checkout-page[data-wizard-step="payment"] .checkout-step-block:not([data-step="payment"]) { display: none; }
+
+  .checkout-steps {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0 0 14px;
+    padding: 0;
+    list-style: none;
+  }
+  .checkout-step { flex: 1 1 0; min-width: 0; }
+  .checkout-step > button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 40px;
+    border: 1px solid var(--kafgir-color-border);
+    border-radius: var(--kafgir-radius-md);
+    padding: 6px 8px;
+    color: var(--kafgir-color-text-secondary);
+    background: var(--kafgir-color-surface);
+    font-size: var(--kafgir-type-caption);
+    font-weight: 700;
+  }
+  /* A finished step is the only one that can be tapped, so it is the only one that looks tappable. */
+  .checkout-step.is-done > button {
+    color: var(--kafgir-color-primary);
+    border-color: color-mix(in srgb, var(--kafgir-color-primary) 45%, var(--kafgir-color-border));
+    background: var(--kafgir-color-primary-soft);
+  }
+  .checkout-step.is-current > button {
+    color: var(--kafgir-color-text-on-primary);
+    border-color: var(--kafgir-color-primary);
+    background: var(--kafgir-color-primary);
+  }
+  .checkout-step-number {
+    display: inline-grid;
+    flex: none;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 50%;
+    background: color-mix(in srgb, currentColor 16%, transparent);
+    font-size: .72rem;
+  }
+  .checkout-step-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .checkout-wizard-actions { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; margin-block-start: 14px; }
+  .checkout-wizard-actions button { min-height: 46px; }
+  .checkout-wizard-actions .full-width { grid-column: 1 / -1; }
+  .checkout-step-block[data-step="cart"] .checkout-wizard-actions { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Desktop keeps the single-page form exactly as it was, so the parts that exist only for the wizard —
+   its step headings and the single-column method selects — are phone-only, and the paired select row
+   and the form's one title are desktop-only. */
+@media (max-width: 639px) { .checkout-desktop-only { display: none; } }
+@media (min-width: 640px) { .checkout-mobile-only { display: none; } }
+.checkout-step-heading { margin-block-start: 0; }
+
 @media (max-width: 639px) {
   body { font-size: .875rem; }
   .app-shell { padding-block-start: 0; padding-block-end: calc(84px + env(safe-area-inset-bottom)); }
@@ -1600,7 +1705,7 @@ select:disabled {
   justify-self: start;
   width: fit-content;
   max-width: 100%;
-  margin-block-start: .3rem;
+  margin-block-start: .2rem;
   border-radius: 999px;
   padding: .2rem .6rem;
   color: var(--kafgir-color-text-on-secondary);

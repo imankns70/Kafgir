@@ -1,5 +1,26 @@
 # Project state
 
+## 2026-09-03 — Checkout as a phone wizard, live delivery windows, compact cart
+
+- Customer checkout is one page on desktop and a three-step wizard on phones (سبد → تحویل → پرداخت).
+  Every block is always rendered; `data-wizard-step` on the page plus `display: contents` step
+  wrappers let CSS alone decide what is on screen, so the desktop layout and the form's state are
+  untouched by the wizard. The desktop page is unchanged down to field order, which is why the two
+  method selects exist twice — a paired row for desktop and one field per step for phones, both
+  bound to the same state. Only completed steps are reachable from the step bar, «ادامه» validates
+  the delivery step, and a submission rejected for a delivery-step reason returns to that step.
+- The cart item list has its own bounded scroll area, so the total and the checkout form stay
+  reachable however long the basket is. Each item shows quantity, «جزئیات» and «حذف» on one control
+  row, and the panel header carries the item count.
+- The delivery-window picker refreshes on the same 15-second cadence as the cart (visibility-gated,
+  plus on focus and after a rejected submission), so a window that closes, fills or is reopened by
+  the operator changes state while checkout stays open.
+- Both order methods book a window from the same set and against the same capacity: the window a
+  courier delivers in is the window a pickup customer collects in. Only the wording differs —
+  «بازه ارسال» for delivery, «بازه تحویل» and «زمان تحویل حضوری» for pickup — and the server's
+  reason messages are worded neutrally for the same reason.
+- No database migration is required.
+
 ## 2026-09-03 — Live, shared money formatting
 
 - `@kafgir/contracts` now owns live money-entry formatting as well as parsing and display. Valid
@@ -14,6 +35,9 @@
   example `1,260,000` as «یک میلیون و دویست و شصت هزار تومان»). The conversion now belongs to the
   shared money contract rather than the daily-menu page, supports zero through safe-integer money
   values, and leaves empty or invalid text without a misleading wording.
+- The wording row is reserved even before entry, so typing the first digit does not resize a form.
+  Compact mixed-control forms top-align their labels/inputs and offset their action row to the input
+  baseline; dates, courier selectors and buttons therefore stay aligned when money wording appears.
 - Money display remains centralized through `formatMoney`/`formatAmount` in the contracts package;
   the Admin and Web audits found their monetary result cells and summaries already using it.
 - Verification: contracts 55/55 tests, Admin 117/117 tests, Admin and Web TypeScript checks, Electron
@@ -91,6 +115,9 @@
 - Courier earnings count only orders whose current status is Delivered; Delivered is terminal, so no
   event ledger is needed. Outstanding balance is always derived (earned − settled) and settlements are
   append-only, never mutating an order snapshot. A settlement above the outstanding balance is refused.
+- The courier-account grid now shows the inclusive work-date range derived from those same Delivered
+  orders' delivery dates. One workday renders as one Persian date; multiple workdays render first to
+  last, and a courier with no successful delivery renders an em dash.
 - Electron Admin gains «پیک‌ها» (اطلاعات پایه), «پیک و هزینه ارسال روزانه» (فروش) and «کارکرد و تسویه
   پیک‌ها» (مالی). Admin order detail shows the courier, both amounts and whether the payable counts
   toward courier earnings. Recording a settlement is Owner-only.

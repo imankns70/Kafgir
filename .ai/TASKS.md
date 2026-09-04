@@ -33,6 +33,7 @@
   `delivery_method_settings.requires_courier`, and remove the fee field from Admin for courier methods.
 - [x] Count courier earnings only from orders whose current status is Delivered, and derive the
   outstanding balance rather than storing it.
+- [x] Show the first-to-last successful delivery date as the work period in the courier-account grid.
 - [x] Add the Admin courier directory, daily configuration and work/settlement pages, and show the
   courier and payable snapshot on Admin order detail.
 - [x] Keep the courier payable out of every customer-facing payload.
@@ -415,3 +416,5 @@
 - [x] Centralize live money-entry grouping and Persian amount wording, migrate the customer
   minimum-spend filter to the shared amount field, and verify monetary entry/display across Admin
   and Web.
+- [x] Stabilize mixed Admin form layout so live Persian amount wording does not shift adjacent
+  dates, selectors or action buttons.

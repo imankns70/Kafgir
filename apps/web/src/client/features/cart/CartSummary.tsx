@@ -43,25 +43,25 @@ export function CartSummary({ items, onQuantityChange }: { items: CartItem[]; on
   }
 
   return <section className="panel">
-    <h2 className="section-title">سبد خرید</h2>
+    <h2 className="section-title">سبد خرید{items.length > 0 && <span className="cart-item-count">{formatNumber(items.length)} قلم</span>}</h2>
     {items.length === 0 && <p className="muted">سبد خرید شما خالی است.</p>}
+    {/* A long basket used to push the total and the whole checkout form below the fold. The list
+        keeps its own bounded scroll area so «جمع اقلام» and the start of the form stay on screen
+        however many foods were added; short baskets never reach the limit and never scroll. */}
+    <div className="cart-items">
     {items.map((item) => {
       const issue = cartItemIssue(item)
       const canAdjust = (item.availability ?? 'available') === 'available' && item.remainingPortions > 0
       return <div className={`cart-row ${issue ? 'cart-row-invalid' : ''}`} key={`${item.dailyMenuItemId}:${Boolean(item.withPersianRice)}`}>
         <div className="cart-item-info">
-          <div className="cart-item-heading">
-            <div className="cart-name">{item.foodName}</div>
-            {item.slug && <a className="outline-button cart-detail-button" href={`/foods/${encodeURIComponent(item.slug)}?menuItemId=${item.dailyMenuItemId}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
-              <Icon name="info" size="sm" /><span>جزئیات</span>
-            </a>}
-          </div>
+          <div className="cart-name">{item.foodName}</div>
           <div className="cart-unit-price"><PriceDisplay compact label="" price={item.unitPrice} originalPrice={item.originalUnitPrice} discountPercentage={item.discountPercentage} /><small className="muted">× {formatNumber(item.quantity)}</small></div>
           {item.persianRiceTitle && <div className="cart-rice-option">
             <span>{item.persianRiceTitle} — {formatMoney(item.persianRicePrice ?? 0)} × {formatNumber(item.quantity)}</span>
           </div>}
           {issue && <span className="cart-item-warning"><Icon name="info" size="xs" />{issue}</span>}
         </div>
+        <span className="cart-line-total">{formatMoney(lineTotal(item))}{issue && <small>در جمع قابل سفارش محاسبه نشده</small>}</span>
         <div className="cart-item-actions">
           {canAdjust && <div className="quantity-controls">
             <button type="button" className="quantity-button" aria-label={`کم کردن تعداد ${item.foodName}`} onClick={() => requestQuantityChange(item, item.quantity - 1)}><Icon name="minus" size="sm" /></button>
@@ -69,9 +69,13 @@ export function CartSummary({ items, onQuantityChange }: { items: CartItem[]; on
             <button type="button" className="quantity-button" aria-label={`اضافه کردن تعداد ${item.foodName}`} disabled={item.quantity >= item.remainingPortions}
               onClick={() => onQuantityChange(item.dailyMenuItemId, item.quantity + 1, Boolean(item.withPersianRice))}><Icon name="add" size="sm" /></button>
           </div>}
-          <button type="button" className="primary-button cart-remove-button" aria-label={`حذف ${item.foodName} از سبد`} onClick={() => requestQuantityChange(item, 0)}><Icon name="delete" size="sm" /><span>حذف</span></button>
+          <div className="cart-item-buttons">
+            {item.slug && <a className="outline-button cart-detail-button" href={`/foods/${encodeURIComponent(item.slug)}?menuItemId=${item.dailyMenuItemId}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
+              <Icon name="info" size="sm" /><span>جزئیات</span>
+            </a>}
+            <button type="button" className="primary-button cart-remove-button" aria-label={`حذف ${item.foodName} از سبد`} onClick={() => requestQuantityChange(item, 0)}><Icon name="delete" size="sm" /><span>حذف</span></button>
+          </div>
         </div>
-        <span className="cart-line-total">{formatMoney(lineTotal(item))}{issue && <small>در جمع قابل سفارش محاسبه نشده</small>}</span>
         {pendingEmptyItem?.dailyMenuItemId === item.dailyMenuItemId && pendingEmptyItem?.withPersianRice === item.withPersianRice && <div className="cart-empty-confirmation" role="alertdialog" aria-labelledby="empty-cart-title" aria-describedby="empty-cart-description">
           <div className="cart-empty-confirmation-head">
             <span className="cart-empty-confirmation-icon" aria-hidden="true"><Icon name="info" size="md" /></span>
@@ -85,6 +89,7 @@ export function CartSummary({ items, onQuantityChange }: { items: CartItem[]; on
         </div>}
       </div>
     })}
+    </div>
     <div className="cart-total"><span>جمع اقلام قابل سفارش</span><span>{formatMoney(total)}</span></div>
   </section>
 }

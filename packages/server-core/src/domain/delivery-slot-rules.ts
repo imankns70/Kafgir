@@ -66,7 +66,9 @@ export function evaluateSlot(
 }
 
 const reasonMessages: Record<DeliverySlotUnavailableReason, string> = {
-  [DeliverySlotUnavailableReason.Inactive]: 'این بازه ارسال غیرفعال است.',
+  // Windows are worded without «ارسال»: the same window is a courier run for a delivery order and a
+  // collection time for a pickup one.
+  [DeliverySlotUnavailableReason.Inactive]: 'این بازه زمانی غیرفعال است.',
   [DeliverySlotUnavailableReason.DisabledForDate]: 'این بازه برای روز انتخابی فعال نیست.',
   [DeliverySlotUnavailableReason.CutoffPassed]: 'زمان انتخاب این بازه گذشته است.',
   [DeliverySlotUnavailableReason.CapacityFull]:

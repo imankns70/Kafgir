@@ -288,6 +288,8 @@ type AccountRow = {
   mobile: string
   isActive: boolean
   deliveredOrders: number
+  firstWorkDate: string | null
+  lastWorkDate: string | null
   earnedAmount: number
   settledAmount: number
 }
@@ -308,11 +310,15 @@ async function selectAccounts(courierId: number | null): Promise<AccountRow[]> {
   return sqlClient<AccountRow[]>`
     SELECT c.id AS "courierId", c.full_name AS "fullName", c.mobile, c.is_active AS "isActive",
            COALESCE(work.delivered, 0)::int AS "deliveredOrders",
+           work.first_work_date::text AS "firstWorkDate",
+           work.last_work_date::text AS "lastWorkDate",
            COALESCE(work.earned, 0)::float8 AS "earnedAmount",
            COALESCE(paid.settled, 0)::float8 AS "settledAmount"
     FROM couriers c
     LEFT JOIN LATERAL (
-      SELECT COUNT(*) AS delivered, SUM(o.courier_payable_amount) AS earned
+      SELECT COUNT(*) AS delivered, SUM(o.courier_payable_amount) AS earned,
+             MIN(o.delivery_date) AS first_work_date,
+             MAX(o.delivery_date) AS last_work_date
       FROM orders o
       WHERE o.courier_id = c.id
         AND o.status = ${OrderStatus.Delivered}
