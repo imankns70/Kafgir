@@ -39,10 +39,7 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
   // The courier charge is fetched and interpreted by the checkout form; the cart step only displays
   // what the form resolved, so a phone customer sees the real cost before leaving the basket.
   const [deliveryCost, setDeliveryCost] = useState<{ fee: number | null; isLoading: boolean }>({ fee: null, isLoading: true })
-  // Express delivery is served as soon as possible, so it has no window to book and the step bar
-  // loses that step entirely rather than showing one the customer cannot use.
-  const [isExpress, setIsExpress] = useState(false)
-  const checkoutSteps = allCheckoutSteps.filter((candidate) => candidate.id !== 'time' || !isExpress)
+  const checkoutSteps = allCheckoutSteps
   const requiresAttention = !isChecking && (!isVerified || messages.length > 0)
   const stepIndex = checkoutSteps.findIndex((candidate) => candidate.id === step)
 
@@ -58,11 +55,6 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
     if (items.length === 0) setStep('cart')
   }, [items.length])
 
-  // Turning express on while standing on the window step would strand the customer on a step that no
-  // longer exists.
-  useEffect(() => {
-    if (isExpress && step === 'time') setStep('payment')
-  }, [isExpress, step])
 
   return <main className="checkout-page" data-wizard-step={step}>
     <div className="page-actions"><div><span className="eyebrow"><Icon name="confirm" size="sm" /> مرحله نهایی</span><h1 className="section-title">ثبت سفارش</h1></div><button className="checkout-back-link" onClick={onBack}>ادامه خرید <Icon name="back" size="sm" /></button></div>
@@ -96,7 +88,6 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
       </div>
     </div>
     <CheckoutForm items={items} isCartVerified={isVerified} isCheckingCart={isChecking} onRefreshCart={onRefresh} onSuccess={onSuccess}
-      onAuthenticationChange={onAuthenticationChange} wizardStep={step} onWizardStepChange={setStep} onDeliveryCostChange={setDeliveryCost}
-      onExpressChange={setIsExpress} />
+      onAuthenticationChange={onAuthenticationChange} wizardStep={step} onWizardStepChange={setStep} onDeliveryCostChange={setDeliveryCost} />
   </main>
 }

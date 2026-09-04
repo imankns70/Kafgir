@@ -8,6 +8,7 @@ import { CartPage } from './features/cart/CartPage'
 import { CartAddedToast, type CartAddition } from "./features/cart/CartAddedToast"
 import { ContactPage } from './features/contact/ContactPage'
 import { MenuPage } from './features/menu/MenuPage'
+import { MenuPlanPage } from './features/menu/MenuPlanPage'
 import { OrderSuccess } from './features/orders/OrderSuccess'
 import { PostDeliveryReviewPrompt } from './features/orders/PostDeliveryReviewPrompt'
 import { ProfilePage } from './features/profile/ProfilePage'
@@ -18,7 +19,7 @@ import { loadStoredCart, saveStoredCart } from './services/cartStorage'
 import { reconcileCart } from './services/cartReconciliation'
 import type { CartItem, DailyMenuItemDto, OrderDto, PublicDailyMenuPageDto, PersianRiceDto } from './types'
 
-type Page = 'menu' | 'cart' | 'profile' | 'contact' | 'success'
+type Page = 'menu' | 'plan' | 'cart' | 'profile' | 'contact' | 'success'
 
 const initialPage = (): Page => {
   if (typeof window === 'undefined') return 'menu'
@@ -33,7 +34,6 @@ function App() {
   const [order, setOrder] = useState<OrderDto | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [menuError, setMenuError] = useState<string | null>(null)
-  const [focusOrders, setFocusOrders] = useState(false)
   const [cartMessages, setCartMessages] = useState<string[]>([])
   const [isCheckingCart, setIsCheckingCart] = useState(false)
   const [isCartVerified, setIsCartVerified] = useState(false)
@@ -229,11 +229,6 @@ function App() {
     void loadMenu(true)
   }
 
-  const openOrders = () => {
-    setFocusOrders(true)
-    setPage('profile')
-  }
-
   return (
     <div className="app-shell" dir="rtl">
       <header className="app-header">
@@ -273,7 +268,8 @@ function App() {
       {page === 'success' && order && (
         <OrderSuccess order={order} onBack={() => { setOrder(null); setPage('menu') }} />
       )}
-      {page === 'profile' && <ProfilePage onBack={() => { setFocusOrders(false); setPage('menu') }} onAuthenticationChange={setIsCustomerAuthenticated} focusOrders={focusOrders} />}
+      {page === 'plan' && <MenuPlanPage onBack={() => setPage('menu')} onOpenToday={() => setPage('menu')} />}
+      {page === 'profile' && <ProfilePage onBack={() => setPage('menu')} onAuthenticationChange={setIsCustomerAuthenticated} />}
       {page === 'contact' && <ContactPage onBack={() => setPage('menu')} onAccount={() => setPage('profile')} />}
 
       {page !== 'success' && (
@@ -282,12 +278,12 @@ function App() {
             <Icon name="home" size="lg" />
             <span>خانه</span>
           </button>
-          {/* Categories are chips on the home page itself; the tab bar is better spent on order
-              tracking, which is what a customer opens the app for after checking out. */}
-          <button className={page === 'profile' ? 'active' : ''} onClick={openOrders} aria-label="سفارش‌های من"
-            aria-current={page === 'profile' ? 'page' : undefined}>
-            <Icon name="orders" size="lg" />
-            <span>سفارش‌ها</span>
+          {/* Order history already lives inside «حساب من», so the tab is spent on the one thing the
+              app cannot show anywhere else: what is being cooked on the days ahead. */}
+          <button className={page === 'plan' ? 'active' : ''} onClick={() => setPage('plan')} aria-label="برنامه ماه"
+            aria-current={page === 'plan' ? 'page' : undefined}>
+            <Icon name="calendar" size="lg" />
+            <span>برنامه ماه</span>
           </button>
           <button className={page === 'cart' ? 'active' : ''} onClick={openCart} aria-label="سبد خرید" aria-current={page === 'cart' ? 'page' : undefined}>
             <span className="nav-icon-wrap"><Icon name="cart" size="lg" />{cart.length > 0 && <span className="nav-count">{cart.length}</span>}</span>

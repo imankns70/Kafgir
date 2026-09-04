@@ -38,7 +38,7 @@ const asciiDigits = (value: string) => value
   .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
   .replace(/\D/g, '')
 
-export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshCart, onSuccess, onAuthenticationChange, wizardStep, onWizardStepChange, onDeliveryCostChange, onExpressChange }: {
+export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshCart, onSuccess, onAuthenticationChange, wizardStep, onWizardStepChange, onDeliveryCostChange }: {
   items: CartItem[]
   isCartVerified: boolean
   isCheckingCart: boolean
@@ -52,8 +52,6 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   /** Reports the courier charge upward so the cart step can show it too; the form stays the one
    *  place that fetches and interprets pricing. */
   onDeliveryCostChange?: (cost: { fee: number | null; isLoading: boolean }) => void
-  /** Express removes the window step, so the step bar has to know about it. */
-  onExpressChange?: (isExpress: boolean) => void
 }) {
   const [form, setForm] = useState(initialForm)
   const [savedAddresses, setSavedAddresses] = useState<CustomerAddressDto[]>([])
@@ -194,7 +192,6 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     if (!expressAvailable && isExpress) setIsExpress(false)
   }, [expressAvailable, isExpress])
 
-  useEffect(() => { onExpressChange?.(expressChosen) }, [expressChosen, onExpressChange])
 
   // Choosing express releases any window already picked, so a stale selection cannot be submitted.
   useEffect(() => {
@@ -450,8 +447,18 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         onSelect={setSelectedAddressId}
       />}
       {form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && <label className="field">آدرس<textarea value={form.addressLine} onChange={(e) => setField('addressLine', e.target.value)} /></label>}
-      {/* Choosing express removes the window step rather than disabling a control inside it: the two
-          are alternatives, and an order that is on its way now has no window to be in. */}
+      {wizardStep === 'delivery' && error && <div className="form-error" role="alert">{error}</div>}
+      <div className="checkout-wizard-actions">
+        <button type="button" className="outline-button" onClick={() => onWizardStepChange?.('cart')}>مرحله قبل</button>
+        <button type="button" className="primary-button" onClick={() => advanceTo('time', deliveryStepError())}>ادامه به زمان تحویل <Icon name="back" size="sm" /></button>
+      </div>
+    </div>
+
+    <div className="checkout-step-block" data-step="time">
+      <h2 className="section-title checkout-step-heading checkout-mobile-only">زمان تحویل</h2>
+      {/* Express belongs with the times, because it is the answer to the same question: when. Picking
+          it puts the window list out of use rather than hiding it, so the customer can see what they
+          are giving up and change their mind. */}
       {expressAvailable && <label className={`express-option ${expressChosen ? 'is-selected' : ''}`}>
         <input type="checkbox" checked={expressChosen} onChange={(event) => setIsExpress(event.target.checked)} />
         <span className="express-option-copy">
@@ -464,16 +471,9 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
           </small>
         </span>
       </label>}
-      {wizardStep === 'delivery' && error && <div className="form-error" role="alert">{error}</div>}
-      <div className="checkout-wizard-actions">
-        <button type="button" className="outline-button" onClick={() => onWizardStepChange?.('cart')}>مرحله قبل</button>
-        <button type="button" className="primary-button" onClick={() => advanceTo(expressChosen ? 'payment' : 'time', deliveryStepError())}>{expressChosen ? 'ادامه به پرداخت' : 'ادامه به زمان تحویل'} <Icon name="back" size="sm" /></button>
+      <div className={expressChosen ? 'delivery-slot-disabled' : undefined} aria-hidden={expressChosen || undefined}>
+        <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} onDateResolved={setDeliveryDate} refreshSignal={slotRefreshSignal} isPickup={isPickup} />
       </div>
-    </div>
-
-    <div className="checkout-step-block" data-step="time">
-      <h2 className="section-title checkout-step-heading checkout-mobile-only">زمان تحویل</h2>
-      <DeliverySlotPicker selectedSlotId={deliveryTimeSlotId} onSelect={setDeliveryTimeSlotId} onDateResolved={setDeliveryDate} refreshSignal={slotRefreshSignal} isPickup={isPickup} />
       {wizardStep === 'time' && error && <div className="form-error" role="alert">{error}</div>}
       <div className="checkout-wizard-actions">
         <button type="button" className="outline-button" onClick={() => onWizardStepChange?.('delivery')}>مرحله قبل</button>
@@ -511,7 +511,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       {/* The final action shares the pinned bar with «مرحله قبل» on a phone. On desktop the bar is
           `display: contents`, so the submit button stays an ordinary last child of the form. */}
       <div className="checkout-wizard-actions checkout-submit-actions">
-      <button type="button" className="outline-button checkout-mobile-only" onClick={() => onWizardStepChange?.(expressChosen ? 'delivery' : 'time')}>مرحله قبل</button>
+      <button type="button" className="outline-button checkout-mobile-only" onClick={() => onWizardStepChange?.('time')}>مرحله قبل</button>
       <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || isLoadingOptions || isLoadingPricing || isDeliveryUnpriced || showLogin || !isCartVerified || Boolean(cartIssue) || isBelowMinimum || !selectedDelivery || !selectedPayment || items.length === 0 || (!expressChosen && deliveryTimeSlotId == null)}>{isSubmitting
         ? <ButtonLoading label={form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} />
         : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>

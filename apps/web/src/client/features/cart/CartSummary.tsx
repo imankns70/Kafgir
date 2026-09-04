@@ -63,7 +63,9 @@ export function CartSummary({ items, onQuantityChange, deliveryCost }: {
           <div className="cart-name">{item.foodName}</div>
           <div className="cart-unit-price"><PriceDisplay compact label="" price={item.unitPrice} originalPrice={item.originalUnitPrice} discountPercentage={item.discountPercentage} /><small className="muted">× {formatNumber(item.quantity)}</small></div>
           {item.persianRiceTitle && <div className="cart-rice-option">
-            <span>{item.persianRiceTitle} — {formatMoney(item.persianRicePrice ?? 0)} × {formatNumber(item.quantity)}</span>
+            <Icon name="confirm" size="xs" aria-hidden="true" />
+            <span>{item.persianRiceTitle}</span>
+            <small>{formatMoney(item.persianRicePrice ?? 0)} × {formatNumber(item.quantity)}</small>
           </div>}
           {issue && <span className="cart-item-warning"><Icon name="info" size="xs" />{issue}</span>}
         </div>

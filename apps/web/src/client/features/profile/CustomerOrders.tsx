@@ -64,8 +64,11 @@ export function OrderProgress({ order, compact = false }: { order: TimelineData;
       const timestamp = status === OrderStatus.Cancelled
         ? occurred.get(status)
         : occurred.get(status)
-      const isCurrent = status === order.status
-      const isCompleted = timestamp != null && !isCurrent
+      // A delivered order has arrived: its last step is an accomplishment, not a step in progress,
+      // so it takes the same tick as the ones before it rather than the "you are here" marker.
+      const isDelivered = order.status === OrderStatus.Delivered
+      const isCurrent = status === order.status && !isDelivered
+      const isCompleted = (timestamp != null || isDelivered) && !isCurrent
       const isUpcoming = timestamp == null && !isCurrent
       return <li className={`${isCurrent ? 'current' : ''} ${isCompleted ? 'completed' : ''} ${isUpcoming ? 'upcoming' : ''} ${status === OrderStatus.Cancelled ? 'cancelled' : ''}`} key={status}>
         <span className="progress-marker" aria-hidden="true">{isCompleted ? '✓' : isCurrent ? '●' : '○'}</span>

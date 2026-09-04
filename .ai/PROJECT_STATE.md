@@ -1,5 +1,18 @@
 # Project state
 
+## 2026-09-04 — Monthly plan, express in the time step, order-status fixes
+
+- The mobile tab bar carries «برنامه ماه» instead of order history, which «حساب من» already reaches.
+  The new page lists every remaining day of the Persian month as a card led by the day's food —
+  pictures, names and a count for the rest — with the day's state («باز برای سفارش», «هنوز باز نشده»,
+  «ثبت نشده») and, for today, a button into the menu. Days nobody has planned yet stay in the list,
+  because an absent day reads as a day with no food. Served by `/api/menus/plan`.
+- Express delivery lives in the «زمان تحویل» step, where it answers the same question as a window.
+  Choosing it leaves the window list visible but out of use, so the customer sees what they are
+  declining; the wizard keeps all four steps.
+- A delivered order's last timeline step is a tick like the others rather than the "you are here"
+  marker, and the order's date no longer sits between the status label and its badge.
+
 ## 2026-09-04 — Express delivery, add-to-cart confirmation and order-history fixes
 
 - Express delivery is an add-on to a delivery method rather than a method of its own:

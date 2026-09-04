@@ -12,6 +12,7 @@ import { DeliveryMethod, OrderStatus, PaymentMethod, PaymentStatus } from './ord
 export * from './payment.js'
 export * from './business.js'
 export * from './delivery.js'
+export * from './menu-plan.js'
 export * from './courier.js'
 export * from './money.js'
 

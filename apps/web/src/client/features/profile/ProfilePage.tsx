@@ -41,12 +41,9 @@ const asciiDigits = (value: string) => value
   .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
   .replace(/\D/g, '')
 
-export function ProfilePage({ onBack, onAuthenticationChange, focusOrders = false }: {
+export function ProfilePage({ onBack, onAuthenticationChange }: {
   onBack: () => void
   onAuthenticationChange: (authenticated: boolean) => void
-  /** Entered from the «سفارش‌های من» tab, which should land on the order history rather than the
-   *  top of the account page. */
-  focusOrders?: boolean
 }) {
   const [profile, setProfile] = useState<CustomerProfileDto | null>(null)
   const [orders, setOrders] = useState<CustomerOrdersPageDto | null>(null)
@@ -185,14 +182,6 @@ export function ProfilePage({ onBack, onAuthenticationChange, focusOrders = fals
     catch (orderError) { setError(orderError instanceof Error ? orderError.message : 'دریافت سفارش ممکن نشد.') }
     finally { setOpeningOrderId(null) }
   }
-
-  useEffect(() => {
-    if (!focusOrders || !profile) return
-    const frame = window.requestAnimationFrame(() => {
-      document.getElementById('my-orders-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [focusOrders, profile])
 
   const openReview = (order: CustomerOrderSummaryDto | CustomerOrderDetailDto) => {
     setReviewError(null)

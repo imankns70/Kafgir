@@ -34,6 +34,8 @@ export type {
   DailyMenuDto,
   DailyMenuItemDto,
   MenuCartSnapshotDto,
+  MenuPlanDayDto,
+  MenuPlanDto,
   OrderDto,
   OrderReviewDto,
   PendingOrderReviewDto,

@@ -1,4 +1,4 @@
-import type { MenuCartSnapshotDto, PublicDailyMenuPageDto } from '../types'
+import type { MenuCartSnapshotDto, MenuPlanDto, PublicDailyMenuPageDto } from '../types'
 import { ApiError, apiGet, apiPost } from './apiClient'
 
 export type TodayMenuQuery = {
@@ -36,3 +36,6 @@ export async function getTodayMenuCartSnapshot(items: Array<{
     throw error
   }
 }
+
+/** The rest of the Persian month: what the kitchen has planned, day by day. */
+export const getMenuPlan = () => apiGet<MenuPlanDto>('/api/menus/plan')
