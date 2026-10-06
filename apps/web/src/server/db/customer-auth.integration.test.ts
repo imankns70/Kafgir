@@ -148,7 +148,8 @@ integration('customer authentication, order ownership and reviews', () => {
       paymentMethod: PaymentMethod.Online,
       status: PaymentStatus.Paid,
       amount: 485000,
-      providerName: 'درگاه آزمایشی',
+      // The provider registry was dropped with the accounting tables, so no name survives.
+      providerName: null,
       trackingNumber: 'TRACK-SAFE',
       referenceNumber: 'REF-SAFE',
     })

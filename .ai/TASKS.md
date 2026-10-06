@@ -1,5 +1,15 @@
 # Tasks
 
+## 2026-10-06 dependency security and integration-test repair
+
+- [x] Upgrade Next.js 16.3.0 → 16.3.8 for the critical advisories (unauthenticated RCE in Image
+  Optimization/AVIF, `next/og`, Windows hosting) and update sharp/nanoid/source-map-js; production
+  dependencies audit clean.
+- [x] Write each purchase and its audit row in one transaction.
+- [x] Repair the stale integration tests; all 113 pass per suite and as the combined run.
+- [ ] Development/packaging dependencies still carry advisories (Electron 43.2.0 → 43.7.7,
+  shell-quote, js-yaml, xmldom and others). The Electron bump needs a Windows packaging check.
+
 ## 2026-09-04 express checkout validation
 
 - [x] Allow express customer orders to reach the shared order service without a delivery-window ID.
@@ -205,11 +215,11 @@
 - [ ] Review the default `rice` assignment for four pre-existing foods (`food-1` through `food-4`)
 - [ ] Rehearse the SQL Server import against staging PostgreSQL
 - [ ] Rotate and configure production database, JWT, Telegram, and processor secrets
-- [ ] Deploy Next.js and PostgreSQL on Liara
+- [ ] ~~Deploy Next.js and PostgreSQL on Liara~~ — superseded: Web deploys on Netlify, food photos use Cloudinary
 - [ ] Create the public Liara Object Storage bucket, configure bucket-scoped credentials, and include it in the production backup plan
 - [ ] Save the production PostgreSQL TLS URL and Object Storage settings through the packaged Electron first-run setup
 - [ ] Run production order, admin, report, and notification smoke tests
-- [ ] Upgrade Next.js when a stable release resolves the inherited PostCSS/Sharp advisories
+- [x] Upgrade Next.js when a stable release resolves the inherited PostCSS/Sharp advisories (16.3.8, 2026-10-06)
 - [x] Add Kafgir 1.5 PostgreSQL schema and idempotent reference-data seed.
 - [x] Add v1.5 shared Zod contracts for ingredients, purchasing, inventory, recipes and finance.
 - [x] Add transactional purchase confirmation/reversal and immutable inventory movements.
@@ -361,7 +371,7 @@
 - [x] Add accessible delivered-order rating/comment create and edit with server-side ownership,
   eligibility, range/length validation and a unique review per order.
 - [x] Apply migration `0018_warm_order_reviews.sql` to the configured local development database.
-- [ ] Run `customer-auth.integration.test.ts` against a migrated disposable database after setting both
+- [x] Run `customer-auth.integration.test.ts` against a migrated disposable database after setting both
   `TEST_DATABASE_URL` and `DATABASE_URL` to the same database whose name contains `test`.
 - [x] Rate limiting phase 1: resolve the trusted client IP from `TRUSTED_PROXY_HOPS` instead of the
   leftmost `X-Forwarded-For` entry.
@@ -389,7 +399,7 @@
   width, edge alignment and metric-specific accessible labels.
 - [x] Add tag-driven Windows Electron packaging and GitHub Release publishing.
 - [x] Apply migration `0019_lightweight_customer_analytics.sql` to the configured development database.
-- [ ] Run `customer-analytics.integration.test.ts` against a disposable migrated PostgreSQL database
+- [x] Run `customer-analytics.integration.test.ts` against a disposable migrated PostgreSQL database
   after setting `TEST_DATABASE_URL`; the local machine currently has no Docker executable.
 - [ ] Before production rollout: count the real proxy chain from a deployed request's
   `X-Forwarded-For` and set `TRUSTED_PROXY_HOPS` accordingly. The committed value is an unverified

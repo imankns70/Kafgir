@@ -39,7 +39,8 @@ let menuItemId = 0
 let courierId = 0
 const orderIds: number[] = []
 const purchaseIds: number[] = []
-const adminUserId = 1
+/** Purchases are audited against a real user, so the file brings its own instead of assuming id 1. */
+let adminUserId = 0
 
 const anonymous = { userId: null, username: null, firstName: null, lastName: null }
 
@@ -81,6 +82,10 @@ integration.sequential('monthly business summary', () => {
     }
     sql = postgres(connectionString!, { max: 5, prepare: false })
     await configureDatabase(connectionString!, 5)
+
+    adminUserId = (await sql<{ id: number }[]>`
+      INSERT INTO users (username,normalized_username,full_name,is_active,created_at)
+      VALUES (${`bs-${suffix}`},${`BS-${suffix}`},'business summary',true,NOW()) RETURNING id`)[0]!.id
 
     categoryId = (await sql<{ id: number }[]>`
       INSERT INTO food_categories (title,slug,is_active,created_at,updated_at)
@@ -124,6 +129,8 @@ integration.sequential('monthly business summary', () => {
     await sql`DELETE FROM daily_menus WHERE id = ${menuId}`
     await sql`DELETE FROM foods WHERE id = ${foodId}`
     await sql`DELETE FROM food_categories WHERE id = ${categoryId}`
+    await sql`DELETE FROM audit_logs WHERE user_id = ${adminUserId}`
+    await sql`DELETE FROM users WHERE id = ${adminUserId}`
     await sql.end()
     await closeDatabase()
   })
@@ -173,6 +180,15 @@ integration.sequential('monthly business summary', () => {
     expect(afterEdit.purchases.filter((row) => row.id === purchase.id)).toHaveLength(1)
 
     await deletePurchase(purchase.id, adminUserId)
+    expect((await getMonthPurchases(year, month)).totalAmount).toBe(4_900_000)
+  })
+
+  it('saves nothing when the purchase cannot be audited', async () => {
+    // No such user, so the audit row violates its foreign key after the purchase insert succeeded.
+    await expect(createPurchase({
+      purchaseDate: firstDay, amount: 333_000, title: 'بدون ردپا',
+      sellerName: null, receiptImageUrl: null, notes: null,
+    }, 2_147_483_000)).rejects.toThrow()
     expect((await getMonthPurchases(year, month)).totalAmount).toBe(4_900_000)
   })
 

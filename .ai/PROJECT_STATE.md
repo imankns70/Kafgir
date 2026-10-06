@@ -1,5 +1,18 @@
 # Project state
 
+## 2026-10-06 — Dependency security, purchase atomicity, integration tests
+
+- Next.js is 16.3.8. 16.3.0 carried critical advisories, including unauthenticated remote code
+  execution through the Image Optimization API. `npm audit --omit=dev` is clean; development and
+  Electron packaging dependencies still carry advisories (tracked in `TASKS.md`).
+- Creating, editing and deleting a purchase now writes its `audit_logs` row in the same transaction.
+  A failed audit previously left the purchase saved while the operator saw an error, inviting a
+  duplicate entry.
+- The guarded PostgreSQL integration suites pass again (113/113), both per suite and as the combined
+  `npm run test:integration` run. They had drifted from the schema and from deliberate behavior:
+  orders now require a customer profile, `providerName` is null since the accounting tables were
+  dropped, purchases audit against a real user, and `cacheLife`/`cacheTag` need mocking outside Next.
+
 ## 2026-09-04 — Express checkout route validation fix
 
 - The customer order HTTP route now requires a delivery window only for standard delivery. Express

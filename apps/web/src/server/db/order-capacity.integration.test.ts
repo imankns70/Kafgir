@@ -57,7 +57,6 @@ integration.sequential('order capacity across rice variants', () => {
     const orders = sql`SELECT id FROM orders WHERE customer_profile_id=${profileId}`
     await sql`DELETE FROM audit_logs WHERE user_id=${userId}`
     await sql`DELETE FROM notification_messages WHERE order_id IN (${orders})`
-    await sql`DELETE FROM order_inventory_consumptions WHERE order_id IN (${orders})`
     await sql`DELETE FROM order_status_histories WHERE order_id IN (${orders})`
     await sql`DELETE FROM order_items WHERE order_id IN (${orders})`
     await sql`DELETE FROM orders WHERE customer_profile_id=${profileId}`

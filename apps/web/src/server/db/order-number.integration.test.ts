@@ -31,6 +31,8 @@ let sql: ReturnType<typeof postgres>
 let categoryId = 0
 let menuId = 0
 let menuItemId = 0
+let userId = 0
+let profileId = 0
 let year = ''
 /** Order numbers this file put in the table, synthetic or created. Dropped after every test. */
 let owned: string[] = []
@@ -51,11 +53,11 @@ const orderRequest = () => ({
 async function seedOrderNumber(orderNumber: string) {
   await sql`
     INSERT INTO orders
-      (order_number, delivery_full_name, delivery_phone_number, delivery_city,
+      (order_number, customer_profile_id, delivery_full_name, delivery_phone_number, delivery_city,
        delivery_address_line, status, payment_method, delivery_method,
        subtotal_amount, delivery_fee, total_amount, created_at)
     VALUES
-      (${orderNumber}, 'seed', '09000000003', 'اندیمشک', 'نشانی', 1, ${PaymentMethod.Cash},
+      (${orderNumber}, ${profileId}, 'seed', '09000000003', 'اندیمشک', 'نشانی', 1, ${PaymentMethod.Cash},
        ${DeliveryMethod.Pickup}, 100, 0, 100, NOW())
   `
   owned.push(orderNumber)
@@ -112,6 +114,13 @@ integration.sequential('order number generation', () => {
       INSERT INTO daily_menu_items
         (daily_menu_id,food_id,price,capacity_portions,sold_portions,is_available,created_at)
       VALUES (${menuId},${foodId},100,5000,0,true,NOW()) RETURNING id`)[0]!.id
+    // Every order belongs to a customer profile; the synthetic number-holders share this one.
+    userId = (await sql<{ id: number }[]>`
+      INSERT INTO users (username,normalized_username,full_name,is_active,created_at)
+      VALUES (${`on-${suffix}`},${`ON-${suffix}`},'order number seed',true,NOW()) RETURNING id`)[0]!.id
+    profileId = (await sql<{ id: number }[]>`
+      INSERT INTO customer_profiles (user_id,preferred_name,default_phone_number,created_at)
+      VALUES (${userId},'seed','09000000003',NOW()) RETURNING id`)[0]!.id
   })
 
   afterEach(async () => {
@@ -128,6 +137,8 @@ integration.sequential('order number generation', () => {
 
   afterAll(async () => {
     if (!sql) return
+    await sql`DELETE FROM customer_profiles WHERE id = ${profileId}`
+    await sql`DELETE FROM users WHERE id = ${userId}`
     await sql`DELETE FROM daily_menu_items WHERE id = ${menuItemId}`
     await sql`DELETE FROM daily_menus WHERE id = ${menuId}`
     await sql`DELETE FROM foods WHERE slug = ${`food-${suffix}`}`

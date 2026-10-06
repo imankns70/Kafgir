@@ -1,5 +1,5 @@
 import postgres from 'postgres'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   getFoodDetail,
   listFavoriteFoods,
@@ -13,6 +13,10 @@ import {
   getMenuCartSnapshotByDate,
   getPublicMenuPageByDate,
 } from '../services/menu-service'
+
+// `'use cache'` directives are inert outside Next.js, but `cacheLife`/`cacheTag` throw unless the
+// framework enabled `cacheComponents`. The catalog read itself is what this file exercises.
+vi.mock('next/cache', () => ({ cacheLife: () => {}, cacheTag: () => {} }))
 
 const connectionString = process.env.TEST_DATABASE_URL
 const canRun = Boolean(connectionString && process.env.DATABASE_URL === connectionString)

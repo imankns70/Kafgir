@@ -1,4 +1,5 @@
 import type { MonthPurchasesDto, PurchaseDto, PurchaseWriteRequest } from '@kafgir/contracts'
+import type { TransactionSql } from 'postgres'
 import { sqlClient } from '../db/client'
 import { NotFoundError } from '../errors'
 import { jalaliMonthRange } from '../domain/jalali-month'
@@ -54,8 +55,14 @@ export async function getMonthPurchases(year: number, month: number): Promise<Mo
   }
 }
 
-async function audit(action: string, id: number, userId: number, details?: string) {
-  await sqlClient`
+type Tx = TransactionSql<Record<string, unknown>>
+
+/**
+ * Written in the same transaction as the change it records. Otherwise a failed audit insert left the
+ * purchase saved while the operator saw an error, and a retry entered it twice.
+ */
+async function audit(tx: Tx, action: string, id: number, userId: number, details?: string) {
+  await tx`
     INSERT INTO audit_logs (action, entity_type, entity_id, user_id, details, created_at)
     VALUES (${action}, 'purchase', ${id}, ${userId}, ${details ?? null}, NOW())
   `
@@ -66,17 +73,19 @@ export async function createPurchase(
   input: PurchaseWriteRequest,
   userId: number,
 ): Promise<PurchaseDto> {
-  const rows = await sqlClient<PurchaseRow[]>`
-    INSERT INTO purchases
-      (purchase_date, amount, title, seller_name, receipt_image_url, notes, created_at)
-    VALUES
-      (${input.purchaseDate}, ${input.amount}, ${input.title}, ${optionalText(input.sellerName)},
-       ${optionalText(input.receiptImageUrl)}, ${optionalText(input.notes)}, NOW())
-    RETURNING ${columns}
-  `
-  const created = dto(rows[0]!)
-  await audit('purchase.create', created.id, userId, String(created.amount))
-  return created
+  return sqlClient.begin(async (tx) => {
+    const rows = await tx<PurchaseRow[]>`
+      INSERT INTO purchases
+        (purchase_date, amount, title, seller_name, receipt_image_url, notes, created_at)
+      VALUES
+        (${input.purchaseDate}, ${input.amount}, ${input.title}, ${optionalText(input.sellerName)},
+         ${optionalText(input.receiptImageUrl)}, ${optionalText(input.notes)}, NOW())
+      RETURNING ${columns}
+    `
+    const created = dto(rows[0]!)
+    await audit(tx, 'purchase.create', created.id, userId, String(created.amount))
+    return created
+  })
 }
 
 export async function updatePurchase(
@@ -84,19 +93,21 @@ export async function updatePurchase(
   input: PurchaseWriteRequest,
   userId: number,
 ): Promise<PurchaseDto> {
-  const rows = await sqlClient<PurchaseRow[]>`
-    UPDATE purchases
-    SET purchase_date = ${input.purchaseDate}, amount = ${input.amount}, title = ${input.title},
-        seller_name = ${optionalText(input.sellerName)},
-        receipt_image_url = ${optionalText(input.receiptImageUrl)},
-        notes = ${optionalText(input.notes)}, updated_at = NOW()
-    WHERE id = ${id}
-    RETURNING ${columns}
-  `
-  if (!rows[0]) throw new NotFoundError('خرید پیدا نشد.')
-  const updated = dto(rows[0])
-  await audit('purchase.update', id, userId, String(updated.amount))
-  return updated
+  return sqlClient.begin(async (tx) => {
+    const rows = await tx<PurchaseRow[]>`
+      UPDATE purchases
+      SET purchase_date = ${input.purchaseDate}, amount = ${input.amount}, title = ${input.title},
+          seller_name = ${optionalText(input.sellerName)},
+          receipt_image_url = ${optionalText(input.receiptImageUrl)},
+          notes = ${optionalText(input.notes)}, updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING ${columns}
+    `
+    if (!rows[0]) throw new NotFoundError('خرید پیدا نشد.')
+    const updated = dto(rows[0])
+    await audit(tx, 'purchase.update', id, userId, String(updated.amount))
+    return updated
+  })
 }
 
 /**
@@ -104,9 +115,11 @@ export async function updatePurchase(
  * reversal to write — the audit row is what records that it once existed.
  */
 export async function deletePurchase(id: number, userId: number): Promise<void> {
-  const rows = await sqlClient<{ amount: number; title: string }[]>`
-    DELETE FROM purchases WHERE id = ${id} RETURNING amount::float8 AS amount, title
-  `
-  if (!rows[0]) throw new NotFoundError('خرید پیدا نشد.')
-  await audit('purchase.delete', id, userId, `${rows[0].title} — ${rows[0].amount}`)
+  await sqlClient.begin(async (tx) => {
+    const rows = await tx<{ amount: number; title: string }[]>`
+      DELETE FROM purchases WHERE id = ${id} RETURNING amount::float8 AS amount, title
+    `
+    if (!rows[0]) throw new NotFoundError('خرید پیدا نشد.')
+    await audit(tx, 'purchase.delete', id, userId, `${rows[0].title} — ${rows[0].amount}`)
+  })
 }

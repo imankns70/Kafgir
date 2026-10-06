@@ -203,7 +203,9 @@ integration.sequential('courier delivery pricing and accounting', () => {
 
   it('earns the courier nothing until the order is actually delivered', async () => {
     const start = await courierAccountSummary(aliId)
-    const order = await place(menuItemId)
+    // A real courier order always books a window (or is express), which is what records its
+    // delivery date — and the work-date range below is read from that date.
+    const order = await place(menuItemId, DeliveryMethod.Delivery, slotId)
 
     const earnedNow = async () => (await courierAccountSummary(aliId)).earnedAmount
     expect(await earnedNow()).toBe(start.earnedAmount) // PendingConfirmation
