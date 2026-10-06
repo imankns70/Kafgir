@@ -13,7 +13,7 @@
   * local/remote divergence
 * Do not use destructive Git operations such as `git reset --hard`, `git clean`, force push, or destructive restore unless explicitly requested.
 * Commit only files relevant to the requested change.
-* Do not include `.mcp.json`, `.ai/`, local assistant configuration, secrets, `.env` files, local databases, or local tooling files in commits.
+* Do not include `.mcp.json`, local assistant configuration, secrets, `.env` files, local databases, or local tooling files in commits.
 
 ## Git / GitHub attribution policy
 
@@ -25,10 +25,12 @@ AI assistance in this project is acceptable and does not need to be hidden.
 
 ## Local-only assistant files
 
+`.ai/` is not local-only: it is tracked project documentation and is committed together with the
+change it describes (see Documentation synchronization).
+
 The following are local development infrastructure and must remain excluded from Git:
 
 * `.mcp.json`
-* `.ai/`
 * `AGENTS.md` if present and already intended to be local-only
 * local AI-agent configuration
 * Codebase Memory cache/database files
