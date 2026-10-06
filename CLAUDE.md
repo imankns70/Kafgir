@@ -17,36 +17,11 @@
 
 ## Git / GitHub attribution policy
 
-Never add AI attribution to repository history or public artifacts.
+AI assistance in this project is acceptable and does not need to be hidden.
 
-Do not mention Claude, Anthropic, ChatGPT, Codex, OpenAI, AI assistants, coding agents, MCP, or Codebase Memory in:
-
-* commit subjects
-* commit bodies
-* commit trailers
-* PR titles
-* PR descriptions
-* branch names
-* tags
-* release notes
-* changelogs
-* GitHub issues created by the agent
-* public repository documentation
-* source-code comments
-
-Do not add:
-
-* `Co-authored-by`
-* `Generated-by`
-* `Assisted-by`
-* `Created-by`
-* `AI-generated`
-* `AI-assisted`
-* equivalent attribution trailers or metadata
-
-Preserve the repository owner's existing Git identity.
-
-Commit messages must describe only the technical change.
+* Attribution trailers such as `Co-authored-by` and AI-generated PR footers are allowed.
+* Commit messages should still describe the technical change first.
+* Do not put local machine paths, secrets, or local assistant configuration contents into commits or public artifacts.
 
 ## Local-only assistant files
 
@@ -228,7 +203,7 @@ For release work:
 * validate the relevant build/tests before promotion to `main`
 * merge/squash intentionally to minimize unnecessary Netlify production deploys
 * publish only actual technical/product changes
-* do not mention AI assistance, MCP, Codebase Memory, or local development tooling in release notes
+* do not mention local development tooling such as MCP or Codebase Memory in release notes
 * do not expose local machine paths
 * do not include `.ai/*` content in public release artifacts
 
