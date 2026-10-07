@@ -7,6 +7,8 @@
   `is_available=false`; those values are already legal and keep the row out of ordering. Today's
   editor completes that same row rather than copying it. No new table, migration, generic SQL IPC or
   duplicate business service is introduced.
+- The plan is optional. When today has no reserved row, «منوی امروز» adds the food directly with its
+  price and capacity, so an unplanned day can still be sold.
 
 ## 2026-09-04 — Express delivery has no delivery-window requirement
 
