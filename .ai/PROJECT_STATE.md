@@ -801,3 +801,5 @@
   delivery-window, daily-capacity, purchase, payment and small catalog/reference-data screens. Courier
   settlement details open in a bounded dialog instead of appending a second form and history table
   below the account grid.
+- Combined `npm run dev` now starts Next.js and Electron reliably on Windows: Vite's development
+  renderer uses IPv4 and Electron retries its initial navigation while the renderer server becomes ready.

@@ -1,5 +1,10 @@
 # Tasks
 
+## 2026-10-07 Development startup
+
+- [x] Make the combined `npm run dev` command reliably load the Electron renderer on Windows.
+- [x] Keep the development renderer on IPv4 and retry the initial Electron navigation while Vite starts.
+
 ## 2026-10-06 dependency security and integration-test repair
 
 - [x] Upgrade Next.js 16.3.0 → 16.3.8 for the critical advisories (unauthenticated RCE in Image

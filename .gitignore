@@ -25,6 +25,7 @@ appsettings.*.local.json
 sms-config.txt
 .env
 .env.*
+**/.env.local
 !.env.example
 
 # Logs and operating systems

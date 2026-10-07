@@ -912,3 +912,9 @@
   controls when an operator starts typing.
 - Money stays a number after parsing and is formatted only at input/display boundaries. Counts,
   quantities, percentages, order numbers and identifiers continue to use their own formatters.
+
+## 2026-10-07 — Reliable combined development startup
+
+- The Electron development renderer binds to `127.0.0.1` so Windows localhost resolution cannot
+  select an IPv6-only Vite listener. Electron retries the initial renderer navigation briefly because
+  electron-vite starts the main process and renderer server concurrently.

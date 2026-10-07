@@ -264,9 +264,27 @@ function createWindow() {
   })
   mainWindow.once('ready-to-show', () => mainWindow?.show())
   if (process.env.ELECTRON_RENDERER_URL) {
-    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
+    void loadDevelopmentRenderer(mainWindow, process.env.ELECTRON_RENDERER_URL)
   } else {
     void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+}
+
+async function loadDevelopmentRenderer(window: BrowserWindow, url: string) {
+  // electron-vite starts the renderer server alongside the main process. On a cold
+  // `npm run dev`, the main bundle can be ready a few hundred milliseconds first.
+  // Retry the initial navigation so the combined web/admin command is reliable.
+  for (let attempt = 0; attempt < 20 && !window.isDestroyed(); attempt += 1) {
+    try {
+      await window.loadURL(url)
+      return
+    } catch (error) {
+      if (attempt === 19 || window.isDestroyed()) {
+        desktopLogger().error({ event: 'renderer.load.failed', attempts: attempt + 1, error }, 'رابط پنل مدیریت بارگذاری نشد')
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 150))
+    }
   }
 }
 
