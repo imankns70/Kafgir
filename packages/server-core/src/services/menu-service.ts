@@ -340,6 +340,7 @@ export async function getPublicMenuPageByDate(
           SELECT 1 FROM daily_menu_items i
           JOIN foods f ON f.id = i.food_id
           WHERE i.daily_menu_id = ${menu.id} AND f.category_id = c.id AND f.is_active = true
+            AND i.is_available = true AND i.capacity_portions > i.sold_portions
         )
       ORDER BY c.display_order, c.id
     `,

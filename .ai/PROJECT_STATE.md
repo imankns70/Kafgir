@@ -1,5 +1,13 @@
 # Project state
 
+## 2026-09-04 — Electron monthly menu planning
+
+- Electron Admin exposes `برنامه ماهانه` beside `منوی امروز`. Planning only reserves food names for
+  the selected Persian date; the stored row starts unavailable with zero price/capacity, so it cannot
+  be ordered accidentally. On the sales day, `منوی امروز` lists those rows as `نیازمند تکمیل` and the
+  operator supplies price and capacity before they become available. Reserved placeholders do not
+  create empty category filters or a zero starting price in the customer Web plan.
+
 ## 2026-09-04 — Express checkout route validation fix
 
 - The customer order HTTP route now requires a delivery window only for standard delivery. Express

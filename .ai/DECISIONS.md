@@ -1,5 +1,13 @@
 # Decisions
 
+## 2026-09-04 — Monthly planning reuses the daily-menu aggregate
+
+- A monthly plan is a date-oriented view over existing daily menus, not a second menu entity. A food
+  reservation is represented by the existing daily-menu row with `price=0`, `capacity=0` and
+  `is_available=false`; those values are already legal and keep the row out of ordering. Today's
+  editor completes that same row rather than copying it. No new table, migration, generic SQL IPC or
+  duplicate business service is introduced.
+
 ## 2026-09-04 — Express delivery has no delivery-window requirement
 
 - Keep the HTTP boundary strict for standard customer orders, but exempt `isExpress=true` from the

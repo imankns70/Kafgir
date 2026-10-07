@@ -705,6 +705,8 @@ td.row-number{color:var(--muted);font-size:12px;font-variant-numeric:tabular-num
 /* The menu form pins its four controls to explicit columns: its full-width discount row keeps every
    auto-fit track alive, which scattered the fields across a dozen skinny columns on wide windows. */
 .menu-form{grid-template-columns:minmax(220px,1.4fr) minmax(190px,1fr) minmax(120px,.6fr) auto;align-items:start}
+.monthly-menu-form{grid-template-columns:minmax(260px,1fr) auto;align-items:end}
+.monthly-menu-form .compact-form-note{grid-column:1/-1}
 .compact-form-note{grid-column:1/-1;margin:0;border-inline-start:3px solid var(--olive);border-radius:7px;padding:7px 10px;color:var(--muted);background:#f1f4e9;font-size:12px;line-height:1.7}
 .compact-form-note.warning{border-inline-start-color:#c58b00;background:#fff0c8}
 .compact-form-note.success{border-inline-start-color:var(--success);background:#e5ebd9}
