@@ -21,7 +21,7 @@ describe('admin navigation structure', () => {
 
   it('reaches every admin screen the app can render', () => {
     expect(allPages).toEqual(expect.arrayContaining([
-      'menu', 'delivery-days', 'courier-days', 'orders', 'manual', 'customer-communication',
+      'menu', 'menu-plan', 'delivery-days', 'courier-days', 'orders', 'manual', 'customer-communication',
       'report', 'customer-report', 'customers', 'site-analytics',
       'foods',
       'purchases', 'months', 'payments', 'courier-accounting',
@@ -70,6 +70,11 @@ describe('reference data versus configuration', () => {
     // The window list is master data; the day view is an operational decision taken per date.
     expect(navigationGroupForPage('delivery-slots')).toBe('reference')
     expect(navigationGroupForPage('delivery-days')).toBe('sales')
+  })
+
+  it('keeps monthly menu planning beside today\'s operational menu', () => {
+    expect(groupItems('sales').slice(0, 2)).toEqual(['menu', 'menu-plan'])
+    expect(navigationGroupForPage('menu-plan')).toBe('sales')
   })
 
   it('keeps order-scoped support with the sales flow rather than in reference data', () => {

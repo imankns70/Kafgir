@@ -2,7 +2,7 @@ import type { AdminOperation } from '../../shared/admin-operations'
 import { isAdminOperationAllowed } from '../../shared/admin-permissions'
 
 export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' | 'food-photos' | 'food-tags'
-  | 'categories' | 'tags' | 'menu' | 'report' | 'purchases' | 'months' | 'payments'
+  | 'categories' | 'tags' | 'menu' | 'menu-plan' | 'report' | 'purchases' | 'months' | 'payments'
   | 'delivery-slots' | 'delivery-days' | 'logs'
   | 'social-dashboard' | 'social-channels' | 'social-publish' | 'social-templates'
   | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
@@ -69,6 +69,7 @@ export const navigationGroups: NavigationGroup[] = [
     hint: 'کارهای هر روز: منو، ظرفیت، سفارش‌ها و گفتگو با مشتری',
     items: [
       { page: 'menu', label: 'منوی امروز', operation: 'menus.get' },
+      { page: 'menu-plan', label: 'برنامه ماهانه', operation: 'menus.get' },
       { page: 'delivery-days', label: 'ظرفیت ارسال روزانه', operation: 'deliveryDays.get' },
       { page: 'courier-days', label: 'پیک و هزینه ارسال روزانه', operation: 'courierDays.get' },
       { page: 'orders', label: 'سفارش‌ها', operation: 'orders.search' },

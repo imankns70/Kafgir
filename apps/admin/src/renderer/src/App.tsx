@@ -1243,12 +1243,13 @@ function FoodPhotosPage({ foodId, onBack }: { foodId: number | null; onBack: () 
   </PageFrame>
 }
 
-function DailyMenuPage() {
+function DailyMenuPage({ planning = false }: { planning?: boolean }) {
   const saveAction = useAsyncAction()
   const toggleAction = useAsyncAction()
   const removeAction = useAsyncAction()
   const [removingId, setRemovingId] = useState<number | null>(null)
-  const date = today()
+  const [plannedDate, setPlannedDate] = useState(today)
+  const date = planning ? plannedDate : today()
   const [menu, setMenu] = useState<DailyMenuDto | null>(null)
   const [foods, setFoods] = useState<FoodDto[]>([])
   const [foodId, setFoodId] = useState('')
@@ -1266,7 +1267,17 @@ function DailyMenuPage() {
     setFoods(foodRows)
     setMenu(menuRow)
   }
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    setEditing(null)
+    setFoodId('')
+    setPriceText('')
+    setDiscountEnabled(false)
+    setDiscountPriceText('')
+    setCapacity(1)
+    setMenu(null)
+    setError(null)
+    void load()
+  }, [date])
   const pagedMenu = usePagination(menu?.items ?? [])
   const persianRice = menu?.persianRice ?? null
   const selectedFood = foods.find((food) => food.id === Number(foodId))
@@ -1275,12 +1286,41 @@ function DailyMenuPage() {
   const discountPrice = parseMoney(discountPriceText) ?? 0
   const saveItem = (event: FormEvent) => {
     event.preventDefault()
+    if (planning) {
+      if (!foodId) {
+        setError('یک غذا برای برنامه این روز انتخاب کنید.')
+        return
+      }
+      void saveAction.run(async () => {
+        try {
+          const updated = await adminApi.addMenuItem(date, {
+            foodId: Number(foodId),
+            price: 0,
+            discountPrice: null,
+            capacityPortions: 0,
+            isAvailable: false,
+          })
+          setMenu(updated)
+          setFoodId('')
+          setError(null)
+        } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+      })
+      return
+    }
+    if (editing == null) {
+      setError('ابتدا از فهرست غذاهای رزروشده، قیمت و ظرفیت یک غذا را تعیین کنید.')
+      return
+    }
     if (isInvalidMoneyText(priceText) || (discountEnabled && isInvalidMoneyText(discountPriceText))) {
       setError('مبلغ واردشده معتبر نیست؛ عدد صحیح به تومان وارد کنید.')
       return
     }
     if (price <= 0) {
       setError('قیمت امروز را وارد کنید.')
+      return
+    }
+    if (capacity <= 0) {
+      setError('ظرفیت امروز باید بیشتر از صفر باشد.')
       return
     }
     if (discountEnabled && (discountPrice <= 0 || discountPrice >= price)) {
@@ -1290,9 +1330,7 @@ function DailyMenuPage() {
     void saveAction.run(async () => {
       try {
         const item = { price, discountPrice: discountEnabled ? discountPrice : null, capacityPortions: capacity, isAvailable: true }
-        const updated = editing
-          ? await adminApi.updateMenuItem(editing, item)
-          : await adminApi.addMenuItem(date, { foodId: Number(foodId), ...item })
+        const updated = await adminApi.updateMenuItem(editing, item)
         setMenu(updated); setEditing(null); setFoodId(''); setPriceText(''); setDiscountEnabled(false); setDiscountPriceText(''); setCapacity(1); setError(null)
       } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
     })
@@ -1327,13 +1365,40 @@ function DailyMenuPage() {
       finally { setRemovingId(null) }
     })
   }
-  return <PageFrame title="منوی امروز" actions={<button className={menu?.isOpen ? 'secondary' : 'primary'} disabled={toggleAction.busy} onClick={toggle}>
-    {toggleAction.busy ? 'در حال تغییر…' : <>سفارش‌گیری {menu?.isOpen ? 'باز است' : 'بسته است'}</>}
-  </button>}>
+  if (planning) return <PageFrame title="برنامه ماهانه" actions={
+    <DateField label="تاریخ برنامه" value={plannedDate} onChange={setPlannedDate} />
+  }>
     <Message error={error} />
-    <form className="panel form-grid menu-form compact-entry-form" onSubmit={saveItem}>
-      <label>غذا<select value={foodId} disabled={editing !== null} onChange={(event) => setFoodId(event.target.value)} required>
-        <option value="">انتخاب غذا</option>{foods.filter((food) => food.isActive).map((food) => <option value={food.id} key={food.id}>{food.name}{food.isPersianRice ? ' (ارتقای مخفی)' : ''}</option>)}</select>
+    <form className="panel form-grid compact-entry-form monthly-menu-form" onSubmit={saveItem}>
+      <label>غذا<select value={foodId} onChange={(event) => setFoodId(event.target.value)} required>
+        <option value="">انتخاب غذا</option>
+        {foods.filter((food) => food.isActive && !menu?.items.some((item) => item.foodId === food.id)).map((food) =>
+          <option value={food.id} key={food.id}>{food.name}</option>)}
+      </select></label>
+      <button className="primary" disabled={saveAction.busy}>{saveAction.busy ? 'در حال رزرو…' : 'رزرو غذا'}</button>
+      <p className="compact-form-note">در برنامه ماهانه فقط غذا را مشخص کنید؛ قیمت و ظرفیت در روز فروش، از «منوی امروز» تکمیل می‌شود.</p>
+    </form>
+    <div className="panel table-wrap compact-grid-panel"><table><thead><tr><RowNumberHead /><th>غذای رزروشده</th><th>وضعیت</th><th /></tr></thead>
+      <tbody>{pagedMenu.visible.map((item, index) => <tr key={item.id}>
+        <RowNumberCell offset={pagedMenu.rowOffset} index={index} />
+        <td>{item.foodName}</td>
+        <td>{item.price > 0 && item.capacityPortions > 0 && item.isAvailable
+          ? <span className="badge open">آماده فروش</span>
+          : <span className="badge status-1">رزرو شده</span>}</td>
+        <td className="actions"><button className="danger" disabled={removeAction.busy} onClick={() => removeItem(item.id)}>{removingId === item.id ? 'در حال حذف…' : 'حذف'}</button></td>
+      </tr>)}</tbody></table></div>
+    {!menu?.items.length && <p className="panel muted">برای این روز هنوز غذایی رزرو نشده است.</p>}
+    <Pager {...pagedMenu} />
+  </PageFrame>
+
+  return <PageFrame title="منوی امروز" actions={
+    <button className={menu?.isOpen ? 'secondary' : 'primary'} disabled={toggleAction.busy} onClick={toggle}>
+      {toggleAction.busy ? 'در حال تغییر…' : <>سفارش‌گیری {menu?.isOpen ? 'باز است' : 'بسته است'}</>}
+    </button>
+  }>
+    <Message error={error} />
+    {editing != null ? <form className="panel form-grid menu-form compact-entry-form" onSubmit={saveItem}>
+      <label>غذا<input value={selectedFood?.name ?? ''} disabled />
         <small>{selectedFood?.isPersianRice ? 'قیمت این ردیف باید مابه‌التفاوت ارتقا به برنج ایرانی باشد، نه قیمت یک پرس کامل برنج.' : selectedFood?.allowsPersianRice ? 'مشتری می‌تواند به این غذا برنج ایرانی اضافه کند؛ «برنج ایرانی» را هم به منوی امروز اضافه کنید.' : ''}</small></label>
       <div className="menu-price-field">
         <AmountField label="قیمت امروز (تومان)" value={priceText} onChange={setPriceText} placeholder="240,000" />
@@ -1352,11 +1417,15 @@ function DailyMenuPage() {
         «ارتقا به برنج ایرانی» هنوز به منوی امروز اضافه نشده است؛ تا وقتی اضافه نشود گزینه ارتقا به مشتری نمایش داده نمی‌شود.
       </p>}
       <button className="primary" disabled={saveAction.busy}>
-        {saveAction.busy ? (editing ? 'در حال ذخیره…' : 'در حال افزودن…') : editing ? 'ذخیره' : 'افزودن به منو'}
+        {saveAction.busy ? 'در حال ذخیره…' : 'ذخیره قیمت و ظرفیت'}
       </button>
-    </form>
-    <div className="panel table-wrap compact-grid-panel"><table><thead><tr><RowNumberHead /><th>غذا</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
-      <tbody>{pagedMenu.visible.map((item, index) => <tr key={item.id}><RowNumberCell offset={pagedMenu.rowOffset} index={index} /><td>{item.foodName}</td><td>{item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{plainNumber(item.capacityPortions)}</td><td>{plainNumber(item.soldPortions)}</td><td>{plainNumber(item.remainingPortions)}</td><td className="actions"><button onClick={() => edit(item)}>ویرایش</button><button className="discount-action" onClick={() => edit(item, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button><button className="danger" disabled={removeAction.busy} onClick={() => removeItem(item.id)}>{removingId === item.id ? 'در حال حذف…' : 'حذف'}</button></td></tr>)}</tbody></table></div>
+    </form> : <p className="panel compact-form-note">غذاهای امروز از برنامه ماهانه آمده‌اند. برای تکمیل هر ردیف، «تعیین قیمت و ظرفیت» را بزنید.</p>}
+    <div className="panel table-wrap compact-grid-panel"><table><thead><tr><RowNumberHead /><th>غذا</th><th>وضعیت</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
+      <tbody>{pagedMenu.visible.map((item, index) => {
+        const needsSetup = item.price <= 0 || item.capacityPortions <= 0 || !item.isAvailable
+        return <tr key={item.id}><RowNumberCell offset={pagedMenu.rowOffset} index={index} /><td>{item.foodName}</td><td>{needsSetup ? <span className="badge status-1">نیازمند تکمیل</span> : <span className="badge open">آماده فروش</span>}</td><td>{item.price > 0 ? (item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)) : '—'}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{item.capacityPortions > 0 ? plainNumber(item.capacityPortions) : '—'}</td><td>{plainNumber(item.soldPortions)}</td><td>{item.capacityPortions > 0 ? plainNumber(item.remainingPortions) : '—'}</td><td className="actions"><button onClick={() => edit(item)}>{needsSetup ? 'تعیین قیمت و ظرفیت' : 'ویرایش'}</button>{!needsSetup && <button className="discount-action" onClick={() => edit(item, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button>}<button className="danger" disabled={removeAction.busy} onClick={() => removeItem(item.id)}>{removingId === item.id ? 'در حال حذف…' : 'حذف'}</button></td></tr>
+      })}</tbody></table></div>
+    {!menu?.items.length && <p className="panel muted">برای امروز غذایی رزرو نشده است؛ ابتدا آن را در «برنامه ماهانه» ثبت کنید.</p>}
     <Pager {...pagedMenu} />
   </PageFrame>
 }
@@ -1818,6 +1887,7 @@ export function App() {
     categories: <CategoriesPage />,
     tags: <TagsPage />,
     menu: <DailyMenuPage />,
+    'menu-plan': <DailyMenuPage planning />,
     report: <ReportPage />,
     payments: <PaymentsPage />,
     purchases: <PurchasesPage />,

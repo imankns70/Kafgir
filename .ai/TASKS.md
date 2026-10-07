@@ -10,6 +10,14 @@
 - [ ] Development/packaging dependencies still carry advisories (Electron 43.2.0 → 43.7.7,
   shell-quote, js-yaml, xmldom and others). The Electron bump needs a Windows packaging check.
 
+## 2026-09-04 Electron monthly menu planning
+
+- [x] Add `برنامه ماهانه` to the Electron sales navigation with the existing menu permission.
+- [x] Let Admin select a Persian date and reserve foods without entering price or capacity.
+- [x] Show today's reservations in `منوی امروز` and require price/capacity before availability.
+- [x] Keep reservation placeholders out of customer category filters and zero-price summaries.
+- [x] Keep `منوی امروز` fixed to today and add navigation regression coverage.
+
 ## 2026-09-04 express checkout validation
 
 - [x] Allow express customer orders to reach the shared order service without a delivery-window ID.

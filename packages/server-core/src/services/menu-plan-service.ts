@@ -52,7 +52,10 @@ export async function getMenuPlan(now = new Date()): Promise<MenuPlanDto> {
            preview.items AS foods
     FROM daily_menus m
     LEFT JOIN LATERAL (
-      SELECT COUNT(*)::int AS total, MIN(COALESCE(i.discount_price, i.price)) AS lowest
+      SELECT COUNT(*)::int AS total,
+             MIN(COALESCE(i.discount_price, i.price)) FILTER (
+               WHERE i.is_available AND i.price > 0 AND i.capacity_portions > i.sold_portions
+             ) AS lowest
       FROM daily_menu_items i
       JOIN foods f ON f.id = i.food_id
       JOIN food_categories c ON c.id = f.category_id
