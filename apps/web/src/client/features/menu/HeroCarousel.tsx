@@ -3,6 +3,8 @@ import { Icon } from '../../design-system/Icon'
 
 const fallbackHeroImage = '/kafgir-food-hero.jpg'
 const slideInterval = 5500
+// A long row of dots reads as noise; a handful of dishes is enough to set the mood.
+const maxSlides = 6
 
 type Props = {
   images: Array<string | null | undefined>
@@ -11,7 +13,7 @@ type Props = {
 export function HeroCarousel({ images }: Props) {
   const slides = useMemo(() => {
     const menuImages = images.filter((image): image is string => Boolean(image))
-    return [...new Set([fallbackHeroImage, ...menuImages])]
+    return [...new Set([fallbackHeroImage, ...menuImages])].slice(0, maxSlides)
   }, [images])
   const [activeSlide, setActiveSlide] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
@@ -56,7 +58,7 @@ export function HeroCarousel({ images }: Props) {
         {slides.map((image, index) => (
           <img
             key={image}
-            className={index === activeSlide ? 'hero-carousel-image active' : 'hero-carousel-image'}
+            className={`hero-carousel-image${index === activeSlide ? ' active' : ''}${image === fallbackHeroImage ? ' is-fallback' : ''}`}
             src={image}
             alt=""
             aria-hidden={index !== activeSlide}

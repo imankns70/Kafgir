@@ -2,6 +2,7 @@ import { normalizePersianSearch } from '@kafgir/contracts'
 import type { CartItem, DailyMenuItemDto, PublicDailyMenuPageDto } from '../../types'
 import { BrandedState } from '../../design-system/BrandedState'
 import { Icon } from '../../design-system/Icon'
+import { formatNumber, formatPersianDay } from '../../utils/format'
 import { getTodayMenu } from '../../services/menuApi'
 import { DiscountShowcase } from './DiscountShowcase'
 import { HeroCarousel } from './HeroCarousel'
@@ -175,6 +176,13 @@ export function MenuPage({ menu, isLoading, error, cartItems, onRetry, onAdd, on
     return () => observer.disconnect()
   }, [isSearching, loadResults, nextCursor, resultError])
 
+  const menuDay = currentMenu?.menuDate ? formatPersianDay(currentMenu.menuDate.slice(0, 10)) : null
+  const orderDeadline = currentMenu?.orderDeadline
+    ? new Intl.DateTimeFormat('fa-IR-u-nu-latn', { timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(new Date(currentMenu.orderDeadline))
+    : null
+  // The hero describes the whole menu, so it keeps the unfiltered count while the list is searched.
+  const menuSize = menu?.totalItems ?? currentMenu?.totalItems ?? 0
+
   if (isLoading && !currentMenu) return <BrandedState animated title="در حال چیدن سفره امروز…" message="چند لحظه صبر کنید تا غذاهای تازه را بیاوریم." />
   if (error && !currentMenu) return <BrandedState title="دریافت منو ممکن نشد" message={error} tone="error" icon="info"><button className="outline-button" onClick={onRetry}><Icon name="refresh" size="md" />تلاش دوباره</button></BrandedState>
   if (!currentMenu) return <BrandedState title="امروز منویی ثبت نشده است" message="به‌زودی غذاهای خانگی تازه اینجا قرار می‌گیرند." />
@@ -184,15 +192,22 @@ export function MenuPage({ menu, isLoading, error, cartItems, onRetry, onAdd, on
     <section className="menu-intro">
       <HeroCarousel images={menu?.items.map((item) => item.imageUrl) ?? []} />
       <div className="menu-intro-copy">
-        <span className="eyebrow"><Icon name="freshIngredients" size="sm" /> سفره امروز کفگیر</span>
+        <span className="menu-intro-eyebrow">
+          <Icon name="freshIngredients" size="sm" /> سفره امروز کفگیر
+          {menuDay && <><i aria-hidden="true" />{menuDay}</>}
+        </span>
         <h1 className="section-title">طعم خونه،<br /><span>آماده سفارش</span></h1>
         <p className="section-subtitle">{currentMenu.note || 'غذای تازه و خانگی در اندیمشک'}</p>
         <div className="menu-intro-promises" aria-label="ویژگی‌های غذای امروز">
-          <span><Icon name="clock" size="sm" /> پخت روز</span>
-          <span><Icon name="freshIngredients" size="sm" /> مواد تازه</span>
+          {menuSize > 0 && <span><Icon name="food" size="sm" /> {formatNumber(menuSize)} غذای امروز</span>}
+          {orderDeadline
+            ? <span><Icon name="clock" size="sm" /> سفارش تا {orderDeadline}</span>
+            : <span><Icon name="clock" size="sm" /> پخت روز</span>}
         </div>
+        <a className="menu-intro-cta" href="#menu-categories">
+          <span>دیدن منوی امروز</span><Icon name="menu" size="sm" />
+        </a>
       </div>
-      <div className="menu-intro-accent" aria-hidden="true"><i /><i /><i /></div>
     </section>
 
     <section className="menu-search" role="search" aria-label="جستجو در منوی امروز">
@@ -230,7 +245,10 @@ export function MenuPage({ menu, isLoading, error, cartItems, onRetry, onAdd, on
     />}
 
     <section id="menu-categories" className="category-strip" aria-label="دسته‌بندی غذاهای امروز">
-      <div className="category-strip-title"><Icon name="categories" size="sm" /><span>دسته‌بندی</span></div>
+      <div className="category-strip-title">
+        <h2>منوی امروز</h2>
+        {!isSearching && <span>{formatNumber(totalItems)} غذا</span>}
+      </div>
       <div className="category-chips" role="list">
         {visibleCategoryOptions.map((category) => (
           <button key={category.key} type="button"
