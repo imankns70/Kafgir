@@ -1,0 +1,25 @@
+.app-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(242, 178, 51, .18), transparent 60%),
+    var(--kafgir-color-background);
+  opacity: 1;
+  transition: opacity .4s var(--kafgir-ease, ease);
+  /* Fallback for a page whose scripts never run: the splash must not hide the menu forever. */
+  animation: app-splash-fallback 0s linear 8s forwards;
+}
+.app-splash.is-leaving { opacity: 0; pointer-events: none; }
+.app-splash-mark { display: grid; justify-items: center; gap: 6px; }
+.app-splash-mark img { width: 112px; height: 112px; object-fit: contain; animation: app-splash-settle 1.6s ease-in-out infinite; }
+.app-splash-mark strong { color: var(--kafgir-color-primary); font-size: 2rem; font-weight: 700; line-height: 1.2; }
+.app-splash-mark span { color: var(--kafgir-color-text-secondary); font-size: .95rem; }
+@keyframes app-splash-settle { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes app-splash-fallback { to { visibility: hidden; opacity: 0; pointer-events: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .app-splash { transition: none; }
+  .app-splash-mark img { animation: none; }
+}

@@ -4,7 +4,9 @@ import '../client/index.css'
 import '../client/App.css'
 import '../client/FoodDetailUx.css'
 import '../client/ActiveOrderTracker.css'
+import '../client/AppSplash.css'
 import { ActiveOrderTracker } from '../client/ActiveOrderTracker'
+import { AppSplash } from '../client/AppSplash'
 import { CustomerAnalytics } from '../client/CustomerAnalytics'
 
 export const metadata: Metadata = {
@@ -27,6 +29,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // which the server never rendered. Without this, React fails hydration on every page load.
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <body>
+        <AppSplash />
         <CustomerAnalytics />
         {children}
         <ActiveOrderTracker />
