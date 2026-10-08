@@ -94,9 +94,40 @@ export const monthlyDailyPointSchema = z.object({
   purchases: z.number().nonnegative(),
 })
 
+/**
+ * What sold and how, for the month's delivered orders. Dish and slot sales are food subtotals before
+ * refunds, because a refund is recorded against the order, not against one dish.
+ */
+export const salesAnalysisSchema = z.object({
+  deliveredOrders: z.number().int().nonnegative(),
+  cancelledOrders: z.number().int().nonnegative(),
+  /** Cancelled ÷ (delivered + cancelled), as a percentage; null when the month has neither. */
+  cancellationPercent: z.number().nonnegative().nullable(),
+  /** Net food sales per delivered order; null when nothing was delivered. */
+  averageBasket: z.number().nonnegative().nullable(),
+  averagePortions: z.number().nonnegative().nullable(),
+  dishes: z.array(z.object({
+    foodName: z.string(),
+    portions: z.number().int().nonnegative(),
+    orders: z.number().int().nonnegative(),
+    sales: z.number().nonnegative(),
+  })),
+  slots: z.array(z.object({
+    label: z.string(),
+    orders: z.number().int().nonnegative(),
+    sales: z.number().nonnegative(),
+  })),
+  paymentMethods: z.array(z.object({
+    paymentMethod: z.number().int(),
+    orders: z.number().int().nonnegative(),
+    sales: z.number().nonnegative(),
+  })),
+})
+
 export const monthlyReportSchema = z.object({
   summary: monthlySummarySchema,
   daily: z.array(monthlyDailyPointSchema),
+  analysis: salesAnalysisSchema,
 })
 
 export const monthListItemSchema = monthlySummarySchema.pick({
@@ -111,4 +142,5 @@ export type JalaliMonthRef = z.infer<typeof jalaliMonthSchema>
 export type MonthlySummaryDto = z.infer<typeof monthlySummarySchema>
 export type MonthlyDailyPointDto = z.infer<typeof monthlyDailyPointSchema>
 export type MonthlyReportDto = z.infer<typeof monthlyReportSchema>
+export type SalesAnalysisDto = z.infer<typeof salesAnalysisSchema>
 export type MonthListItemDto = z.infer<typeof monthListItemSchema>

@@ -4,8 +4,9 @@ import type {
   MonthlyDailyPointDto,
   MonthlyReportDto,
   MonthlySummaryDto,
+  SalesAnalysisDto,
 } from '@kafgir/contracts'
-import { OrderReviewHandlingStatus, OrderStatus, PaymentStatus, SupportConversationStatus } from '@kafgir/contracts'
+import { DeliveryMethod, OrderReviewHandlingStatus, OrderStatus, PaymentStatus, SupportConversationStatus } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
 import { orderServiceDate } from '../db/service-date'
 import { paymentBucketTotals } from './payment-service'
@@ -150,10 +151,71 @@ async function dailySeries(range: JalaliMonthRange): Promise<MonthlyDailyPointDt
   }))
 }
 
+/**
+ * Which dishes, windows and payment methods the month's delivered orders came from, plus the two
+ * ratios an owner asks about first: how big an order is, and how many orders end up cancelled.
+ */
+async function salesAnalysis(range: JalaliMonthRange): Promise<SalesAnalysisDto> {
+  // A fresh fragment per use: the month's orders, by the day they were served.
+  const monthOrders = () => sqlClient`
+    SELECT o.* FROM orders o
+    WHERE ${orderServiceDate('o')} >= ${range.fromDate}::date
+      AND ${orderServiceDate('o')} < ${range.toExclusiveDate}::date`
+  const [counts, dishes, slots, methods] = await Promise.all([
+    sqlClient<Array<{ delivered: number; cancelled: number; netSales: number; portions: number }>>`
+      SELECT
+        COUNT(*) FILTER (WHERE m.status = ${soldStatus})::int AS delivered,
+        COUNT(*) FILTER (WHERE m.status = ${OrderStatus.Cancelled})::int AS cancelled,
+        COALESCE(SUM(m.subtotal_amount - ${refundedFood('m')}) FILTER (WHERE m.status = ${soldStatus}), 0)::float8 AS "netSales",
+        COALESCE((SELECT SUM(i.quantity) FROM order_items i JOIN (${monthOrders()}) d ON d.id = i.order_id
+          WHERE d.status = ${soldStatus}), 0)::int AS portions
+      FROM (${monthOrders()}) m`,
+    sqlClient<SalesAnalysisDto['dishes']>`
+      SELECT i.food_name AS "foodName", SUM(i.quantity)::int AS portions,
+        COUNT(DISTINCT i.order_id)::int AS orders, SUM(i.total_price)::float8 AS sales
+      FROM order_items i JOIN (${monthOrders()}) m ON m.id = i.order_id
+      WHERE m.status = ${soldStatus}
+      GROUP BY i.food_name
+      ORDER BY sales DESC, portions DESC, i.food_name`,
+    sqlClient<Array<{ express: boolean; pickup: boolean; title: string | null; startTime: string | null; endTime: string | null; orders: number; sales: number }>>`
+      SELECT m.is_express AS express, (m.delivery_method = ${DeliveryMethod.Pickup}) AS pickup,
+        m.delivery_time_slot_title AS title,
+        to_char(m.delivery_start_time, 'HH24:MI') AS "startTime", to_char(m.delivery_end_time, 'HH24:MI') AS "endTime",
+        COUNT(*)::int AS orders, SUM(m.subtotal_amount)::float8 AS sales
+      FROM (${monthOrders()}) m
+      WHERE m.status = ${soldStatus}
+      GROUP BY 1, 2, 3, 4, 5
+      ORDER BY 4 NULLS LAST, 3 NULLS LAST, 1, 2`,
+    sqlClient<SalesAnalysisDto['paymentMethods']>`
+      SELECT m.payment_method AS "paymentMethod", COUNT(*)::int AS orders, SUM(m.subtotal_amount)::float8 AS sales
+      FROM (${monthOrders()}) m
+      WHERE m.status = ${soldStatus}
+      GROUP BY m.payment_method
+      ORDER BY sales DESC`,
+  ])
+  const { delivered = 0, cancelled = 0, netSales = 0, portions = 0 } = counts[0] ?? {}
+  return {
+    deliveredOrders: delivered,
+    cancelledOrders: cancelled,
+    cancellationPercent: delivered + cancelled > 0 ? Math.round((cancelled / (delivered + cancelled)) * 1000) / 10 : null,
+    averageBasket: delivered > 0 ? Math.round(netSales / delivered) : null,
+    averagePortions: delivered > 0 ? Math.round((portions / delivered) * 10) / 10 : null,
+    dishes: [...dishes],
+    slots: slots.map((row) => ({ label: slotLabel(row), orders: row.orders, sales: row.sales })),
+    paymentMethods: [...methods],
+  }
+}
+
+function slotLabel(row: { express: boolean; pickup: boolean; title: string | null; startTime: string | null; endTime: string | null }) {
+  if (row.express) return 'ارسال فوری'
+  if (row.title) return row.startTime && row.endTime ? `${row.title} (${row.startTime}–${row.endTime})` : row.title
+  return row.pickup ? 'حضوری، بدون بازه' : 'بدون بازه ارسال'
+}
+
 export async function getMonthlyReport(year: number, month: number): Promise<MonthlyReportDto> {
   const range = jalaliMonthRange(year, month)
-  const [totals, daily] = await Promise.all([monthTotals(range), dailySeries(range)])
-  return { summary: summaryOf(range, totals), daily }
+  const [totals, daily, analysis] = await Promise.all([monthTotals(range), dailySeries(range), salesAnalysis(range)])
+  return { summary: summaryOf(range, totals), daily, analysis }
 }
 
 export async function getMonthlySummary(year: number, month: number): Promise<MonthlySummaryDto> {

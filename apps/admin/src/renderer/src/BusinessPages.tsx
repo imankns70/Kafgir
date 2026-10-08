@@ -5,8 +5,9 @@ import type {
   MonthlyDailyPointDto,
   MonthlyReportDto,
   PurchaseDto,
+  SalesAnalysisDto,
 } from '@kafgir/contracts'
-import { persianMonthNames } from '@kafgir/contracts'
+import { PaymentMethod, persianMonthNames } from '@kafgir/contracts'
 import { adminApi } from './api'
 import {
   AmountField, DateField, ListState, Message, PageFrame, Pager, RowNumberCell, RowNumberHead,
@@ -341,6 +342,62 @@ export function MonthMetrics({ report }: { report: MonthlyReportDto }) {
   </>
 }
 
+const paymentMethodName: Record<number, string> = {
+  [PaymentMethod.Cash]: 'نقدی',
+  [PaymentMethod.CardToCard]: 'کارت‌به‌کارت',
+  [PaymentMethod.Pos]: 'دستگاه پوز',
+  [PaymentMethod.Online]: 'آنلاین',
+}
+
+/** A share of the month's food sales, for the bar beside each row. */
+const shareOf = (part: number, whole: number) => whole > 0 ? Math.round((part / whole) * 1000) / 10 : 0
+
+function ShareTable<T extends { orders: number; sales: number }>({ title, label, rows, extra }: {
+  title: string
+  label: (row: T) => string
+  rows: T[]
+  extra?: { header: string; value: (row: T) => string }
+}) {
+  const total = rows.reduce((sum, row) => sum + row.sales, 0)
+  return <section className="sales-share">
+    <h3>{title}</h3>
+    {rows.length === 0 ? <p className="muted">سفارش تحویل‌شده‌ای در این ماه نیست.</p> : <table>
+      <thead><tr><th>{title.replace(/^فروش /u, '')}</th>{extra && <th>{extra.header}</th>}<th>سفارش</th><th>فروش (تومان)</th><th>سهم</th></tr></thead>
+      <tbody>{rows.map((row) => {
+        const share = shareOf(row.sales, total)
+        return <tr key={label(row)}>
+          <td className="text-cell">{label(row)}</td>
+          {extra && <td>{extra.value(row)}</td>}
+          <td>{formatNumber(row.orders)}</td>
+          <td>{formatMoney(row.sales)}</td>
+          <td className="share-cell"><span className="share-bar" style={{ inlineSize: `${share}%` }} /><span>{formatNumber(share, 1)}٪</span></td>
+        </tr>
+      })}</tbody>
+    </table>}
+  </section>
+}
+
+/** What sold, in which window and how it was paid, for the month's delivered orders. */
+export function SalesAnalysis({ analysis }: { analysis: SalesAnalysisDto }) {
+  return <section className="sales-analysis">
+    <div className="table-panel-head"><h2>تحلیل فروش</h2><span>فقط سفارش‌های تحویل‌شده؛ مبالغ پیش از استرداد</span></div>
+    <div className="metric-grid">
+      <article className="metric"><span>سفارش تحویل‌شده</span><strong>{formatNumber(analysis.deliveredOrders)}</strong></article>
+      <article className="metric"><span>میانگین سبد (خالص)</span><strong>{analysis.averageBasket === null ? '—' : formatMoney(analysis.averageBasket)}</strong></article>
+      <article className="metric"><span>میانگین پرس در هر سفارش</span><strong>{analysis.averagePortions === null ? '—' : formatNumber(analysis.averagePortions)}</strong></article>
+      <article className="metric"><span>نرخ لغو</span><strong>{percentText(analysis.cancellationPercent)}</strong>
+        <small>{formatNumber(analysis.cancelledOrders)} لغو از {formatNumber(analysis.cancelledOrders + analysis.deliveredOrders)}</small></article>
+    </div>
+    <ShareTable title="فروش غذا" rows={analysis.dishes} label={(row) => row.foodName}
+      extra={{ header: 'پرس', value: (row) => formatNumber(row.portions) }} />
+    <div className="sales-share-pair">
+      <ShareTable title="فروش بازه ارسال" rows={analysis.slots} label={(row) => row.label} />
+      <ShareTable title="فروش روش پرداخت" rows={analysis.paymentMethods}
+        label={(row) => paymentMethodName[row.paymentMethod] ?? String(row.paymentMethod)} />
+    </div>
+  </section>
+}
+
 /** Browse months, then open one. Nothing has to be created first. */
 export function MonthsPage() {
   const [months, setMonths] = useState<MonthListItemDto[]>([])
@@ -384,6 +441,7 @@ export function MonthsPage() {
       <div className="table-panel-head"><h2>{report?.summary.title ?? persianMonthNames[selected.month - 1]}</h2></div>
       <ListState loading={loading} error={error} isEmpty={false} emptyText="" />
       {report && <MonthMetrics report={report} />}
+      {report && <SalesAnalysis analysis={report.analysis} />}
     </section>
   </PageFrame>
 }

@@ -230,6 +230,19 @@ integration.sequential('monthly business summary', () => {
       .toBe(Math.round((summary.purchases / summary.foodSales) * 1000) / 10)
   })
 
+  it('breaks the delivered orders down by dish, window and payment method, with cancellation rate', async () => {
+    const { analysis } = await getMonthlyReport(year, month)
+    // One delivered order of two portions, one cancelled order.
+    expect(analysis.deliveredOrders).toBe(1)
+    expect(analysis.cancelledOrders).toBe(1)
+    expect(analysis.cancellationPercent).toBe(50)
+    expect(analysis.averageBasket).toBe(1_000_000)
+    expect(analysis.averagePortions).toBe(2)
+    expect(analysis.dishes).toEqual([{ foodName: suffix, portions: 2, orders: 1, sales: 1_000_000 }])
+    expect(analysis.slots).toEqual([{ label: 'بدون بازه ارسال', orders: 1, sales: 1_000_000 }])
+    expect(analysis.paymentMethods).toEqual([{ paymentMethod: PaymentMethod.Cash, orders: 1, sales: 1_000_000 }])
+  })
+
   it('gives the month a row per day, with zeros where nothing happened', async () => {
     const { daily } = await getMonthlyReport(year, month)
     expect(daily).toHaveLength(31)
