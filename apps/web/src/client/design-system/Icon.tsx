@@ -64,11 +64,14 @@ const iconSizes: Record<IconSize, string> = {
 
 type Props = SVGProps<SVGSVGElement> & { name: IconName; size?: IconSize }
 
-export function Icon({ name, size = 'md', ...props }: Props) {
+export function Icon({ name, size = 'md', style, ...props }: Props) {
+  // The size goes through `style`, not the width/height attributes: an SVG attribute does not
+  // resolve `var()` in every browser (Chromium 141 ignores it), and the icon then stretches to fill
+  // its container.
   return (
-    <svg viewBox="0 0 24 24" width={iconSizes[size]} height={iconSizes[size]} fill="none" stroke="currentColor"
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
-      focusable="false" {...props}>
+      focusable="false" {...props} style={{ width: iconSizes[size], height: iconSizes[size], flex: 'none', ...style }}>
       <path d={paths[name]} />
     </svg>
   )
