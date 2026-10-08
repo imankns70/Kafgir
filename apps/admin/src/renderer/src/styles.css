@@ -49,7 +49,7 @@
   .detail-section:last-child{grid-column:1/-1}
 }
 .page-guide{overflow:hidden;padding:0;border-color:#d8c59f;background:linear-gradient(135deg,#fffaf3,#fff3e2)}.page-guide>summary{display:flex;min-height:68px;align-items:center;justify-content:space-between;gap:18px;padding:13px 18px;cursor:pointer;list-style:none}.page-guide>summary::-webkit-details-marker{display:none}.page-guide>summary:focus-visible{outline:3px solid #a7432e55;outline-offset:-3px}.page-guide[open]>summary{border-bottom:1px solid var(--border)}.page-guide-heading{display:grid;gap:3px}.page-guide-heading strong{color:var(--olive);font-size:17px}.page-guide-heading small{color:var(--muted);font-size:13px;font-weight:400}.page-guide-chevron{width:10px;height:10px;flex:0 0 auto;border-inline-end:2px solid var(--olive);border-bottom:2px solid var(--olive);transform:rotate(45deg);transition:transform .16s ease}.page-guide[open] .page-guide-chevron{transform:rotate(225deg)}.page-guide-body{display:grid;grid-template-columns:1.2fr .9fr 1fr;gap:12px;padding:14px}.page-guide-body>section,.page-guide-body>aside{min-width:0;border:1px solid var(--border);border-radius:12px;padding:13px 15px;background:#fffaf3}.page-guide-body h2{margin:0 0 8px;color:#3f4b2d;font-size:15px}.page-guide-body p,.page-guide-body ol,.page-guide-body ul{margin:0;color:#514d45;font-size:13px;line-height:1.9}.page-guide-body ol,.page-guide-body ul{display:grid;gap:4px;padding-inline-start:22px}.page-guide-example{border-inline-start:4px solid var(--primary)!important;background:var(--primary-soft)!important}.page-guide-notes{background:#f1f4e9!important}.grid-empty-state{display:grid;min-height:96px;place-items:center;padding:20px;color:var(--muted);text-align:center}@media(max-width:1200px){.page-guide-body{grid-template-columns:repeat(2,minmax(0,1fr))}.page-guide-body>section:first-child{grid-column:1/-1}}@media(prefers-reduced-motion:reduce){.page-guide-chevron{transition:none}}
-.logs-toolbar label{min-width:170px}.logs-toolbar label:last-of-type{min-width:300px;flex:1}.logs-count{margin-inline-start:auto;color:var(--muted);font-weight:500}.logs-table{max-height:calc(100vh - 210px)}.logs-table table{min-width:1100px}.log-message{max-width:420px;overflow:hidden;text-overflow:ellipsis;text-align:right}.log-info{color:#496a70;background:#e2eef0}.log-warn{color:#8b5e00;background:#fff0c8}.log-error,.log-fatal{color:var(--error);background:#fbe2de}.log-debug,.log-trace{color:var(--muted);background:#eadcc0}
+.logs-toolbar label{min-width:170px}.logs-toolbar label:last-of-type{min-width:300px;flex:1}.logs-count{margin-inline-start:auto;color:var(--muted);font-weight:500}.logs-table{max-height:calc(100vh - 210px)}.logs-table table{min-width:0}.log-message{max-width:420px;overflow:hidden;text-overflow:ellipsis;text-align:right}.log-info{color:#496a70;background:#e2eef0}.log-warn{color:#8b5e00;background:#fff0c8}.log-error,.log-fatal{color:var(--error);background:#fbe2de}.log-debug,.log-trace{color:var(--muted);background:#eadcc0}
 
 /* Grouped admin navigation */
 .admin-shell>aside{padding:16px 14px 14px}
@@ -675,7 +675,12 @@ td.row-number{color:var(--muted);font-size:12px;font-variant-numeric:tabular-num
 .catalog-form>label.switch,.tag-form>label.switch,.catalog-form>button,.tag-form>button{flex:0 0 auto}
 
 /* Review comments vary wildly in length; keep the column readable without stretching the row. */
-.review-comment-cell{max-width:320px;white-space:pre-wrap;overflow-wrap:anywhere}
+/* `anywhere` lets the table shrink the comment to one character per line, since every other column
+   is nowrap; a real minimum keeps a sentence readable and the actions wrap instead. */
+.review-comment-cell{min-width:170px;max-width:360px;white-space:pre-wrap;overflow-wrap:break-word;text-align:right;line-height:1.8}
+.review-table td.actions{white-space:normal;min-width:190px}
+.review-table td.actions>button{margin:3px}
+.review-table td.actions>button+button{margin-inline-start:3px}
 
 /* Dashboard bands: today, then the month. A heading over each so the two never read as one list. */
 .dashboard-band{display:grid;gap:10px;margin-block-end:18px}
@@ -749,11 +754,51 @@ td.row-number{color:var(--muted);font-size:12px;font-variant-numeric:tabular-num
 .month-trend{margin:14px 0 0}
 .month-trend figcaption{display:flex;align-items:center;gap:8px;margin-block-end:8px;color:var(--muted);font-size:12px}
 .month-trend-key{display:inline-block;width:10px;height:10px;border-radius:3px}
-.month-trend-key.sales{background:var(--olive)}
-.month-trend-key.purchases{background:var(--primary)}
-.month-trend-scroll{max-width:100%;overflow-x:auto}
-.month-trend .bar-sales{fill:var(--olive)}
-.month-trend .bar-purchases{fill:var(--primary)}
-.month-trend .bar-label{fill:var(--muted);font-size:9px}
+/* Chart pair validated for colour-vision deficiency against the cream surface; the brand olive and
+   terracotta collapse into one colour for protan readers, so the chart uses its own two steps. */
+.month-trend{--trend-sales:#5a7d2e;--trend-purchases:#c98a1a}
+.month-trend-key.sales{background:var(--trend-sales)}
+.month-trend-key.purchases{background:var(--trend-purchases)}
+.month-trend-plot{position:relative}
+.month-trend-plot svg{display:block;width:100%;height:auto;max-height:260px}
+.month-trend .bar-sales{fill:var(--trend-sales)}
+.month-trend .bar-purchases{fill:var(--trend-purchases)}
+.month-trend .bar-label,.month-trend-grid text{fill:var(--muted);font-size:11px}
+.month-trend-grid line{stroke:#e5d5bb;stroke-width:1;stroke-dasharray:3 4}
+.month-trend-hit{fill:transparent}
+.month-trend g.is-hovered .month-trend-hit{fill:#5d3d2a0d}
+.month-trend-tooltip{position:absolute;top:0;transform:translateX(50%);display:grid;gap:3px;min-width:170px;padding:8px 10px;border:1px solid var(--border);border-radius:10px;background:#fff;box-shadow:0 8px 20px #5d3d2a26;font-size:12px;pointer-events:none;z-index:2}
+.month-trend-tooltip span{display:flex;align-items:center;gap:6px}
+.month-trend-tooltip i{display:inline-block;width:9px;height:9px;border-radius:3px}
 .menu-item-setup{display:grid;grid-template-columns:minmax(300px,1fr) minmax(320px,1fr);gap:16px;align-items:start;max-width:1100px}.menu-item-food{display:grid;gap:10px}.menu-item-food img,.menu-item-no-photo{width:100%;aspect-ratio:4/3;border-radius:12px;object-fit:cover;background:#f8e9d3}.menu-item-no-photo{display:grid;place-items:center;color:var(--muted)}.menu-item-food h2,.menu-item-food p{margin:0}.menu-item-food dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0}.menu-item-food dt{color:var(--muted)}.menu-item-food dd{margin:0}.menu-item-form{align-content:start}.menu-item-form small{color:var(--muted);font-size:12px}
 .payment-order-search{display:flex;align-items:center;gap:8px;margin-inline-start:auto;font-size:13px;font-weight:500}.payment-order-search input{width:170px;min-height:38px;border:1px solid var(--border);border-radius:10px;padding:6px 10px;background:#fff}
+
+/* Table fit. At the 1280px most office screens run, the main column is about 1000px wide; tables
+   wider than that used to run off the panel's left edge with no way to reach the cut columns.
+   Every table now scrolls inside its panel, long text wraps instead of widening its column, and
+   cells and in-table buttons are a little tighter below 1440px. */
+*:has(> table),
+.table-wrap { overflow-x: auto; }
+.table-wrap td.text-cell,
+td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-align: right; line-height: 1.8; }
+.report-table { min-width: 0; }
+.report-table .food-summary { min-width: 180px; }
+.logs-table td:nth-child(6) { white-space: normal; min-width: 150px; max-width: 360px; text-align: right; }
+@media (max-width: 1439px) {
+  th { padding: 10px 8px; }
+  td { padding: 9px 8px; }
+  .table-wrap td.actions > button,
+  td.actions > button { padding: 5px 8px; font-size: 12.5px; }
+}
+
+/* Form fields fill their grid cell. Without this a text input keeps its intrinsic ~20ch width and,
+   in a 150px column, spills under the next field (purchase and payment entry forms). */
+.form-grid > label, .form-grid > .field, .form-grid > .admin-amount-field { min-width: 0; }
+.form-grid input, .form-grid select, .form-grid textarea, .admin-amount-field > input { width: 100%; min-width: 0; }
+.page-header .field, .page-actions .field { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; }
+.page-header .field select, .page-actions .field select { min-height: 40px; min-width: 150px; border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; background: #fff; }
+@media (max-width: 1439px) {
+  .orders-workspace { grid-template-columns: minmax(330px, .52fr) minmax(0, 1fr); }
+}
+.purchase-form { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+.orders-empty-detail{padding-inline:18px;text-align:center}

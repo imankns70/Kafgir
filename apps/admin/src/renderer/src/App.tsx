@@ -694,11 +694,10 @@ function OrdersPage() {
     <Message error={error}>{message || (!error && !busy && orders.length === 0 ? 'سفارشی برای این فیلترها پیدا نشد.' : null)}</Message>
     <div className="orders-workspace">
       <aside className="panel orders-detail-pane">
-        <div className="orders-detail-actions">
-          {selected
-            ? <OrderStatusActions status={selected.status} busy={busy} onChange={(next) => void changeStatus(next)} />
-            : <div className="order-status-actions"><button disabled>تایید</button><button disabled>تحویل</button><button disabled>لغو</button></div>}
-        </div>
+        {/* Actions belong to a chosen order; three disabled buttons over an empty pane read as broken. */}
+        {selected && <div className="orders-detail-actions">
+          <OrderStatusActions status={selected.status} busy={busy} onChange={(next) => void changeStatus(next)} />
+        </div>}
         <h2>جزئیات سفارش</h2>
         {selected
           ? <OrderDetails order={selected} />
@@ -895,7 +894,7 @@ function FoodsPage({ onCreate, onEdit, onPhotos, onTags }: {
         const riceRole = food.isPersianRice
           ? 'ارتقای مخفی برنج ایرانی'
           : food.allowsPersianRice ? 'قابل ارتقا به برنج ایرانی' : '—'
-        return <tr key={food.id}><RowNumberCell offset={pagedFoods.rowOffset} index={index} /><td>{food.name}</td><td>{categories.find((category) => category.id === food.categoryId)?.title}</td><td>{food.description}</td><td><span className={`badge ${hasPhoto ? 'open' : 'closed'}`}>{hasPhoto ? 'دارد' : 'ندارد'}</span></td><td><span className={`badge ${food.isPersianRice || food.allowsPersianRice ? 'open' : 'closed'}`}>{riceRole}</span></td><td><StatusPill active={food.isActive} /></td><td className="actions"><button onClick={() => onEdit(food.id)}>ویرایش</button><button onClick={() => onTags(food.id)}>تگ‌ها</button><button onClick={() => onPhotos(food.id)}>عکس‌ها</button></td></tr>
+        return <tr key={food.id}><RowNumberCell offset={pagedFoods.rowOffset} index={index} /><td>{food.name}</td><td>{categories.find((category) => category.id === food.categoryId)?.title}</td><td className="text-cell">{food.description}</td><td><span className={`badge ${hasPhoto ? 'open' : 'closed'}`}>{hasPhoto ? 'دارد' : 'ندارد'}</span></td><td><span className={`badge ${food.isPersianRice || food.allowsPersianRice ? 'open' : 'closed'}`}>{riceRole}</span></td><td><StatusPill active={food.isActive} /></td><td className="actions"><button onClick={() => onEdit(food.id)}>ویرایش</button><button onClick={() => onTags(food.id)}>تگ‌ها</button><button onClick={() => onPhotos(food.id)}>عکس‌ها</button></td></tr>
       })}</tbody></table>
       {pagedFoods.totalItems === 0 && <div className="grid-empty-state">{
         pagedFoods.loading ? 'در حال بارگذاری…'
@@ -1913,7 +1912,7 @@ function ReportPage() {
   </PageFrame>
 }
 
-function ReportOrderTable({ orders, onOpen, rowOffset }: {
+export function ReportOrderTable({ orders, onOpen, rowOffset }: {
   orders: OrderSummaryDto[]
   onOpen: (id: number) => void
   rowOffset: number
@@ -1928,6 +1927,7 @@ function ReportOrderTable({ orders, onOpen, rowOffset }: {
     <td dir="ltr">{order.customerPhoneNumber}</td>
     <td><Status value={order.status} /></td>
     <td>{deliveryMethodLabel[order.deliveryMethod]}</td>
+    <td>{deliveryWindowLabel(order)}</td>
     <td>{paymentMethodLabel[order.paymentMethod]}</td>
     <td className="food-summary">{order.foodSummary || '—'}</td>
     <td>{plainNumber(order.totalQuantity)}</td>

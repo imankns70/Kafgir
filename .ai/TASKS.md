@@ -1,5 +1,46 @@
 # Tasks
 
+## 2026-10-08 Admin (Electron) review follow-up
+
+UI defects
+- [ ] A1 Order report rows are missing the «زمان تحویل» cell, so every later column is shifted.
+- [ ] A2 Order-review table squeezes the comment to one character per line; actions overflow.
+- [ ] A3 Wide tables (orders, customers, today's menu) are clipped on the left at 1280px.
+- [ ] A4 Purchase and payment entry forms overlap fields; native month select is unstyled.
+- [ ] A5 Order action buttons show before any order is selected.
+- [ ] A6 Dashboard chart has no value axis and runs left-to-right.
+- [ ] A7 Dashboard does not surface urgent work (orders awaiting confirmation, dishes near sell-out).
+
+Money and order correctness
+- [ ] B1 Cancelling a paid order leaves its payment «Paid» with no refund prompt.
+- [ ] B2 Order grid, dashboard and kitchen views go by creation date instead of delivery date.
+- [ ] B3 Refunded payments still count as sales; refunds are always full and carry no reason.
+- [ ] B4 No list of delivered-but-unpaid orders and no daily payment reconciliation by method.
+- [ ] B5 Pending orders do not reserve capacity and the operator cannot see that demand.
+- [ ] B6 Order status changes do not record the operator; the audit log has no admin view.
+- [ ] B7 Kitchen role can delete purchases.
+
+Operations features
+- [ ] C1 Kitchen production sheet and packing list per delivery date (printable).
+- [ ] C2 Sound and desktop notification for new orders.
+- [ ] C3 CSV export for orders, payments, customers and purchases.
+- [ ] C4 Sales report by dish, average basket, cancellation rate, by delivery slot and payment method.
+- [ ] C5 Edit an order's items and address before it is prepared; Owner can revert a wrong final status.
+- [ ] C6 Customer notes, tags and blocking.
+- [ ] C7 Discount codes (coupons).
+- [ ] C8 SMS order-status notifications for customers without Telegram.
+- [ ] C9 Staff user and role management.
+- [ ] C10 More than one courier per day, and cash a courier collects from customers.
+
+Smaller improvements
+- [ ] D1 Estimated cost per portion and margin per dish.
+- [ ] D2 Record leftover portions per day.
+- [ ] D3 Database backup export from Admin.
+- [ ] D4 Auto-cancel pending orders nobody confirmed in time.
+- [ ] D5 Kitchen ticket and bag-label printing.
+- [ ] D6 Delivery-fee margin (customer charge vs courier pay) in reports.
+- [ ] D7 Review what server logs expose to the kitchen role.
+
 ## 2026-10-07 Development startup
 
 - [x] Make the combined `npm run dev` command reliably load the Electron renderer on Windows.

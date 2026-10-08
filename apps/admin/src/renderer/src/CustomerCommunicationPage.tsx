@@ -181,7 +181,7 @@ export function CustomerCommunicationPage() {
       </div>
     </AdminControls>
     <section className="panel table-wrap">
-      <table><thead><tr>
+      <table className="review-table"><thead><tr>
         <RowNumberHead /><th>سفارش</th><th>مشتری</th><th>امتیاز</th><th>نظر</th>
         <th>زمان ثبت</th><th>وضعیت رسیدگی</th><th>عملیات</th>
       </tr></thead>

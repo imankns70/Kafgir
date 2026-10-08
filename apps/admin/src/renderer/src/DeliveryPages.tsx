@@ -231,7 +231,7 @@ export function DeliveryDaysPage() {
               {pagedDay.visible.map((slot, index) => <tr key={slot.slotId}><RowNumberCell offset={pagedDay.rowOffset} index={index} />
                 <td>{slot.title}</td>
                 <td dir="ltr">{window_(slot.startTime, slot.endTime)}</td>
-                <td>
+                <td className="text-cell">
                   {slot.isAvailable ? 'فعال' : 'غیرفعال'}
                   {!slot.isActiveGlobally && <small className="muted"> (در تنظیمات پایه غیرفعال است)</small>}
                   {!slot.hasOverride && <small className="muted"> — پیش‌فرض</small>}

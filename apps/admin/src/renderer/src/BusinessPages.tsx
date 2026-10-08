@@ -232,41 +232,79 @@ export function PurchasesPage() {
   </PageFrame>
 }
 
+/** «۱٫۲ میلیون»-style tick labels; full amounts live in the hover tooltip. */
+export function compactToman(value: number): string {
+  if (value >= 1_000_000) return `${formatNumber(Math.round(value / 100_000) / 10)} میلیون`
+  if (value >= 1_000) return `${formatNumber(Math.round(value / 1_000))} هزار`
+  return formatNumber(value)
+}
+
+function niceCeiling(value: number): number {
+  if (value <= 0) return 1
+  const magnitude = 10 ** Math.floor(Math.log10(value))
+  const step = [1, 2, 2.5, 5, 10].find((candidate) => candidate * magnitude >= value) ?? 10
+  return step * magnitude
+}
+
 /**
- * Sales against purchases, drawn as two bars per day.
- *
- * Plain SVG rather than a charting dependency: the shape of the month is the whole message, and a
- * library would add weight without adding meaning at this size.
+ * Sales against purchases, two thin bars per day, read right to left like the rest of the page:
+ * day 1 sits at the right edge. A value axis with three gridlines gives the bars a scale, and
+ * hovering a day shows both amounts. Plain SVG; the month's shape is the whole message.
  */
 export function MonthTrend({ daily }: { daily: MonthlyDailyPointDto[] }) {
-  const peak = useMemo(
-    () => Math.max(1, ...daily.map((point) => Math.max(point.foodSales, point.purchases))),
+  const [hovered, setHovered] = useState<number | null>(null)
+  const top = useMemo(
+    () => niceCeiling(Math.max(1, ...daily.map((point) => Math.max(point.foodSales, point.purchases)))),
     [daily],
   )
   if (daily.length === 0) return null
-  const width = daily.length * 18
+  const width = 900
+  const height = 220
+  const axis = 78
+  const plotTop = 10
+  const plotBottom = 190
+  const plotHeight = plotBottom - plotTop
+  const slot = (width - axis) / daily.length
+  const bar = Math.max(3, Math.min(9, slot / 2 - 2))
+  const xOf = (index: number) => width - axis - (index + 1) * slot
+  const yOf = (value: number) => plotBottom - (value / top) * plotHeight
+  const ticks = [0, top / 2, top]
+  const point = hovered == null ? null : daily[hovered]
   return <figure className="month-trend">
     <figcaption>
       <span className="month-trend-key sales" /> فروش غذا
       <span className="month-trend-key purchases" /> خرید
     </figcaption>
-    <div className="month-trend-scroll">
-      <svg viewBox={`0 0 ${width} 120`} role="img" width={width} height={120}
+    <div className="month-trend-plot" onMouseLeave={() => setHovered(null)}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img"
         aria-label="نمودار روزانه فروش و خرید این ماه">
-        {daily.map((point, index) => {
-          const x = index * 18
-          const salesHeight = Math.round((point.foodSales / peak) * 96)
-          const purchaseHeight = Math.round((point.purchases / peak) * 96)
-          return <g key={point.date}>
-            <title>{`روز ${point.dayOfMonth} — فروش ${formatMoney(point.foodSales)}، خرید ${formatMoney(point.purchases)}`}</title>
-            <rect x={x + 2} y={100 - salesHeight} width={6} height={salesHeight} className="bar-sales" />
-            <rect x={x + 9} y={100 - purchaseHeight} width={6} height={purchaseHeight} className="bar-purchases" />
-            {point.dayOfMonth % 5 === 0 && <text x={x + 8} y={114} textAnchor="middle" className="bar-label">
-              {point.dayOfMonth}
+        {ticks.map((tick) => <g key={tick} className="month-trend-grid">
+          <line x1={0} x2={width - axis} y1={yOf(tick)} y2={yOf(tick)} />
+          <text x={width - axis + 8} y={yOf(tick) + 4}>{compactToman(tick)}</text>
+        </g>)}
+        {daily.map((day, index) => {
+          const x = xOf(index)
+          const sales = Math.max(day.foodSales > 0 ? 2 : 0, plotBottom - yOf(day.foodSales))
+          const purchases = Math.max(day.purchases > 0 ? 2 : 0, plotBottom - yOf(day.purchases))
+          const centre = x + slot / 2
+          return <g key={day.date} className={hovered === index ? 'is-hovered' : undefined}>
+            <rect className="month-trend-hit" x={x} y={plotTop} width={slot} height={plotHeight + 24}
+              onMouseEnter={() => setHovered(index)} />
+            {/* Sales on the right of each pair, the side the day starts reading from. */}
+            <rect className="bar-sales" x={centre + 1} y={plotBottom - sales} width={bar} height={sales} rx={2} />
+            <rect className="bar-purchases" x={centre - 1 - bar} y={plotBottom - purchases} width={bar} height={purchases} rx={2} />
+            {(day.dayOfMonth === 1 || day.dayOfMonth % 5 === 0) && <text x={centre} y={height - 10} textAnchor="middle" className="bar-label">
+              {formatNumber(day.dayOfMonth)}
             </text>}
           </g>
         })}
       </svg>
+      {point && hovered != null && <div className="month-trend-tooltip" role="status"
+        style={{ right: `${((axis + (hovered + 0.5) * slot) / width) * 100}%` }}>
+        <strong>روز {formatNumber(point.dayOfMonth)}</strong>
+        <span><i className="month-trend-key sales" /> فروش {formatMoney(point.foodSales)}</span>
+        <span><i className="month-trend-key purchases" /> خرید {formatMoney(point.purchases)}</span>
+      </div>}
     </div>
   </figure>
 }
