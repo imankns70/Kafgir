@@ -49,6 +49,10 @@ export const customerDirectoryQuerySchema = z.object({
   minSpent: z.number().min(0).nullable().optional(),
   /** Matched against saved addresses and the city recorded on past orders. */
   city: z.string().trim().max(100).nullable().optional(),
+  /** One of the business's own customer tags, matched exactly. */
+  tag: z.string().trim().max(30).nullable().optional(),
+  /** Only customers who are blocked from ordering in the customer app. */
+  blockedOnly: z.boolean().default(false),
   sort: customerSortSchema.default('lastOrder'),
   page: z.number().int().min(1).default(1),
   // Upper bound matches the largest option the admin pager offers.
@@ -67,6 +71,8 @@ export const customerDirectoryRowSchema = z.object({
   lastOrderAt: z.string().nullable(),
   hasActiveOrder: z.boolean(),
   city: z.string().nullable(),
+  tags: z.array(z.string()).default([]),
+  isBlocked: z.boolean().default(false),
 })
 
 export const customerDirectoryPageSchema = z.object({
@@ -116,6 +122,11 @@ export const customerDetailSchema = z.object({
   channel: customerChannelSchema,
   telegramUsername: z.string().nullable(),
   joinedAt: z.string(),
+  /** The business's private note and tags; never shown to the customer. */
+  adminNote: z.string().nullable().default(null),
+  tags: z.array(z.string()).default([]),
+  blockedAt: z.string().nullable().default(null),
+  blockedReason: z.string().nullable().default(null),
   /** Lifetime figures, not bounded by any range. */
   totals: z.object({
     orderCount: z.number().int().nonnegative(),
@@ -145,3 +156,17 @@ export type CustomerHistoryOrderDto = z.infer<typeof customerHistoryOrderSchema>
 export type CustomerHistoryReviewDto = z.infer<typeof customerHistoryReviewSchema>
 export type CustomerHistoryAddressDto = z.infer<typeof customerHistoryAddressSchema>
 export type CustomerDetailDto = z.infer<typeof customerDetailSchema>
+
+const customerTag = z.string().trim().min(1).max(30).regex(/^[^,،]+$/u, 'برچسب نباید ویرگول داشته باشد.')
+
+/** What an operator may change about a customer: the note, the tags and whether they may order. */
+export const customerCrmWriteSchema = z.object({
+  adminNote: z.string().trim().max(2000).nullable(),
+  tags: z.array(customerTag).max(12).transform((tags) => [...new Set(tags)]),
+  blocked: z.boolean(),
+  blockedReason: z.string().trim().max(500).nullable().optional(),
+}).refine((value) => !value.blocked || Boolean(value.blockedReason?.trim()), {
+  message: 'برای مسدود کردن، دلیل را بنویسید.', path: ['blockedReason'],
+})
+
+export type CustomerCrmWriteRequest = z.infer<typeof customerCrmWriteSchema>

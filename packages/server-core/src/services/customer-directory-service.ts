@@ -1,5 +1,6 @@
 import {
   OrderStatus,
+  type CustomerCrmWriteRequest,
   type CustomerDetailDto,
   type CustomerDirectoryPageDto,
   type CustomerDirectoryQuery,
@@ -10,6 +11,7 @@ import {
 } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
 import { NotFoundError } from '../errors'
+import { logger } from '../logging/logger'
 import { averageOrderValue } from '../domain/customer-report-rules'
 import {
   customerSearchTerms,
@@ -70,6 +72,8 @@ export async function searchCustomers(query: CustomerDirectoryQuery): Promise<Cu
   const city = query.city?.trim() || null
   const minOrders = query.minOrders ?? null
   const minSpent = query.minSpent ?? null
+  const tag = query.tag?.trim() || null
+  const blockedOnly = query.blockedOnly ?? false
   const offset = (query.page - 1) * query.pageSize
 
   // The sort fragment is looked up from a whitelist, never interpolated from caller text.
@@ -101,12 +105,16 @@ export async function searchCustomers(query: CustomerDirectoryQuery): Promise<Cu
                SELECT a.city FROM customer_addresses a
                WHERE a.customer_profile_id = p.id AND a.is_active = true
                ORDER BY a.is_default DESC, a.last_used_at DESC NULLS LAST, a.id LIMIT 1
-             )) AS city
+             )) AS city,
+             p.tags,
+             (p.blocked_at IS NOT NULL) AS "isBlocked"
       FROM customer_profiles p
       JOIN users u ON u.id = p.user_id
       LEFT JOIN telegram_accounts t ON t.user_id = p.user_id
       LEFT JOIN customer_orders co ON co.profile_id = p.id
-      WHERE (${name}::text IS NULL OR p.preferred_name ILIKE '%' || ${name} || '%')
+      WHERE (${tag}::text IS NULL OR p.tags @> ARRAY[${tag}::text])
+        AND (NOT ${blockedOnly}::boolean OR p.blocked_at IS NOT NULL)
+        AND (${name}::text IS NULL OR p.preferred_name ILIKE '%' || ${name} || '%')
         AND (${firstName}::text IS NULL OR
              ${sqlClient.unsafe(foldName(givenPart))} LIKE '%' || ${firstName} || '%' OR
              ${sqlClient.unsafe(foldName('COALESCE(u.telegram_first_name, \'\')'))}
@@ -166,6 +174,8 @@ export async function searchCustomers(query: CustomerDirectoryQuery): Promise<Cu
       lastOrderAt: nullableIso(row.lastOrderAt),
       hasActiveOrder: row.hasActiveOrder,
       city: row.city,
+      tags: row.tags ?? [],
+      isBlocked: row.isBlocked,
     })),
     page: query.page,
     pageSize: query.pageSize,
@@ -186,6 +196,10 @@ export async function getCustomerDetail(customerProfileId: number): Promise<Cust
     channel: 'telegram' | 'phone'
     telegramUsername: string | null
     joinedAt: DbDate
+    adminNote: string | null
+    tags: string[]
+    blockedAt: DbDate | null
+    blockedReason: string | null
     orderCount: number
     deliveredCount: number
     cancelledCount: number
@@ -204,6 +218,7 @@ export async function getCustomerDetail(customerProfileId: number): Promise<Cust
              CASE WHEN t.user_id IS NULL THEN 'phone' ELSE 'telegram' END AS channel,
              t.username AS "telegramUsername",
              p.created_at AS "joinedAt",
+             p.admin_note AS "adminNote", p.tags, p.blocked_at AS "blockedAt", p.blocked_reason AS "blockedReason",
              (SELECT COUNT(*)::int FROM orders o
                WHERE o.customer_profile_id = p.id AND o.status <> ${OrderStatus.Cancelled}) AS "orderCount",
              (SELECT COUNT(*)::int FROM orders o
@@ -273,6 +288,10 @@ export async function getCustomerDetail(customerProfileId: number): Promise<Cust
     channel: profile.channel,
     telegramUsername: profile.telegramUsername,
     joinedAt: iso(profile.joinedAt),
+    adminNote: profile.adminNote,
+    tags: profile.tags ?? [],
+    blockedAt: nullableIso(profile.blockedAt),
+    blockedReason: profile.blockedReason,
     orderLimit: orderHistoryLimit,
     totals: {
       orderCount: profile.orderCount,
@@ -290,4 +309,40 @@ export async function getCustomerDetail(customerProfileId: number): Promise<Cust
     orders: orderRows.map((row) => ({ ...row, createdAt: iso(row.createdAt) })),
     reviews: reviewRows.map((row) => ({ ...row, createdAt: iso(row.createdAt) })),
   }
+}
+
+/**
+ * The operator's own record of a customer. Blocking keeps the first block time, so unblocking and
+ * re-blocking is visible in the audit log rather than silently moving the date.
+ */
+export async function updateCustomerCrm(customerProfileId: number, input: CustomerCrmWriteRequest, userId: number): Promise<CustomerDetailDto> {
+  await sqlClient.begin(async (tx) => {
+    const before = await tx<{ blocked: boolean }[]>`
+      SELECT blocked_at IS NOT NULL AS blocked FROM customer_profiles WHERE id = ${customerProfileId} FOR UPDATE`
+    if (!before[0]) throw new NotFoundError('مشتری پیدا نشد.')
+    await tx`
+      UPDATE customer_profiles SET
+        admin_note = ${input.adminNote?.trim() || null},
+        tags = ${sqlClient.array(input.tags)}::text[],
+        blocked_at = CASE WHEN ${input.blocked} THEN COALESCE(blocked_at, NOW()) ELSE NULL END,
+        blocked_reason = CASE WHEN ${input.blocked} THEN ${input.blockedReason?.trim() || null} ELSE NULL END
+      WHERE id = ${customerProfileId}
+    `
+    const action = before[0].blocked === input.blocked ? 'customer.update' : input.blocked ? 'customer.block' : 'customer.unblock'
+    const details = action === 'customer.block' ? `دلیل: ${input.blockedReason?.trim()}` : input.tags.length ? `برچسب‌ها: ${input.tags.join('، ')}` : null
+    await tx`
+      INSERT INTO audit_logs (action, entity_type, entity_id, user_id, details, created_at)
+      VALUES (${action}, 'customer', ${customerProfileId}, ${userId}, ${details}, NOW())
+    `
+    logger.info({ event: action, entityType: 'customer', entityId: customerProfileId, userId }, 'مشتری به‌روزرسانی شد')
+  })
+  return getCustomerDetail(customerProfileId)
+}
+
+/** Every tag in use, most used first, for the filter and the tag picker. */
+export async function listCustomerTags(): Promise<string[]> {
+  const rows = await sqlClient<{ tag: string }[]>`
+    SELECT tag FROM customer_profiles, unnest(tags) AS tag
+    GROUP BY tag ORDER BY COUNT(*) DESC, tag LIMIT 200`
+  return rows.map((row) => row.tag)
 }

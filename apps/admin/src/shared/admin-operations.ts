@@ -83,6 +83,8 @@ export const adminOperations = [
   'reports.customers',
   'customers.search',
   'customers.detail',
+  'customers.update',
+  'customers.tags',
   'logs.server',
   'social.dashboard',
   'social.channels.list',

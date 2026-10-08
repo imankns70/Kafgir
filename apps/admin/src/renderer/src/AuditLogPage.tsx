@@ -12,6 +12,9 @@ import { formatPersianDateTime } from './number-format'
 const actionLabel: Record<string, string> = {
   'order.status': 'تغییر وضعیت سفارش',
   'order.edit': 'ویرایش سفارش',
+  'customer.update': 'ویرایش یادداشت/برچسب مشتری',
+  'customer.block': 'مسدود کردن مشتری',
+  'customer.unblock': 'رفع مسدودی مشتری',
   'payment.create': 'ثبت پرداخت',
   'payment.status': 'تغییر وضعیت پرداخت',
   'payment.refund': 'استرداد',
@@ -20,7 +23,7 @@ const actionLabel: Record<string, string> = {
   'purchase.delete': 'حذف خرید',
 }
 
-const entityLabel: Record<string, string> = { order: 'سفارش', payment: 'پرداخت', purchase: 'خرید' }
+const entityLabel: Record<string, string> = { order: 'سفارش', payment: 'پرداخت', purchase: 'خرید', customer: 'مشتری' }
 
 const orderStatusLabel: Record<number, string> = {
   [OrderStatus.PendingConfirmation]: 'در انتظار تأیید',

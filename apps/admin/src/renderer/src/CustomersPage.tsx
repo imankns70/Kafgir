@@ -10,6 +10,7 @@ import {
   isInvalidMoneyText, parseMoney,
 } from './number-format'
 import { downloadCsv, fetchAllPages, toCsv } from './csv-export'
+import { CustomerCrmPanel } from './CustomerCrmPanel'
 
 /**
  * Look up a customer and read their history.
@@ -48,7 +49,7 @@ const sortLabel: Record<CustomerDirectoryQuery['sort'], string> = {
 
 const emptyQuery: CustomerDirectoryQuery = {
   search: null, firstName: null, lastName: null, channel: null, joinedFrom: null, joinedTo: null,
-  activity: 'all', lapsedDays: 60, minOrders: null, minSpent: null, city: null,
+  activity: 'all', lapsedDays: 60, minOrders: null, minSpent: null, city: null, tag: null, blockedOnly: false,
   sort: 'lastOrder', page: 1, pageSize: defaultPageSize,
 }
 
@@ -82,6 +83,9 @@ export function CustomersPage() {
   }, [])
 
   useEffect(() => { void searchAction.run(() => load(emptyQuery)) }, [])
+  const [knownTags, setKnownTags] = useState<string[]>([])
+  const loadTags = () => { void adminApi.customerTags().then(setKnownTags).catch(() => undefined) }
+  useEffect(loadTags, [])
 
   const runSearch = (next: CustomerDirectoryQuery) => {
     setQuery(next)
@@ -133,6 +137,8 @@ export function CustomersPage() {
         { header: 'سفارش لغوشده', value: (row) => row.cancelledCount },
         { header: 'مجموع خرید (تومان)', value: (row) => row.totalSpent },
         { header: 'آخرین سفارش', value: (row) => row.lastOrderAt ? formatPersianDateTime(row.lastOrderAt) : '' },
+        { header: 'برچسب‌ها', value: (row) => row.tags.join('، ') },
+        { header: 'مسدود', value: (row) => row.isBlocked ? 'بله' : '' },
       ]))
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -163,6 +169,16 @@ export function CustomersPage() {
             {Object.entries(activityLabel).map(([value, label]) =>
               <option key={value} value={value}>{label}</option>)}
           </select>
+        </label>
+        {knownTags.length > 0 && <label>برچسب
+          <select value={query.tag ?? ''} onChange={(event) => patch({ tag: event.target.value || null })}>
+            <option value="">همه</option>
+            {knownTags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
+          </select>
+        </label>}
+        <label className="switch customer-blocked-filter">
+          <input type="checkbox" checked={query.blockedOnly} onChange={(event) => patch({ blockedOnly: event.target.checked })} />
+          فقط مسدودها
         </label>
         <label>مرتب‌سازی
           <select value={query.sort}
@@ -234,7 +250,11 @@ export function CustomersPage() {
             <tbody>{page.items.map((row, index) => <tr key={row.customerProfileId}
               className={selected?.customerProfileId === row.customerProfileId ? 'selected-row' : ''}>
               <RowNumberCell offset={rowOffsetOf(page.page, page.pageSize)} index={index} />
-              <td>{row.preferredName}{row.hasActiveOrder && <span className="badge open">سفارش فعال</span>}</td>
+              <td className="customer-name-cell">{row.preferredName}
+                {row.isBlocked && <span className="badge closed">مسدود</span>}
+                {row.hasActiveOrder && <span className="badge open">سفارش فعال</span>}
+                {row.tags.slice(0, 3).map((tag) => <span className="customer-tag small" key={tag}>{tag}</span>)}
+              </td>
               <td><bdi dir="ltr">{row.phoneNumber || '—'}</bdi></td>
               <td>{row.channel === 'telegram' ? 'تلگرام' : 'موبایل'}</td>
               <td>{row.city ?? '—'}</td>
@@ -289,6 +309,17 @@ export function CustomersPage() {
               {totals.supportConversationCount > 0 &&
                 <> · {formatNumber(totals.supportConversationCount)} گفتگوی پشتیبانی</>}
             </p>
+
+            <CustomerCrmPanel key={selected.customerProfileId} customer={selected} knownTags={knownTags}
+              onSaved={(updated) => {
+                setSelected(updated)
+                loadTags()
+                setPage((current) => current && {
+                  ...current,
+                  items: current.items.map((row) => row.customerProfileId === updated.customerProfileId
+                    ? { ...row, tags: updated.tags, isBlocked: Boolean(updated.blockedAt) } : row),
+                })
+              }} />
 
             <section className="customer-detail-section">
               <h3>آدرس‌ها</h3>

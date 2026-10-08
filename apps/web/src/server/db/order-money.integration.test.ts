@@ -6,6 +6,9 @@ import {
   createOrder,
   createPayment,
   editOrder,
+  getCustomerDetail,
+  searchCustomers,
+  updateCustomerCrm,
   reopenOrder,
   getAdminOrderDetail,
   getMonthlyReport,
@@ -266,5 +269,41 @@ integration.sequential('order money integrity', () => {
     await refundPayment(payment, { amount: 400_000, reason: 'لغو' }, adminUserId)
     await expect(reopenOrder(refunded.id, { reason: 'برگشت' }, adminUserId)).rejects.toThrow(/مسترد/u)
     await expect(reopenOrder(delivered.id, { reason: 'دوباره' }, adminUserId)).rejects.toThrow()
+  })
+
+  it('keeps a private note and tags on a customer, and a block stops only customer-app orders', async () => {
+    const order = await placeOrder(1)
+    const { profileId, userId } = (await sql<{ profileId: number; userId: number }[]>`
+      SELECT p.id AS "profileId", p.user_id AS "userId" FROM orders o
+      JOIN customer_profiles p ON p.id = o.customer_profile_id WHERE o.id = ${order.id}`)[0]!
+    const tag = `آزمون-${suffix.slice(0, 8)}`
+    const updated = await updateCustomerCrm(profileId, {
+      adminNote: 'زنگ خراب است', tags: [tag, 'وفادار'], blocked: true, blockedReason: 'سفارش‌های پرداخت‌نشده',
+    }, adminUserId)
+    expect(updated.adminNote).toBe('زنگ خراب است')
+    expect(updated.tags).toEqual([tag, 'وفادار'])
+    expect(updated.blockedAt).not.toBeNull()
+
+    const found = await searchCustomers({ tag, blockedOnly: true, activity: 'all', lapsedDays: 60, sort: 'lastOrder', page: 1, pageSize: 10 })
+    expect(found.items.map((row) => row.customerProfileId)).toEqual([profileId])
+    expect(found.items[0]!.isBlocked).toBe(true)
+
+    const request = {
+      fullName: `مشتری ${suffix}`, phoneNumber: '09000000088', city: 'x', addressLine: 'x', saveAddress: false,
+      paymentMethod: PaymentMethod.Cash, deliveryMethod: DeliveryMethod.Pickup, customerNote: null,
+      deliveryTimeSlotId: null, items: [{ dailyMenuItemId: menuItemId, withPersianRice: false, quantity: 1 }],
+    } as never
+    await expect(createOrder(request, anonymous, false, userId)).rejects.toThrow(/پشتیبانی/u)
+    // Staff can still take the order by hand.
+    const manual = await placeOrder(1)
+    expect(manual.id).toBeGreaterThan(0)
+
+    await updateCustomerCrm(profileId, { adminNote: null, tags: [], blocked: false }, adminUserId)
+    const cleared = await getCustomerDetail(profileId)
+    expect(cleared.blockedAt).toBeNull()
+    expect(cleared.tags).toEqual([])
+    const log = await listAuditLogs({ page: 1, pageSize: 50, entityType: 'customer' } as never)
+    expect(log.items.filter((entry) => entry.entityId === profileId).map((entry) => entry.action))
+      .toEqual(expect.arrayContaining(['customer.block', 'customer.unblock']))
   })
 })

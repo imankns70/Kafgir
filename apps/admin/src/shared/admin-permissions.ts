@@ -44,7 +44,7 @@ const orderOperations = new Set<AdminOperation>([
   'support.conversations.setClosed', 'support.reviews.list', 'support.reviews.setStatus', 'support.reviews.reply',
   'payments.list', 'payments.totals', 'payments.create', 'payments.changeStatus',
   'payments.unpaid', 'payments.reconciliation',
-  'logs.server', 'reports.customers', 'customers.search', 'customers.detail',
+  'logs.server', 'reports.customers', 'customers.search', 'customers.detail', 'customers.update', 'customers.tags',
   'purchases.month', 'months.list', 'months.get',
   'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',
   // Order managers run dispatch, so they assign each day's courier and read the resulting work and

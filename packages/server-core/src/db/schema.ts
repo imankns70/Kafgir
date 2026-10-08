@@ -129,8 +129,15 @@ export const customerProfiles = pgTable('customer_profiles', {
   defaultPhoneNumber: varchar('default_phone_number', { length: 30 }).notNull(),
   createdAt: utcTimestamp('created_at').notNull(),
   lastOrderAt: utcTimestamp('last_order_at'),
+  /** Private to the business; never sent to the customer. */
+  adminNote: varchar('admin_note', { length: 2000 }),
+  tags: text('tags').array().notNull().default(sql`'{}'::text[]`),
+  /** Set while the customer may not order from the customer app. Manual orders stay possible. */
+  blockedAt: utcTimestamp('blocked_at'),
+  blockedReason: varchar('blocked_reason', { length: 500 }),
 }, (table) => [
   uniqueIndex('customer_profiles_user_id_uidx').on(table.userId),
+  index('customer_profiles_tags_idx').using('gin', table.tags),
 ])
 
 export const customerLoginPhones = pgTable('customer_login_phones', {

@@ -31,6 +31,7 @@ import {
   supportSubjectWriteSchema,
   customerReportQuerySchema,
   customerDirectoryQuerySchema,
+  customerCrmWriteSchema,
   paymentMethodSettingWriteSchema,
   deliveryMethodSettingWriteSchema,
   PaymentMethod,
@@ -69,6 +70,8 @@ import {
   getCustomerReport,
   searchCustomers,
   getCustomerDetail,
+  updateCustomerCrm,
+  listCustomerTags,
   refundPayment,
   listUnpaidOrders,
   paymentReconciliation,
@@ -354,6 +357,9 @@ export async function dispatchAdminOperation(
       })
     case 'customers.search': return searchCustomers(customerDirectoryQuerySchema.parse(body.value))
     case 'customers.detail': return getCustomerDetail(numberField(body, 'id'))
+    case 'customers.update':
+      return updateCustomerCrm(numberField(body, 'id'), customerCrmWriteSchema.parse(body.value), principal.userId)
+    case 'customers.tags': return listCustomerTags()
     case 'reports.customers': {
       const query = customerReportQuerySchema.parse(body.value)
       return getCustomerReport(query.from, query.to)

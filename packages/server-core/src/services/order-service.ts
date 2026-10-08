@@ -262,6 +262,14 @@ export async function createOrder(
       throw new AppError('برای ارسال فوری بازه زمانی انتخاب نمی‌شود.')
     }
     const customer = await resolveCustomer(tx, identity, fullName, phoneNumber, now, authenticatedUserId)
+    if (!allowMissingTelegramIdentity) {
+      // A blocked customer is stopped at the customer app only; staff can still take their order.
+      const blocked = await tx<{ value: boolean }[]>`
+        SELECT blocked_at IS NOT NULL AS value FROM customer_profiles WHERE id = ${customer.profileId}`
+      if (blocked[0]?.value) {
+        throw new AppError('ثبت سفارش برای این حساب فعلاً ممکن نیست. لطفاً با پشتیبانی کفگیر تماس بگیرید.')
+      }
+    }
     let customerAddressId = request.customerAddressId ?? null
     let city = optionalText(request.city) ?? defaultCity
     let addressLine = optionalText(request.addressLine) ?? ''

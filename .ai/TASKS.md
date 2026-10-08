@@ -26,7 +26,7 @@ Operations features
 - [x] C3 CSV export for orders, payments, customers and purchases.
 - [x] C4 Sales report by dish, average basket, cancellation rate, by delivery slot and payment method.
 - [x] C5 Edit an order's items and address before it is prepared; Owner can revert a wrong final status.
-- [ ] C6 Customer notes, tags and blocking.
+- [x] C6 Customer notes, tags and blocking.
 - [ ] C7 Discount codes (coupons).
 - [ ] C8 SMS order-status notifications for customers without Telegram.
 - [ ] C9 Staff user and role management.
@@ -39,7 +39,7 @@ Smaller improvements
 - [ ] D4 Auto-cancel pending orders nobody confirmed in time.
 - [x] D5 Kitchen ticket and bag-label printing.
 - [x] D6 Delivery-fee margin (customer charge vs courier pay) in reports.
-- [ ] Apply `0026_order_money_integrity.sql` to Neon and any other deployed database before releasing.
+- [ ] Apply migrations `0026_order_money_integrity.sql` and `0027_customer_notes_tags_blocking.sql` to Neon and any other deployed database before releasing.
 - [ ] D7 Review what server logs expose to the kitchen role.
 
 ## 2026-10-07 Development startup

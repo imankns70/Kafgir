@@ -893,3 +893,24 @@ td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-ali
 .order-reopen-reason textarea{border:1px solid var(--border);border-radius:10px;padding:8px 11px;background:#fff}
 .order-edit-actions{display:flex;gap:8px;justify-content:flex-start}
 .orders-detail-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+/* Customer note, tags and blocking. */
+.customer-crm{display:grid;gap:10px}
+.customer-crm label{display:grid;gap:5px;font-size:13px;font-weight:500}
+.customer-crm textarea,.customer-crm input:not([type=checkbox]){border:1px solid var(--border);border-radius:10px;padding:8px 11px;background:#fff}
+.customer-crm.is-blocked{border-inline-start:3px solid var(--error);padding-inline-start:10px}
+.customer-blocked-note{margin:0;padding:8px 10px;border-radius:10px;color:var(--error);background:#fbe2de;font-size:13px}
+.customer-tag-editor{display:grid;gap:6px}.customer-tag-label{font-size:13px;font-weight:500}
+.customer-tags{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-height:42px;border:1px solid var(--border);border-radius:10px;padding:5px 8px;background:#fff}
+.customer-tags input{flex:1;min-width:120px;border:0!important;padding:4px!important;background:transparent!important}
+.customer-tags input:focus-visible{outline:0}
+.customer-tags:focus-within{outline:3px solid #a7432e55;outline-offset:2px}
+.customer-tag{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 10px;color:#3f4b2d;background:#e5ebd9;font-size:12px;font-weight:700;white-space:nowrap}
+.customer-tag button{width:18px;height:18px;padding:0;border:0;border-radius:50%;color:inherit;background:transparent;line-height:1}
+.customer-tag button:hover{background:#3f4b2d22}
+.customer-tag.small{padding:1px 8px;font-size:11px;font-weight:500}
+.customer-tag-suggestions{display:flex;flex-wrap:wrap;gap:6px}
+.customer-tag-suggestions button{padding:3px 10px;border-radius:999px;font-size:12px}
+.customer-crm-actions{display:flex;align-items:center;gap:10px}
+.customer-name-cell{white-space:normal}.customer-name-cell .badge,.customer-name-cell .customer-tag{margin-inline-start:6px}
+.customer-blocked-filter{align-self:center}

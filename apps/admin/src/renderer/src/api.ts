@@ -32,6 +32,7 @@ import type {
   CustomerDirectoryQuery,
   CustomerDirectoryPageDto,
   CustomerDetailDto,
+  CustomerCrmWriteRequest,
   PageRequest,
   PagedResult,
   CustomerPaymentDto,
@@ -417,6 +418,9 @@ export const adminApi = {
   searchCustomers: (query: CustomerDirectoryQuery) =>
     socialInvoke<CustomerDirectoryPageDto>('customers.search', { value: query }),
   customerDetail: (id: number) => socialInvoke<CustomerDetailDto>('customers.detail', { id }),
+  updateCustomer: (id: number, value: CustomerCrmWriteRequest) =>
+    socialInvoke<CustomerDetailDto>('customers.update', { id, value }, true),
+  customerTags: () => socialInvoke<string[]>('customers.tags'),
   customerReport: (from: string, to: string) =>
     socialInvoke<CustomerReportDto>('reports.customers', { value: { from, to } }),
   serverLogs: (limit = 500) => request<LogEntry[]>(`/api/admin/logs?limit=${limit}`),
