@@ -8,6 +8,7 @@ import '../client/AppSplash.css'
 import { ActiveOrderTracker } from '../client/ActiveOrderTracker'
 import { AppSplash } from '../client/AppSplash'
 import { CustomerAnalytics } from '../client/CustomerAnalytics'
+import { splashSeenScript } from '../client/splash-session'
 
 export const metadata: Metadata = {
   title: 'کفگیر | غذای خانگی',
@@ -28,6 +29,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     // The Telegram Web App script runs before hydration and writes --tg-viewport-* onto <html>,
     // which the server never rendered. Without this, React fails hydration on every page load.
     <html lang="fa" dir="rtl" suppressHydrationWarning>
+      <head>
+        {/* Hides the splash before first paint when this session has already seen it. */}
+        <script dangerouslySetInnerHTML={{ __html: splashSeenScript }} />
+      </head>
       <body>
         <AppSplash />
         <CustomerAnalytics />

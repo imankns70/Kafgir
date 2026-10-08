@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import type { CartItem } from '../../types'
 import { formatMoney, formatNumber } from '../../utils/format'
 import { Icon } from '../../design-system/Icon'
@@ -72,9 +73,9 @@ export function CartSummary({ items, onQuantityChange, deliveryCost }: {
         {/* The item's own actions sit in the top corner opposite the name, where they read as
             belonging to this food and stay clear of the quantity controls below. */}
         <div className="cart-item-buttons">
-          {item.slug && <a className="outline-button cart-detail-button" href={`/foods/${encodeURIComponent(item.slug)}?menuItemId=${item.dailyMenuItemId}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
+          {item.slug && <Link className="outline-button cart-detail-button" href={`/foods/${encodeURIComponent(item.slug)}?menuItemId=${item.dailyMenuItemId}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
             <Icon name="info" size="sm" /><span>جزئیات</span>
-          </a>}
+          </Link>}
           <button type="button" className="primary-button cart-remove-button" aria-label={`حذف ${item.foodName} از سبد`} onClick={() => requestQuantityChange(item, 0)}><Icon name="delete" size="sm" /><span>حذف</span></button>
         </div>
         <div className="cart-item-actions">

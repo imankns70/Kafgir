@@ -14,6 +14,7 @@
   /* Fallback for a page whose scripts never run: the splash must not hide the menu forever. */
   animation: app-splash-fallback 0s linear 8s forwards;
 }
+.splash-seen .app-splash { display: none !important; }
 .app-splash.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; }
 .app-splash.is-leaving .app-splash-mark { transform: translateY(-12px) scale(.98); }
 

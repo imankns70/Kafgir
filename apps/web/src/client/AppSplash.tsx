@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { SPLASH_SEEN_CLASS, SPLASH_SEEN_KEY } from './splash-session'
 
 /**
  * The brand on screen from the very first paint until the app can respond.
@@ -14,6 +15,12 @@ import { useEffect, useState } from 'react'
 export function AppSplash() {
   const [phase, setPhase] = useState<'shown' | 'leaving' | 'gone'>('shown')
   useEffect(() => {
+    try { sessionStorage.setItem(SPLASH_SEEN_KEY, '1') } catch { /* storage unavailable: show it each load */ }
+    // Already shown this session: the head script hid it before paint, so drop it without a fade.
+    if (document.documentElement.classList.contains(SPLASH_SEEN_CLASS)) {
+      setPhase('gone')
+      return
+    }
     const frame = requestAnimationFrame(() => setPhase('leaving'))
     const timer = window.setTimeout(() => setPhase('gone'), 600)
     return () => {
