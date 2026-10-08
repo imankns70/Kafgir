@@ -57,6 +57,8 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   const [editingName, setEditingName] = useState('')
   const [address, setAddress] = useState<CustomerAddressWriteRequest>(emptyAddress)
   const [editingAddressId, setEditingAddressId] = useState<number | null>(null)
+  // The address form opens only on demand: from «آدرس جدید» or an address's «ویرایش».
+  const [isAddressFormOpen, setIsAddressFormOpen] = useState(false)
   const [reviewTarget, setReviewTarget] = useState<{ id: number; orderNumber: string; review: OrderReviewDto | null } | null>(null)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [isReviewSubmitting, setIsReviewSubmitting] = useState(false)
@@ -136,6 +138,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
   }
 
   const startAddressEdit = (item?: CustomerAddressDto) => {
+    setIsAddressFormOpen(true)
     setEditingAddressId(item?.id ?? null)
     setAddress(item ? {
       title: item.title,
@@ -143,6 +146,12 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
       addressLine: item.addressLine,
       isDefault: item.isDefault,
     } : emptyAddress)
+  }
+
+  const closeAddressForm = () => {
+    setEditingAddressId(null)
+    setAddress(emptyAddress)
+    setIsAddressFormOpen(false)
   }
 
   const saveAddress = async (event: FormEvent) => {
@@ -154,7 +163,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
         ? await updateCustomerAddress(editingAddressId, address)
         : await createCustomerAddress(address)
       setProfile(updated)
-      startAddressEdit()
+      closeAddressForm()
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'ذخیره آدرس ممکن نشد.')
     } finally {
@@ -299,7 +308,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
             </div>
           </section>
 
-          <form className="panel form-grid" onSubmit={saveAddress}>
+          {isAddressFormOpen && <form className="panel form-grid" onSubmit={saveAddress}>
             <h2 className="section-title">{editingAddressId ? 'ویرایش آدرس' : 'افزودن آدرس'}</h2>
             <div className="form-grid two-columns">
               <label className="field">عنوان<input value={address.title} onChange={(event) => setAddress({ ...address, title: event.target.value })} placeholder="خانه یا محل کار" /></label>
@@ -307,8 +316,8 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
             </div>
             <label className="field">نشانی<textarea value={address.addressLine} onChange={(event) => setAddress({ ...address, addressLine: event.target.value })} /></label>
             <label className="check-field"><input type="checkbox" checked={address.isDefault} onChange={(event) => setAddress({ ...address, isDefault: event.target.checked })} /> آدرس پیش‌فرض</label>
-            <div className="form-actions"><button className="primary-button" disabled={isAddressSubmitting || deletingAddressId !== null}>{isAddressSubmitting ? <ButtonLoading label={editingAddressId ? 'در حال به‌روزرسانی آدرس…' : 'در حال ثبت آدرس…'} /> : editingAddressId ? 'به‌روزرسانی آدرس' : 'ثبت آدرس'}</button>{editingAddressId && <button type="button" className="outline-button" disabled={isAddressSubmitting} onClick={() => startAddressEdit()}>انصراف</button>}</div>
-          </form>
+            <div className="form-actions"><button className="primary-button" disabled={isAddressSubmitting || deletingAddressId !== null}>{isAddressSubmitting ? <ButtonLoading label={editingAddressId ? 'در حال به‌روزرسانی آدرس…' : 'در حال ثبت آدرس…'} /> : editingAddressId ? 'به‌روزرسانی آدرس' : 'ثبت آدرس'}</button><button type="button" className="outline-button" disabled={isAddressSubmitting} onClick={closeAddressForm}>انصراف</button></div>
+          </form>}
           <button className="outline-button danger-outline profile-logout" disabled={isLoggingOut} onClick={() => void logout()}>{isLoggingOut ? <ButtonLoading label="در حال خروج…" /> : <><Icon name="logout" size="sm" /> خروج از حساب</>}</button>
         </div>
 
