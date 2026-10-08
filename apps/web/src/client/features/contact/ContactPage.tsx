@@ -24,6 +24,7 @@ import {
 } from '../../types'
 import { formatNumber, formatPersianDay } from '../../utils/format'
 
+// `onBack` stays in the props for the app shell; the logo and the tab bar already lead home.
 type Props = { onBack: () => void; onAccount: () => void }
 type View = 'inbox' | 'new' | 'thread'
 
@@ -70,7 +71,7 @@ function dayLabel(value: string, now = new Date()) {
   return formatPersianDay(day)
 }
 
-export function ContactPage({ onBack, onAccount }: Props) {
+export function ContactPage({ onAccount }: Props) {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [orders, setOrders] = useState<CustomerOrderSummaryDto[]>([])
   const [conversations, setConversations] = useState<SupportConversationSummaryDto[]>([])
@@ -378,7 +379,6 @@ export function ContactPage({ onBack, onAccount }: Props) {
         </section>
       </div>
       {view === 'inbox' && error && <p className="form-error" role="alert">{error}</p>}
-      <button type="button" className="contact-home-link" onClick={onBack}>بازگشت به منوی امروز</button>
     </main>
   )
 }

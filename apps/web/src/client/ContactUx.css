@@ -199,13 +199,10 @@
 .contact-login p { margin: 3px 0 0; color: var(--kafgir-color-text-secondary); font-size: .84rem; line-height: 1.8; }
 .contact-login .primary-button { min-height: 44px; border-radius: var(--kafgir-radius-pill); }
 
-.contact-home-link { display: block; margin: 18px auto 0; padding: 4px; border: 0; color: var(--kafgir-color-text-muted); background: none; font: inherit; font-size: .82rem; text-decoration: underline; cursor: pointer; }
-
 @media (max-width: 899px) {
   .contact-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
   .contact-view-inbox .contact-pane { display: none; }
   .contact-view-new .contact-sidebar, .contact-view-thread .contact-sidebar { display: none; }
-  .contact-view-new .contact-home-link, .contact-view-thread .contact-home-link { display: none; }
   .contact-pane { position: static; min-height: 0; border-radius: 22px; }
   .contact-back { display: grid; }
   .contact-thread { height: auto; min-height: calc(100vh - 290px); }
