@@ -2,7 +2,7 @@ import type { AdminOperation } from '../../shared/admin-operations'
 import { isAdminOperationAllowed } from '../../shared/admin-permissions'
 
 export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' | 'food-photos' | 'food-tags'
-  | 'categories' | 'tags' | 'menu' | 'menu-plan' | 'report' | 'purchases' | 'months' | 'payments'
+  | 'categories' | 'tags' | 'menu' | 'menu-item' | 'menu-plan' | 'report' | 'purchases' | 'months' | 'payments'
   | 'delivery-slots' | 'delivery-days' | 'logs'
   | 'social-dashboard' | 'social-channels' | 'social-publish' | 'social-templates'
   | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
@@ -146,7 +146,7 @@ export const navigationGroups: NavigationGroup[] = [
 
 /** Detail screens reached from a list keep their parent highlighted in the sidebar. */
 export const navigationPage = (page: Page): Page =>
-  ['food-editor', 'food-photos', 'food-tags'].includes(page) ? 'foods' : page
+  ['food-editor', 'food-photos', 'food-tags'].includes(page) ? 'foods' : page === 'menu-item' ? 'menu' : page
 
 export const navigationGroupForPage = (page: Page): NavigationGroupId | null => {
   const visiblePage = navigationPage(page)

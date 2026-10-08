@@ -755,3 +755,4 @@ td.row-number{color:var(--muted);font-size:12px;font-variant-numeric:tabular-num
 .month-trend .bar-sales{fill:var(--olive)}
 .month-trend .bar-purchases{fill:var(--primary)}
 .month-trend .bar-label{fill:var(--muted);font-size:9px}
+.menu-item-setup{display:grid;grid-template-columns:minmax(300px,1fr) minmax(320px,1fr);gap:16px;align-items:start;max-width:1100px}.menu-item-food{display:grid;gap:10px}.menu-item-food img,.menu-item-no-photo{width:100%;aspect-ratio:4/3;border-radius:12px;object-fit:cover;background:#f8e9d3}.menu-item-no-photo{display:grid;place-items:center;color:var(--muted)}.menu-item-food h2,.menu-item-food p{margin:0}.menu-item-food dl{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0}.menu-item-food dt{color:var(--muted)}.menu-item-food dd{margin:0}.menu-item-form{align-content:start}.menu-item-form small{color:var(--muted);font-size:12px}

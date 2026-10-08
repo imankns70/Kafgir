@@ -120,6 +120,7 @@ describe('navigation behaviour', () => {
   it('keeps nested food screens highlighted under their parent', () => {
     expect(navigationPage('food-editor')).toBe('foods')
     expect(navigationPage('food-photos')).toBe('foods')
+    expect(navigationPage('menu-item')).toBe('menu')
     expect(navigationPage('food-tags')).toBe('foods')
     expect(navigationGroupForPage('food-editor')).toBe('catalog')
   })

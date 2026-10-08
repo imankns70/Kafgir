@@ -1243,7 +1243,24 @@ function FoodPhotosPage({ foodId, onBack }: { foodId: number | null; onBack: () 
   </PageFrame>
 }
 
-export function DailyMenuPage({ planning = false }: { planning?: boolean }) {
+/** The rules a sellable menu row must meet, shared by today's add form and the row setup page. */
+function menuPricingError(priceText: string, discountEnabled: boolean, discountPriceText: string, capacity: number): string | null {
+  if (isInvalidMoneyText(priceText) || (discountEnabled && isInvalidMoneyText(discountPriceText))) {
+    return 'مبلغ واردشده معتبر نیست؛ عدد صحیح به تومان وارد کنید.'
+  }
+  const price = parseMoney(priceText) ?? 0
+  const discountPrice = parseMoney(discountPriceText) ?? 0
+  if (price <= 0) return 'قیمت امروز را وارد کنید.'
+  if (capacity <= 0) return 'ظرفیت امروز باید بیشتر از صفر باشد.'
+  if (discountEnabled && (discountPrice <= 0 || discountPrice >= price)) return 'قیمت تخفیف باید بیشتر از صفر و کمتر از قیمت اصلی باشد.'
+  return null
+}
+
+export function DailyMenuPage({ planning = false, onSetup }: {
+  planning?: boolean
+  /** Opens one of today's rows on its own page to set price and capacity. */
+  onSetup?: (itemId: number, startDiscount: boolean) => void
+}) {
   const saveAction = useAsyncAction()
   const toggleAction = useAsyncAction()
   const removeAction = useAsyncAction()
@@ -1257,7 +1274,6 @@ export function DailyMenuPage({ planning = false }: { planning?: boolean }) {
   const [discountEnabled, setDiscountEnabled] = useState(false)
   const [discountPriceText, setDiscountPriceText] = useState('')
   const [capacity, setCapacity] = useState(1)
-  const [editing, setEditing] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const load = async () => {
     const [foodRows, menuRow] = await Promise.all([
@@ -1268,7 +1284,6 @@ export function DailyMenuPage({ planning = false }: { planning?: boolean }) {
     setMenu(menuRow)
   }
   useEffect(() => {
-    setEditing(null)
     setFoodId('')
     setPriceText('')
     setDiscountEnabled(false)
@@ -1307,48 +1322,25 @@ export function DailyMenuPage({ planning = false }: { planning?: boolean }) {
       })
       return
     }
-    // Without a reserved row today's editor adds the food directly, so a day nobody planned can still
-    // be sold; with one it completes that row.
-    if (editing == null && !foodId) {
+    // Today's editor adds a food directly, so a day nobody planned can still be sold. Reserved rows
+    // are completed on their own page, opened from the grid.
+    if (!foodId) {
       setError('یک غذا برای منوی امروز انتخاب کنید.')
       return
     }
-    if (isInvalidMoneyText(priceText) || (discountEnabled && isInvalidMoneyText(discountPriceText))) {
-      setError('مبلغ واردشده معتبر نیست؛ عدد صحیح به تومان وارد کنید.')
-      return
-    }
-    if (price <= 0) {
-      setError('قیمت امروز را وارد کنید.')
-      return
-    }
-    if (capacity <= 0) {
-      setError('ظرفیت امروز باید بیشتر از صفر باشد.')
-      return
-    }
-    if (discountEnabled && (discountPrice <= 0 || discountPrice >= price)) {
-      setError('قیمت تخفیف باید بیشتر از صفر و کمتر از قیمت اصلی باشد.')
+    const invalid = menuPricingError(priceText, discountEnabled, discountPriceText, capacity)
+    if (invalid) {
+      setError(invalid)
       return
     }
     void saveAction.run(async () => {
       try {
-        const item = { price, discountPrice: discountEnabled ? discountPrice : null, capacityPortions: capacity, isAvailable: true }
-        const updated = editing == null
-          ? await adminApi.addMenuItem(date, { foodId: Number(foodId), ...item })
-          : await adminApi.updateMenuItem(editing, item)
-        setMenu(updated); setEditing(null); setFoodId(''); setPriceText(''); setDiscountEnabled(false); setDiscountPriceText(''); setCapacity(1); setError(null)
+        const updated = await adminApi.addMenuItem(date, {
+          foodId: Number(foodId), price, discountPrice: discountEnabled ? discountPrice : null, capacityPortions: capacity, isAvailable: true,
+        })
+        setMenu(updated); setFoodId(''); setPriceText(''); setDiscountEnabled(false); setDiscountPriceText(''); setCapacity(1); setError(null)
       } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
     })
-  }
-  const edit = (item: DailyMenuDto['items'][number], startDiscount = false) => {
-    const regularPrice = item.originalPrice ?? item.price
-    const hasDiscount = item.originalPrice != null
-    setEditing(item.id)
-    setFoodId(String(item.foodId))
-    setPriceText(moneyInputText(regularPrice))
-    setDiscountEnabled(hasDiscount || startDiscount)
-    setDiscountPriceText(moneyInputText(hasDiscount ? item.price : Math.max(1, Math.round((regularPrice * 0.9) / 1_000) * 1_000)))
-    setCapacity(item.capacityPortions)
-    setError(null)
   }
   const discountPercentage = discountEnabled && price > 0 && discountPrice > 0 && discountPrice < price
     ? Math.round((1 - discountPrice / price) * 100)
@@ -1402,13 +1394,11 @@ export function DailyMenuPage({ planning = false }: { planning?: boolean }) {
   }>
     <Message error={error} />
     <form className="panel form-grid menu-form compact-entry-form" onSubmit={saveItem}>
-      <label>غذا{editing != null
-        ? <input value={selectedFood?.name ?? ''} disabled />
-        : <select value={foodId} onChange={(event) => setFoodId(event.target.value)} required>
-            <option value="">انتخاب غذا</option>
-            {foods.filter((food) => food.isActive && !menu?.items.some((item) => item.foodId === food.id)).map((food) =>
-              <option value={food.id} key={food.id}>{food.name}</option>)}
-          </select>}
+      <label>غذا<select value={foodId} onChange={(event) => setFoodId(event.target.value)} required>
+          <option value="">انتخاب غذا</option>
+          {foods.filter((food) => food.isActive && !menu?.items.some((item) => item.foodId === food.id)).map((food) =>
+            <option value={food.id} key={food.id}>{food.name}</option>)}
+        </select>
         <small>{selectedFood?.isPersianRice ? 'قیمت این ردیف باید مابه‌التفاوت ارتقا به برنج ایرانی باشد، نه قیمت یک پرس کامل برنج.' : selectedFood?.allowsPersianRice ? 'مشتری می‌تواند به این غذا برنج ایرانی اضافه کند؛ «برنج ایرانی» را هم به منوی امروز اضافه کنید.' : ''}</small></label>
       <div className="menu-price-field">
         <AmountField label="قیمت امروز (تومان)" value={priceText} onChange={setPriceText} placeholder="240,000" />
@@ -1427,19 +1417,131 @@ export function DailyMenuPage({ planning = false }: { planning?: boolean }) {
         «ارتقا به برنج ایرانی» هنوز به منوی امروز اضافه نشده است؛ تا وقتی اضافه نشود گزینه ارتقا به مشتری نمایش داده نمی‌شود.
       </p>}
       <button className="primary" disabled={saveAction.busy}>
-        {saveAction.busy ? 'در حال ذخیره…' : editing != null ? 'ذخیره قیمت و ظرفیت' : 'افزودن به منوی امروز'}
+        {saveAction.busy ? 'در حال ذخیره…' : 'افزودن به منوی امروز'}
       </button>
-      {editing != null && <button type="button" className="secondary" onClick={() => {
-        setEditing(null); setFoodId(''); setPriceText(''); setDiscountEnabled(false); setDiscountPriceText(''); setCapacity(1); setError(null)
-      }}>انصراف</button>}
     </form>
     <div className="panel table-wrap compact-grid-panel"><table><thead><tr><RowNumberHead /><th>غذا</th><th>وضعیت</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
       <tbody>{pagedMenu.visible.map((item, index) => {
         const needsSetup = item.price <= 0 || item.capacityPortions <= 0 || !item.isAvailable
-        return <tr key={item.id}><RowNumberCell offset={pagedMenu.rowOffset} index={index} /><td>{item.foodName}</td><td>{needsSetup ? <span className="badge status-1">نیازمند تکمیل</span> : <span className="badge open">آماده فروش</span>}</td><td>{item.price > 0 ? (item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)) : '—'}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{item.capacityPortions > 0 ? plainNumber(item.capacityPortions) : '—'}</td><td>{plainNumber(item.soldPortions)}</td><td>{item.capacityPortions > 0 ? plainNumber(item.remainingPortions) : '—'}</td><td className="actions"><button onClick={() => edit(item)}>{needsSetup ? 'تعیین قیمت و ظرفیت' : 'ویرایش'}</button>{!needsSetup && <button className="discount-action" onClick={() => edit(item, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button>}<button className="danger" disabled={removeAction.busy} onClick={() => removeItem(item.id)}>{removingId === item.id ? 'در حال حذف…' : 'حذف'}</button></td></tr>
+        return <tr key={item.id}><RowNumberCell offset={pagedMenu.rowOffset} index={index} /><td>{item.foodName}</td><td>{needsSetup ? <span className="badge status-1">نیازمند تکمیل</span> : <span className="badge open">آماده فروش</span>}</td><td>{item.price > 0 ? (item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)) : '—'}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{item.capacityPortions > 0 ? plainNumber(item.capacityPortions) : '—'}</td><td>{plainNumber(item.soldPortions)}</td><td>{item.capacityPortions > 0 ? plainNumber(item.remainingPortions) : '—'}</td><td className="actions"><button onClick={() => onSetup?.(item.id, false)}>{needsSetup ? 'تعیین قیمت و ظرفیت' : 'ویرایش'}</button>{!needsSetup && <button className="discount-action" onClick={() => onSetup?.(item.id, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button>}<button className="danger" disabled={removeAction.busy} onClick={() => removeItem(item.id)}>{removingId === item.id ? 'در حال حذف…' : 'حذف'}</button></td></tr>
       })}</tbody></table></div>
     {!menu?.items.length && <p className="panel muted">برای امروز برنامه‌ای ثبت نشده است؛ غذا را از فرم بالا مستقیم به منوی امروز اضافه کنید.</p>}
     <Pager {...pagedMenu} />
+  </PageFrame>
+}
+
+/**
+ * One of today's menu rows on its own page: the food as the customer will see it beside the price,
+ * capacity and discount that make it sellable. Saving returns to today's menu.
+ */
+export function MenuItemSetupPage({ itemId, startDiscount, onDone }: {
+  itemId: number | null
+  startDiscount: boolean
+  onDone: () => void
+}) {
+  const saveAction = useAsyncAction()
+  const [menu, setMenu] = useState<DailyMenuDto | null>(null)
+  const [food, setFood] = useState<FoodDto | null>(null)
+  const [imageSrc, setImageSrc] = useState<string | null>(null)
+  const [priceText, setPriceText] = useState('')
+  const [discountEnabled, setDiscountEnabled] = useState(false)
+  const [discountPriceText, setDiscountPriceText] = useState('')
+  const [capacity, setCapacity] = useState(1)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const item = menu?.items.find((row) => row.id === itemId) ?? null
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        setLoading(true)
+        const [menuRow, foodRows] = await Promise.all([adminApi.menu(today()), adminApi.foods()])
+        const row = menuRow.items.find((value) => value.id === itemId)
+        if (!row) throw new Error('این غذا در منوی امروز پیدا نشد.')
+        const foodRow = foodRows.find((value) => value.id === row.foodId) ?? null
+        if (cancelled) return
+        const regularPrice = row.originalPrice ?? row.price
+        const hasDiscount = row.originalPrice != null
+        setMenu(menuRow)
+        setFood(foodRow)
+        setPriceText(regularPrice > 0 ? moneyInputText(regularPrice) : '')
+        setDiscountEnabled(hasDiscount || startDiscount)
+        setDiscountPriceText(hasDiscount ? moneyInputText(row.price)
+          : regularPrice > 0 ? moneyInputText(Math.max(1, Math.round((regularPrice * 0.9) / 1_000) * 1_000)) : '')
+        setCapacity(row.capacityPortions > 0 ? row.capacityPortions : 1)
+        setError(null)
+        const imageUrl = foodRow?.images.find((image) => image.isPrimary)?.imageUrl
+          ?? foodRow?.images[0]?.imageUrl ?? foodRow?.imageUrl ?? row.imageUrl ?? null
+        if (imageUrl) {
+          const resolved = await adminApi.resolveMediaUrl(imageUrl).catch(() => imageUrl)
+          if (!cancelled) setImageSrc(resolved)
+        }
+      } catch (reason) {
+        if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason))
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [itemId, startDiscount])
+  const price = parseMoney(priceText) ?? 0
+  const discountPrice = parseMoney(discountPriceText) ?? 0
+  const discountPercentage = discountEnabled && price > 0 && discountPrice > 0 && discountPrice < price
+    ? Math.round((1 - discountPrice / price) * 100)
+    : 0
+  const persianRice = menu?.persianRice ?? null
+  const save = (event: FormEvent) => {
+    event.preventDefault()
+    if (!item) return
+    const invalid = menuPricingError(priceText, discountEnabled, discountPriceText, capacity)
+    if (invalid) {
+      setError(invalid)
+      return
+    }
+    void saveAction.run(async () => {
+      try {
+        await adminApi.updateMenuItem(item.id, {
+          price, discountPrice: discountEnabled ? discountPrice : null, capacityPortions: capacity, isAvailable: true,
+        })
+        onDone()
+      } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    })
+  }
+  return <PageFrame title={item ? `قیمت و ظرفیت — ${item.foodName}` : 'قیمت و ظرفیت'} actions={
+    <button type="button" onClick={onDone}>بازگشت به منوی امروز</button>
+  }>
+    <Message error={error} />
+    {loading ? <p className="panel muted">در حال بارگذاری…</p> : item && <div className="menu-item-setup">
+      <article className="panel menu-item-food">
+        {imageSrc ? <img src={imageSrc} alt={item.foodName} /> : <div className="menu-item-no-photo">بدون عکس</div>}
+        <h2>{item.foodName}</h2>
+        <p className="muted">{item.category.title}{item.tags.length ? ` · ${item.tags.map((tag) => tag.title).join('، ')}` : ''}</p>
+        {food?.description && <p>{food.description}</p>}
+        <dl>
+          {food?.portionDescription && <><dt>محتوای پرس</dt><dd>{food.portionDescription}</dd></>}
+          {food?.ingredients && <><dt>مواد تشکیل‌دهنده</dt><dd>{food.ingredients}</dd></>}
+          {food?.allergyInformation && <><dt>حساسیت‌زا</dt><dd>{food.allergyInformation}</dd></>}
+          <dt>فروخته‌شده امروز</dt><dd>{plainNumber(item.soldPortions)} پرس</dd>
+        </dl>
+      </article>
+      <form className="panel form-grid menu-item-form" onSubmit={save}>
+        {food?.isPersianRice && <p className="compact-form-note">قیمت این ردیف باید مابه‌التفاوت ارتقا به برنج ایرانی باشد، نه قیمت یک پرس کامل برنج.</p>}
+        {food?.allowsPersianRice && !persianRice && <p className="menu-rice-warning">
+          «ارتقا به برنج ایرانی» هنوز به منوی امروز اضافه نشده است؛ تا وقتی اضافه نشود گزینه ارتقا به مشتری نمایش داده نمی‌شود.
+        </p>}
+        <AmountField label="قیمت امروز (تومان)" value={priceText} onChange={setPriceText} placeholder="240,000" />
+        <label>ظرفیت پرس<input type="number" min="0" value={capacity} onChange={(event) => setCapacity(Number(event.target.value))} /></label>
+        <label className="switch"><input type="checkbox" checked={discountEnabled} onChange={(event) => setDiscountEnabled(event.target.checked)} /> تخفیف فوری</label>
+        {discountEnabled && <div>
+          <AmountField label="قیمت نهایی (تومان)" value={discountPriceText} onChange={setDiscountPriceText} />
+          <small>{discountPercentage > 0 ? `${plainNumber(discountPercentage)}٪ تخفیف؛ ${money(price - discountPrice)} صرفه‌جویی` : 'قیمت نهایی باید کمتر از قیمت اصلی باشد'}</small>
+        </div>}
+        <div className="action-row">
+          <button className="primary" disabled={saveAction.busy}>{saveAction.busy ? 'در حال ذخیره…' : 'ذخیره و بازگشت'}</button>
+          <button type="button" onClick={onDone} disabled={saveAction.busy}>انصراف</button>
+        </div>
+      </form>
+    </div>}
   </PageFrame>
 }
 
@@ -1846,6 +1948,7 @@ export function App() {
   const [foodEditorId, setFoodEditorId] = useState<number | null>(null)
   const [foodPhotoId, setFoodPhotoId] = useState<number | null>(null)
   const [foodTagsId, setFoodTagsId] = useState<number | null>(null)
+  const [menuItemSetup, setMenuItemSetup] = useState<{ id: number; discount: boolean } | null>(null)
   const roles = session?.roles ?? []
   const groups = useMemo(() => visibleNavigationGroups(roles), [roles.join(',')])
   useEffect(() => {
@@ -1879,6 +1982,14 @@ export function App() {
     setFoodPhotoId(null)
     setPage('foods')
   }
+  const openMenuItemSetup = (id: number, discount: boolean) => {
+    setMenuItemSetup({ id, discount })
+    setPage('menu-item')
+  }
+  const closeMenuItemSetup = () => {
+    setMenuItemSetup(null)
+    setPage('menu')
+  }
   const closeFoodTags = () => {
     setFoodTagsId(null)
     setPage('foods')
@@ -1899,7 +2010,8 @@ export function App() {
     'food-tags': <FoodTagsPage foodId={foodTagsId} onBack={closeFoodTags} />,
     categories: <CategoriesPage />,
     tags: <TagsPage />,
-    menu: <DailyMenuPage />,
+    menu: <DailyMenuPage onSetup={openMenuItemSetup} />,
+    'menu-item': <MenuItemSetupPage itemId={menuItemSetup?.id ?? null} startDiscount={menuItemSetup?.discount ?? false} onDone={closeMenuItemSetup} />,
     'menu-plan': <DailyMenuPage planning />,
     report: <ReportPage />,
     payments: <PaymentsPage />,

@@ -3,8 +3,9 @@
 ## 2026-10-07 — Today's menu no longer depends on the monthly plan
 
 - «منوی امروز» in Electron Admin always shows an add form. Without a reserved row, the operator picks a
-  food and enters price, capacity and an optional discount, and it is added directly as available;
-  reserved rows are still completed from the grid as before.
+  food and enters price, capacity and an optional discount, and it is added directly as available.
+- «تعیین قیمت و ظرفیت», «ویرایش» and «تخفیف» on a row open a dedicated page showing the food's photo
+  and details beside the price, capacity and discount form; saving returns to «منوی امروز».
 
 ## 2026-10-06 — Dependency security, purchase atomicity, integration tests
 
