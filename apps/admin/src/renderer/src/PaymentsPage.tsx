@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import type { CustomerPaymentDto, OrderSummaryDto } from '@kafgir/contracts'
-import { PaymentMethod, PaymentStatus } from '@kafgir/contracts'
+import type { CustomerPaymentDto, OrderSummaryDto, PaymentReconciliationDto, UnpaidOrderDto } from '@kafgir/contracts'
+import { OrderStatus, PaymentMethod, PaymentStatus } from '@kafgir/contracts'
 import { adminApi } from './api'
 import {
   AmountField, DateField, Message, PageFrame, Pager, RowNumberCell, RowNumberHead,
   useAsyncAction, useServerPagedGrid,
 } from './admin-ui'
-import { formatMoney, formatNumber, formatPersianDateTime, parseMoney } from './number-format'
+import { formatMoney, formatNumber, formatPersianDate, formatPersianDateTime, parseMoney } from './number-format'
 import { todayJalali, toIsoDate } from './persian-calendar'
 
 /**
@@ -20,7 +20,8 @@ import { todayJalali, toIsoDate } from './persian-calendar'
 const errorText = (reason: unknown) => reason instanceof Error ? reason.message : String(reason)
 const today = () => toIsoDate(todayJalali())
 
-type Bucket = 'all' | 'successful' | 'failed' | 'pending' | 'refunded'
+type Bucket = 'all' | 'successful' | 'failed' | 'pending' | 'refunded' | 'refundDue'
+type View = 'payments' | 'unpaid' | 'daily'
 type BucketFilters = { bucket: Bucket; search?: string | null }
 
 const statusLabel: Record<number, string> = {
@@ -41,6 +42,23 @@ const methodLabel: Record<number, string> = {
 }
 
 export function PaymentsPage() {
+  const [view, setView] = useState<View>('payments')
+  return <PageFrame
+    title="پرداخت‌های سفارش"
+    description="پرداخت مشتری برای هر سفارش: روش، مبلغ و وضعیت. این صفحه دفتر حساب نیست."
+  >
+    <div className="payment-view-tabs" role="tablist" aria-label="بخش‌های پرداخت">
+      {([['payments', 'پرداخت‌ها'], ['unpaid', 'سفارش‌های پرداخت‌نشده'], ['daily', 'تراز روزانه']] as Array<[View, string]>)
+        .map(([key, label]) => <button type="button" role="tab" key={key} aria-selected={view === key}
+          className={view === key ? 'active' : ''} onClick={() => setView(key)}>{label}</button>)}
+    </div>
+    {view === 'payments' && <PaymentsLedger />}
+    {view === 'unpaid' && <UnpaidOrdersPanel />}
+    {view === 'daily' && <DailyReconciliationPanel />}
+  </PageFrame>
+}
+
+function PaymentsLedger() {
   const createAction = useAsyncAction()
   const rowAction = useAsyncAction()
   const [rowBusyId, setRowBusyId] = useState<number | null>(null)
@@ -116,13 +134,27 @@ export function PaymentsPage() {
     })
   }
 
-  const refund = (id: number) => {
-    if (!window.confirm('وجه مسترد شود؟')) return
-    setRowBusyId(id)
+  // A refund names its amount and reason, so it opens a small form on the row instead of a yes/no.
+  const [refunding, setRefunding] = useState<{ id: number; amount: string; reason: string } | null>(null)
+  const startRefund = (payment: CustomerPaymentDto) => setRefunding({
+    id: payment.id,
+    amount: String(Math.round((payment.amount - (payment.refundedAmount ?? 0)) * 100) / 100),
+    reason: payment.orderStatus === OrderStatus.Cancelled ? 'لغو سفارش' : '',
+  })
+  const submitRefund = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!refunding) return
+    const value = parseMoney(refunding.amount)
+    if (value === null || value <= 0 || refunding.reason.trim().length < 2) {
+      setMessage('مبلغ و دلیل استرداد را وارد کنید.')
+      return
+    }
+    setRowBusyId(refunding.id)
     void rowAction.run(async () => {
       try {
-        await adminApi.refundPayment(id)
-        setMessage('وجه مسترد شد.')
+        await adminApi.refundPayment(refunding.id, { amount: value, reason: refunding.reason.trim() })
+        setRefunding(null)
+        setMessage('استرداد ثبت شد.')
         await Promise.all([load(), paged.refresh()])
       } catch (reason) { setMessage(errorText(reason)) }
       finally { setRowBusyId(null) }
@@ -134,12 +166,10 @@ export function PaymentsPage() {
     ['failed', 'پرداخت ناموفق', 'failed'],
     ['pending', 'نیازمند بررسی', 'pending'],
     ['refunded', 'برگشت وجه', 'refunded'],
+    ['refundDue', 'استرداد معوق', 'failed'],
   ]
 
-  return <PageFrame
-    title="پرداخت‌های سفارش"
-    description="پرداخت مشتری برای هر سفارش: روش، مبلغ و وضعیت. این صفحه دفتر حساب نیست."
-  >
+  return <>
     <section className="panel admin-controls">
       <form className="form-grid two-columns compact-entry-form" onSubmit={create}>
         <DateField label="تاریخ سفارش" value={orderDate} onChange={setOrderDate} />
@@ -169,6 +199,7 @@ export function PaymentsPage() {
     </section>
 
     <Message>{message}</Message>
+    {bucketOf('refundDue').count > 0 && <Message error={`${formatNumber(bucketOf('refundDue').count)} پرداخت موفق متعلق به سفارش لغوشده است و ${formatMoney(bucketOf('refundDue').amount)} باید به مشتری برگردد.`} />}
 
     <section className="payment-status-overview" aria-label="خلاصه پرداخت مشتریان">
       {buckets.map(([key, label, tone]) => {
@@ -185,7 +216,7 @@ export function PaymentsPage() {
 
     <div className="payment-filter-bar" role="group" aria-label="فیلتر وضعیت پرداخت">
       {([['all', 'همه'], ['successful', 'موفق'], ['failed', 'ناموفق'],
-        ['pending', 'در انتظار بررسی'], ['refunded', 'مستردشده']] as Array<[Bucket, string]>)
+        ['pending', 'در انتظار بررسی'], ['refunded', 'مستردشده'], ['refundDue', 'استرداد معوق']] as Array<[Bucket, string]>)
         .map(([key, label]) => <button type="button" key={key}
           className={filter === key ? 'active' : ''} onClick={() => applyFilter(key)}>{label}</button>)}
       <label className="payment-order-search">
@@ -213,7 +244,9 @@ export function PaymentsPage() {
               <td>{payment.customerFullName}</td>
               <td dir="ltr">{payment.customerPhoneNumber}</td>
               <td>{methodLabel[payment.paymentMethod]}</td>
-              <td>{formatMoney(payment.amount)}</td>
+              <td>{formatMoney(payment.amount)}{(payment.refundedAmount ?? 0) > 0 && <small className="refund-note">
+                مسترد: {formatMoney(payment.refundedAmount ?? 0)}{payment.refundReason ? ` — ${payment.refundReason}` : ''}
+              </small>}{payment.orderStatus === OrderStatus.Cancelled && <small className="refund-note warn">سفارش لغو شده</small>}</td>
               <td dir="ltr">{payment.trackingNumber || payment.referenceNumber || '—'}</td>
               <td>{formatPersianDateTime(payment.createdAt)}</td>
               <td><span className={`payment-status payment-status-${payment.status}`}>
@@ -230,13 +263,87 @@ export function PaymentsPage() {
                     {rowBusyId === payment.id ? '…' : 'رد'}
                   </button>
                 </>}
-                {payment.status === PaymentStatus.Paid && <button className="danger" disabled={rowAction.busy}
-                  onClick={() => refund(payment.id)}>
-                  {rowBusyId === payment.id ? 'در حال استرداد…' : 'استرداد'}
-                </button>}
+                {payment.status === PaymentStatus.Paid && refunding?.id !== payment.id && <button className="danger" disabled={rowAction.busy}
+                  onClick={() => startRefund(payment)}>استرداد</button>}
+                {refunding?.id === payment.id && <form className="refund-form" onSubmit={submitRefund}>
+                  <input aria-label="مبلغ استرداد" dir="ltr" value={refunding.amount}
+                    onChange={(event) => setRefunding({ ...refunding, amount: event.target.value })} />
+                  <input aria-label="دلیل استرداد" placeholder="دلیل" value={refunding.reason}
+                    onChange={(event) => setRefunding({ ...refunding, reason: event.target.value })} />
+                  <button className="danger" disabled={rowAction.busy}>{rowBusyId === payment.id ? '…' : 'ثبت'}</button>
+                  <button type="button" onClick={() => setRefunding(null)}>انصراف</button>
+                </form>}
               </td>
             </tr>)}</tbody>
           </table></div><Pager {...paged} /></>}
     </section>
-  </PageFrame>
+  </>
+}
+
+/** Orders handed over (or ready) whose money has not fully arrived — the end-of-day collection list. */
+function UnpaidOrdersPanel() {
+  const paged = useServerPagedGrid<UnpaidOrderDto, Record<string, never>>(
+    ({ page, pageSize }) => adminApi.unpaidOrders({ page, pageSize }), {},
+  )
+  return <section className="panel compact-grid-panel">
+    <div className="table-panel-head">
+      <h2>سفارش‌های تحویلی بدون پرداخت کامل</h2>
+      <span>{formatNumber(paged.totalItems)} سفارش</span>
+    </div>
+    {paged.visible.length === 0
+      ? <p className="list-state">{paged.loading ? 'در حال دریافت…' : 'همه سفارش‌های تحویلی تسویه شده‌اند.'}</p>
+      : <><div className="table-wrap"><table>
+          <thead><tr><RowNumberHead /><th>سفارش</th><th>روز سرویس</th><th>مشتری</th><th>موبایل</th>
+            <th>روش</th><th>وضعیت</th><th>مبلغ سفارش</th><th>دریافت‌شده</th><th>در انتظار تأیید</th><th>مانده</th></tr></thead>
+          <tbody>{paged.visible.map((order, index) => <tr key={order.orderId}>
+            <RowNumberCell offset={paged.rowOffset} index={index} />
+            <td dir="ltr">{order.orderNumber}</td>
+            <td>{formatPersianDate(order.serviceDate)}</td>
+            <td>{order.customerFullName}</td>
+            <td dir="ltr">{order.customerPhoneNumber}</td>
+            <td>{methodLabel[order.paymentMethod]}</td>
+            <td>{order.status === OrderStatus.Delivered ? 'تحویل‌شده' : 'آماده تحویل'}</td>
+            <td>{formatMoney(order.totalAmount)}</td>
+            <td>{formatMoney(order.paidAmount)}</td>
+            <td>{order.pendingAmount > 0 ? formatMoney(order.pendingAmount) : '—'}</td>
+            <td><strong className="amount-due">{formatMoney(order.balance)}</strong></td>
+          </tr>)}</tbody>
+        </table></div><Pager {...paged} /></>}
+  </section>
+}
+
+/** A day's money by method, for closing the till. */
+function DailyReconciliationPanel() {
+  const [date, setDate] = useState(today())
+  const [data, setData] = useState<PaymentReconciliationDto | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    setError(null)
+    void adminApi.paymentReconciliation(date).then(setData).catch((reason) => setError(errorText(reason)))
+  }, [date])
+  return <>
+    <section className="panel admin-controls">
+      <div className="form-grid compact-entry-form"><DateField label="روز" value={date} onChange={setDate} /></div>
+    </section>
+    <Message error={error} />
+    {data && <>
+      <section className="payment-status-overview" aria-label="جمع روز">
+        <div className="payment-metric success"><span>دریافت</span><strong>{formatMoney(data.totals.received)}</strong></div>
+        <div className="payment-metric refunded"><span>استرداد</span><strong>{formatMoney(data.totals.refunded)}</strong></div>
+        <div className="payment-metric pending"><span>خالص روز</span><strong>{formatMoney(data.totals.net)}</strong></div>
+        <div className="payment-metric failed"><span>تحویلی بدون پرداخت کامل</span><strong>{formatNumber(data.unpaidDeliveredCount)}</strong>
+          <small>{formatMoney(data.unpaidDeliveredAmount)}</small></div>
+      </section>
+      <section className="panel table-wrap">
+        <table><thead><tr><th>روش</th><th>تعداد</th><th>دریافت</th><th>استرداد</th><th>خالص</th></tr></thead>
+          <tbody>{data.methods.length === 0
+            ? <tr><td colSpan={5}>در این روز پرداختی تأیید نشده است.</td></tr>
+            : data.methods.map((row) => <tr key={row.paymentMethod}>
+                <td>{methodLabel[row.paymentMethod]}</td><td>{formatNumber(row.count)}</td>
+                <td>{formatMoney(row.received)}</td><td>{formatMoney(row.refunded)}</td>
+                <td><strong>{formatMoney(row.net)}</strong></td>
+              </tr>)}</tbody></table>
+      </section>
+    </>}
+  </>
 }

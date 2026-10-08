@@ -9,7 +9,7 @@ import type {
   UpdateDailyMenuSettingsRequest,
 } from '@kafgir/contracts'
 import type { PersianRiceDto } from '@kafgir/contracts'
-import { normalizePersianSearch } from '@kafgir/contracts'
+import { normalizePersianSearch, OrderStatus } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
 import { AppError, NotFoundError } from '../errors'
 import type { TransactionSql } from 'postgres'
@@ -44,6 +44,7 @@ type ItemRecord = {
   capacityPortions: number
   soldPortions: number
   isAvailable: boolean
+  pendingPortions?: number
 }
 
 /**
@@ -113,7 +114,10 @@ export async function getMenuByDate(menuDate: string, customerVisible = false): 
              THEN ROUND(((i.price - i.discount_price) / i.price) * 100)::int
              ELSE NULL END AS "discountPercentage",
            i.capacity_portions AS "capacityPortions",
-           i.sold_portions AS "soldPortions", i.is_available AS "isAvailable"
+           i.sold_portions AS "soldPortions", i.is_available AS "isAvailable",
+           (SELECT COALESCE(SUM(oi.quantity), 0)::int FROM order_items oi
+              JOIN orders o ON o.id = oi.order_id
+             WHERE oi.daily_menu_item_id = i.id AND o.status = ${OrderStatus.PendingConfirmation}) AS "pendingPortions"
     FROM daily_menu_items i
     JOIN foods f ON f.id = i.food_id
     JOIN food_categories c ON c.id = f.category_id
@@ -168,7 +172,12 @@ export async function getMenuByDate(menuDate: string, customerVisible = false): 
     orderDeadline: menu.orderDeadline?.toISOString() ?? null,
     categories,
     // Admin keeps rice add-ons in `items` so their price and capacity stay editable like any food.
-    items: items.map(mapMenuItem),
+    // Pending demand is an operator's number; customer views never carry it.
+    items: items.map((item) => {
+      const mapped = mapMenuItem(item)
+      if (customerVisible) delete mapped.pendingPortions
+      return mapped
+    }),
     persianRice,
   }
 }

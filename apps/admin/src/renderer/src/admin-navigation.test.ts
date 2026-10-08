@@ -63,7 +63,7 @@ describe('reference data versus configuration', () => {
     // Payment and delivery methods are enum-bounded and carry commercial terms, so they are settings.
     expect(groupItems('reference')).not.toContain('payment-methods')
     expect(groupItems('reference')).not.toContain('delivery-methods')
-    expect(groupItems('settings')).toEqual(['payment-methods', 'delivery-methods', 'logs'])
+    expect(groupItems('settings')).toEqual(['payment-methods', 'delivery-methods', 'audit-log', 'logs'])
   })
 
   it('separates the reusable delivery windows from the per-date capacity screen', () => {
@@ -198,5 +198,17 @@ describe('permission-aware navigation', () => {
 
   it('treats the dashboard as reachable by anyone signed in', () => {
     expect(isPageAllowed('dashboard', ['Unknown'])).toBe(true)
+  })
+})
+
+describe('owner-only change log and purchase deletion', () => {
+  it('shows the change log only to Owner and keeps purchase deletion away from the kitchen', async () => {
+    const { isAdminOperationAllowed } = await import('../../shared/admin-permissions')
+    expect(isAdminOperationAllowed('audit.list', ['Owner'])).toBe(true)
+    expect(isAdminOperationAllowed('audit.list', ['KitchenAdmin'])).toBe(false)
+    expect(isAdminOperationAllowed('audit.list', ['OrderManager'])).toBe(false)
+    expect(isAdminOperationAllowed('purchases.delete', ['KitchenAdmin'])).toBe(false)
+    expect(isAdminOperationAllowed('purchases.update', ['KitchenAdmin'])).toBe(true)
+    expect(isAdminOperationAllowed('payments.unpaid', ['OrderManager'])).toBe(true)
   })
 })

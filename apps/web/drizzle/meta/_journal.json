@@ -183,6 +183,13 @@
       "when": 1788540000000,
       "tag": "0025_express_delivery",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791460000000,
+      "tag": "0026_order_money_integrity",
+      "breakpoints": true
     }
   ]
 }

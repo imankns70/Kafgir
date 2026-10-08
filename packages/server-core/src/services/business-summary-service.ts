@@ -5,8 +5,10 @@ import type {
   MonthlyReportDto,
   MonthlySummaryDto,
 } from '@kafgir/contracts'
-import { OrderStatus } from '@kafgir/contracts'
+import { OrderReviewHandlingStatus, OrderStatus, PaymentStatus, SupportConversationStatus } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
+import { orderServiceDate } from '../db/service-date'
+import { paymentBucketTotals } from './payment-service'
 import { businessDate } from '../time'
 import {
   currentJalaliMonth,
@@ -39,6 +41,8 @@ const soldStatus = OrderStatus.Delivered
 
 type MonthTotals = {
   foodSales: number
+  refunds: number
+  deliveryFees: number
   purchases: number
   courierCost: number
   purchaseCount: number
@@ -46,28 +50,40 @@ type MonthTotals = {
 }
 
 /**
+ * What was handed back on an order, capped at its food subtotal: a refund comes off food sales, and
+ * any part of it beyond the food (the delivery charge) is not a food sale to begin with.
+ */
+const refundedFood = (alias: string) => sqlClient.unsafe(`LEAST(${alias}.subtotal_amount, COALESCE((
+  SELECT SUM(p.refunded_amount) FROM payments p WHERE p.order_id = ${alias}.id), 0))`)
+
+/**
  * One round trip for a month's totals.
  *
- * Orders are attributed by `created_at` in Tehran — the same rule the order grid and the customer
- * report use — while purchases carry a plain `purchase_date` the operator chose.
+ * Orders are attributed to their service date — the day they are cooked and delivered — while
+ * purchases carry a plain `purchase_date` the operator chose. Refunds on an order come off the month
+ * that order belongs to.
  */
 async function monthTotals(range: JalaliMonthRange): Promise<MonthTotals> {
   const rows = await sqlClient<MonthTotals[]>`
     SELECT
       COALESCE(orders.food_sales, 0)::float8 AS "foodSales",
+      COALESCE(orders.refunds, 0)::float8 AS "refunds",
+      COALESCE(orders.delivery_fees, 0)::float8 AS "deliveryFees",
       COALESCE(orders.courier_cost, 0)::float8 AS "courierCost",
       COALESCE(orders.order_count, 0)::int AS "orderCount",
       COALESCE(bought.total, 0)::float8 AS "purchases",
       COALESCE(bought.count, 0)::int AS "purchaseCount"
     FROM
       (SELECT
-         SUM(subtotal_amount) AS food_sales,
-         SUM(courier_payable_amount) AS courier_cost,
+         SUM(o.subtotal_amount) AS food_sales,
+         SUM(${refundedFood('o')}) AS refunds,
+         SUM(o.delivery_fee) AS delivery_fees,
+         SUM(o.courier_payable_amount) AS courier_cost,
          COUNT(*) AS order_count
-       FROM orders
-       WHERE status = ${soldStatus}
-         AND created_at >= (${range.fromDate}::date AT TIME ZONE 'Asia/Tehran')
-         AND created_at < (${range.toExclusiveDate}::date AT TIME ZONE 'Asia/Tehran')) orders
+       FROM orders o
+       WHERE o.status = ${soldStatus}
+         AND ${orderServiceDate('o')} >= ${range.fromDate}::date
+         AND ${orderServiceDate('o')} < ${range.toExclusiveDate}::date) orders
     CROSS JOIN
       (SELECT SUM(amount) AS total, COUNT(*) AS count
        FROM purchases
@@ -75,7 +91,7 @@ async function monthTotals(range: JalaliMonthRange): Promise<MonthTotals> {
          AND purchase_date < ${range.toExclusiveDate}) bought
   `
   return rows[0] ?? {
-    foodSales: 0, purchases: 0, courierCost: 0, purchaseCount: 0, orderCount: 0,
+    foodSales: 0, refunds: 0, deliveryFees: 0, purchases: 0, courierCost: 0, purchaseCount: 0, orderCount: 0,
   }
 }
 
@@ -85,10 +101,14 @@ const summaryOf = (range: JalaliMonthRange, totals: MonthTotals): MonthlySummary
   title: range.title,
   fromDate: range.fromDate,
   toDate: range.toDate,
-  foodSales: totals.foodSales,
+  foodSales: Math.max(0, totals.foodSales - totals.refunds),
+  grossFoodSales: totals.foodSales,
+  refunds: totals.refunds,
+  deliveryFees: totals.deliveryFees,
+  deliveryMargin: totals.deliveryFees - totals.courierCost,
   purchases: totals.purchases,
-  salesMinusPurchases: totals.foodSales - totals.purchases,
-  purchaseToSalesPercent: purchaseToSalesPercent(totals.purchases, totals.foodSales),
+  salesMinusPurchases: totals.foodSales - totals.refunds - totals.purchases,
+  purchaseToSalesPercent: purchaseToSalesPercent(totals.purchases, totals.foodSales - totals.refunds),
   courierCost: totals.courierCost,
   purchaseCount: totals.purchaseCount,
   orderCount: totals.orderCount,
@@ -105,10 +125,9 @@ async function dailySeries(range: JalaliMonthRange): Promise<MonthlyDailyPointDt
     SELECT
       days.day::text AS date,
       COALESCE((
-        SELECT SUM(o.subtotal_amount) FROM orders o
+        SELECT SUM(o.subtotal_amount - ${refundedFood('o')}) FROM orders o
         WHERE o.status = ${soldStatus}
-          AND o.created_at >= (days.day AT TIME ZONE 'Asia/Tehran')
-          AND o.created_at < ((days.day + 1) AT TIME ZONE 'Asia/Tehran')
+          AND ${orderServiceDate('o')} = days.day
       ), 0)::float8 AS "foodSales",
       COALESCE((
         SELECT SUM(p.amount) FROM purchases p WHERE p.purchase_date = days.day
@@ -172,8 +191,7 @@ export async function getDashboard(): Promise<AdminDashboardSummaryDto> {
       WITH today_orders AS (
         SELECT *
         FROM orders
-        WHERE created_at >= (${date}::date AT TIME ZONE 'Asia/Tehran')
-          AND created_at < ((${date}::date + 1) AT TIME ZONE 'Asia/Tehran')
+        WHERE ${orderServiceDate('orders')} = ${date}::date
       ),
       order_stats AS (
         SELECT
@@ -184,7 +202,7 @@ export async function getDashboard(): Promise<AdminDashboardSummaryDto> {
           ))::int AS "activeOrders",
           COUNT(*) FILTER (WHERE status = ${OrderStatus.Delivered})::int AS "deliveredOrders",
           COUNT(*) FILTER (WHERE status = ${OrderStatus.Cancelled})::int AS "cancelledOrders",
-          COALESCE(SUM(subtotal_amount) FILTER (WHERE status = ${soldStatus}), 0)::float8 AS "foodSales"
+          COALESCE(SUM(subtotal_amount - ${refundedFood('today_orders')}) FILTER (WHERE status = ${soldStatus}), 0)::float8 AS "foodSales"
         FROM today_orders
       ),
       portion_stats AS (
@@ -205,6 +223,7 @@ export async function getDashboard(): Promise<AdminDashboardSummaryDto> {
     getMonthlySummary(current.year, current.month),
     dailySeries(jalaliMonthRange(current.year, current.month)),
   ])
+  const attention = await dashboardAttention(date)
   const row = todayRows[0]
   const today: AdminDashboardSummaryDto['today'] = row
     ? { ...row, date, isTodayMenuOpen: row.isTodayMenuOpen ?? false }
@@ -212,5 +231,57 @@ export async function getDashboard(): Promise<AdminDashboardSummaryDto> {
       date, totalOrders: 0, pendingOrders: 0, activeOrders: 0, deliveredOrders: 0,
       cancelledOrders: 0, totalPortions: 0, foodSales: 0, todayMenuItems: 0, isTodayMenuOpen: false,
     }
-  return { today, month, monthDaily }
+  return { today, month, monthDaily, attention }
+}
+
+const lowStockThreshold = 5
+
+/** The few things that need someone now, read in one pass each so the dashboard opens with them. */
+async function dashboardAttention(date: string): Promise<AdminDashboardSummaryDto['attention']> {
+  const [counts, lowStock, money] = await Promise.all([
+    sqlClient<Array<{ pendingOrders: number; unpaidOrders: number; unpaidAmount: number; openSupport: number; newReviews: number }>>`
+      SELECT
+        (SELECT COUNT(*)::int FROM orders WHERE status = ${OrderStatus.PendingConfirmation}) AS "pendingOrders",
+        (SELECT COUNT(*)::int FROM (
+           SELECT o.id FROM orders o LEFT JOIN payments p ON p.order_id = o.id
+           WHERE o.status = ${OrderStatus.Delivered}
+           GROUP BY o.id, o.total_amount
+           HAVING COALESCE(SUM(p.amount - p.refunded_amount) FILTER (WHERE p.status = ${PaymentStatus.Paid}), 0) + 0.005 < o.total_amount) unpaid) AS "unpaidOrders",
+        (SELECT COALESCE(SUM(balance), 0)::float8 FROM (
+           SELECT o.total_amount - COALESCE(SUM(p.amount - p.refunded_amount) FILTER (WHERE p.status = ${PaymentStatus.Paid}), 0) AS balance
+           FROM orders o LEFT JOIN payments p ON p.order_id = o.id
+           WHERE o.status = ${OrderStatus.Delivered}
+           GROUP BY o.id, o.total_amount) owed WHERE balance > 0.005) AS "unpaidAmount",
+        (SELECT COUNT(*)::int FROM support_conversations WHERE status = ${SupportConversationStatus.AwaitingAdmin}) AS "openSupport",
+        (SELECT COUNT(*)::int FROM order_reviews WHERE handling_status = ${OrderReviewHandlingStatus.New}) AS "newReviews"
+    `,
+    sqlClient<AdminDashboardSummaryDto['attention']['lowStock']>`
+      SELECT i.id AS "menuItemId", f.name AS "foodName",
+             (i.capacity_portions - i.sold_portions)::int AS "remainingPortions",
+             COALESCE(pending.portions, 0)::int AS "pendingPortions"
+      FROM daily_menu_items i
+      JOIN daily_menus m ON m.id = i.daily_menu_id
+      JOIN foods f ON f.id = i.food_id
+      LEFT JOIN LATERAL (
+        SELECT SUM(oi.quantity) AS portions FROM order_items oi JOIN orders o ON o.id = oi.order_id
+        WHERE oi.daily_menu_item_id = i.id AND o.status = ${OrderStatus.PendingConfirmation}
+      ) pending ON true
+      WHERE m.menu_date = ${date}::date AND i.is_available AND i.capacity_portions > 0
+        AND (i.capacity_portions - i.sold_portions <= ${lowStockThreshold}
+             OR COALESCE(pending.portions, 0) > i.capacity_portions - i.sold_portions)
+      ORDER BY i.capacity_portions - i.sold_portions, f.name
+    `,
+    paymentBucketTotals(),
+  ])
+  const row = counts[0]
+  return {
+    pendingOrders: row?.pendingOrders ?? 0,
+    lowStock,
+    unpaidOrders: row?.unpaidOrders ?? 0,
+    unpaidAmount: row?.unpaidAmount ?? 0,
+    refundDueCount: money.refundDue.count,
+    refundDueAmount: money.refundDue.amount,
+    openSupportConversations: row?.openSupport ?? 0,
+    newReviews: row?.newReviews ?? 0,
+  }
 }

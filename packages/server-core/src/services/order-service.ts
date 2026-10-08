@@ -4,6 +4,7 @@ import {
   NotificationStatus,
   NotificationType,
   OrderStatus,
+  PaymentStatus,
   type AdminOrderDetailDto,
   type CreateOrderRequest,
   type OrderDto,
@@ -14,6 +15,7 @@ import {
 } from '@kafgir/contracts'
 import type { TransactionSql } from 'postgres'
 import { sqlClient } from '../db/client'
+import { orderServiceDate } from '../db/service-date'
 import { pagedResult, resolvePaging, type ResolvedPaging } from '../db/paginate'
 import { AppError, NotFoundError, UnauthorizedError } from '../errors'
 import { persianBusinessYear } from '../time'
@@ -594,7 +596,29 @@ export async function getAdminOrderDetail(id: number): Promise<AdminOrderDetailD
   `
   const courier = rows[0]
   if (!courier) throw new NotFoundError()
-  return { ...order, ...courier }
+  const changes = await sqlClient<Array<HistoryRecord & { changedBy: string | null }>>`
+    SELECT h.from_status AS "fromStatus", h.to_status AS "toStatus", h.note, h.changed_at AS "changedAt",
+           NULLIF(TRIM(u.full_name), '') AS "changedBy"
+    FROM order_status_histories h
+    LEFT JOIN users u ON u.id = h.changed_by_user_id
+    WHERE h.order_id = ${id}
+    ORDER BY h.changed_at
+  `
+  const money = await sqlClient<Array<{ paid: number; refunded: number; pending: number }>>`
+    SELECT COALESCE(SUM(amount - refunded_amount) FILTER (WHERE status IN (${PaymentStatus.Paid}, ${PaymentStatus.Refunded})), 0)::float8 AS paid,
+           COALESCE(SUM(refunded_amount), 0)::float8 AS refunded,
+           COALESCE(SUM(amount) FILTER (WHERE status IN (${PaymentStatus.Pending}, ${PaymentStatus.AwaitingVerification})), 0)::float8 AS pending
+    FROM payments WHERE order_id = ${id}
+  `
+  const { paid, refunded, pending } = money[0] ?? { paid: 0, refunded: 0, pending: 0 }
+  // A cancelled order owes nothing, so whatever was paid for it is owed back (a negative balance).
+  const due = order.status === OrderStatus.Cancelled ? 0 : order.totalAmount
+  return {
+    ...order,
+    ...courier,
+    statusChanges: changes.map((change) => ({ ...change, changedAt: isoTimestamp(change.changedAt) })),
+    paymentSummary: { paid, refunded, pending, balance: Math.round((due - paid) * 100) / 100 },
+  }
 }
 
 /**
@@ -645,10 +669,8 @@ async function searchOrderRows(
     LEFT JOIN order_items oi ON oi.order_id = o.id
     -- Looking an order up by its number is a search across every day: the operator has the number
     -- in hand (from a customer or a receipt) and should not first have to know the order's date.
-    WHERE (${orderNumber}::text IS NOT NULL OR (
-        o.created_at >= (${query.date}::date AT TIME ZONE 'Asia/Tehran')
-        AND o.created_at < ((${query.date}::date + 1) AT TIME ZONE 'Asia/Tehran')
-      ))
+    -- A day's orders are the ones served that day, so an order placed last night for today is here.
+    WHERE (${orderNumber}::text IS NOT NULL OR ${orderServiceDate('o')} = ${query.date}::date)
       AND (${status}::int IS NULL OR o.status = ${status})
       AND (${deliveryMethod}::int IS NULL OR o.delivery_method = ${deliveryMethod})
       AND (${paymentMethod}::int IS NULL OR o.payment_method = ${paymentMethod})
@@ -693,7 +715,7 @@ export async function searchOrdersPaged(query: OrderReportQuery): Promise<PagedR
   )
 }
 
-export async function updateOrderStatus(id: number, request: UpdateOrderStatusRequest, userId = 1): Promise<void> {
+export async function updateOrderStatus(id: number, request: UpdateOrderStatusRequest, userId: number | null = null): Promise<void> {
   await sqlClient.begin(async (tx) => {
     const orderRows = await tx<{ status: OrderStatus; orderNumber: string; customerProfileId: number }[]>`
       SELECT status, order_number AS "orderNumber", customer_profile_id AS "customerProfileId"
@@ -743,9 +765,19 @@ export async function updateOrderStatus(id: number, request: UpdateOrderStatusRe
           cancelled_at = CASE WHEN ${request.newStatus} = ${OrderStatus.Cancelled} THEN ${nowSql} ELSE cancelled_at END
       WHERE id = ${id}
     `
+    if (request.newStatus === OrderStatus.Cancelled) {
+      // Money that never arrived has nothing to hand back, so those payments are closed with the
+      // order. Payments that did arrive stay «Paid»: returning that money is a real action someone
+      // has to take, and the payments screen lists it as a refund still owed.
+      await tx`
+        UPDATE payments SET status = ${PaymentStatus.Cancelled}, updated_at = ${nowSql}
+        WHERE order_id = ${id} AND status IN (${PaymentStatus.Pending}, ${PaymentStatus.AwaitingVerification})
+      `
+    }
     await tx`
-      INSERT INTO order_status_histories (order_id, from_status, to_status, note, changed_at)
-      VALUES (${id}, ${order.status}, ${request.newStatus}, ${optionalText(request.statusNote)}, ${nowSql})
+      INSERT INTO order_status_histories (order_id, from_status, to_status, note, changed_at, changed_by_user_id)
+      VALUES (${id}, ${order.status}, ${request.newStatus}, ${optionalText(request.statusNote)}, ${nowSql},
+              ${userId != null && userId > 0 ? userId : null})
     `
     const chats = await tx<{ chatId: string }[]>`
       SELECT t.chat_id AS "chatId"

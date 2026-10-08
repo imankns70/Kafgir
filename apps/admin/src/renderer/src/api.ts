@@ -33,6 +33,10 @@ import type {
   PageRequest,
   PagedResult,
   CustomerPaymentDto,
+  UnpaidOrderDto,
+  PaymentReconciliationDto,
+  PaymentRefundWriteRequest,
+  AuditLogEntryDto,
   SocialAutomationEvaluationDto,
   SocialChannelDto,
   SocialChannelWriteRequest,
@@ -387,12 +391,19 @@ export const adminApi = {
     request<PagedResult<CustomerPaymentDto>>(`/api/admin/payments?${pageQuery(paging, { bucket, search: search || undefined })}`),
   /** Totals across every payment, so the metric cards do not count only the visible page. */
   paymentTotals: () => socialInvoke<Record<
-    'all' | 'successful' | 'failed' | 'pending' | 'refunded', { count: number; amount: number }
+    'all' | 'successful' | 'failed' | 'pending' | 'refunded' | 'refundDue', { count: number; amount: number }
   >>('payments.totals'),
+  unpaidOrders: (paging?: PageRequest) =>
+    socialInvoke<PagedResult<UnpaidOrderDto>>('payments.unpaid', { page: paging?.page, pageSize: paging?.pageSize }),
+  paymentReconciliation: (date: string) =>
+    socialInvoke<PaymentReconciliationDto>('payments.reconciliation', { date }),
+  auditLog: (query: { entityType?: string | null; search?: string | null; page?: number; pageSize?: number }) =>
+    socialInvoke<PagedResult<AuditLogEntryDto>>('audit.list', query),
   createPayment: (value: PaymentWriteRequest) => request<{ id: number }>('/api/admin/payments', 'POST', value),
   changePaymentStatus: (id: number, status: number) =>
     request<void>(`/api/admin/payments/${id}/status`, 'PATCH', { status }),
-  refundPayment: (id: number) => request<void>(`/api/admin/payments/${id}/refund`, 'POST'),
+  refundPayment: (id: number, value: PaymentRefundWriteRequest) =>
+    socialInvoke<void>('payments.refund', { id, value }, true),
   searchCustomers: (query: CustomerDirectoryQuery) =>
     socialInvoke<CustomerDirectoryPageDto>('customers.search', { value: query }),
   customerDetail: (id: number) => socialInvoke<CustomerDetailDto>('customers.detail', { id }),

@@ -38,6 +38,7 @@ import { DeliveryDaysPage, DeliverySlotsPage } from './DeliveryPages'
 import { CourierAccountingPage, CourierDaysPage, CouriersPage } from './CourierPages'
 import { MonthTrend } from './BusinessPages'
 import { LogsPage } from './LogsPage'
+import { AuditLogPage } from './AuditLogPage'
 import { CustomerCommunicationPage } from './CustomerCommunicationPage'
 import { FoodTagGroupsPage, SupportSubjectsPage } from './ReferenceDataPages'
 import { DeliveryMethodsPage, PaymentMethodsPage } from './SettingsPages'
@@ -407,7 +408,7 @@ function PageFrame({ title, actions, children }: { title: string; actions?: Reac
  *
  * Everything here comes from one aggregated call, so opening the dashboard is one round trip.
  */
-function DashboardPage() {
+function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => void }) {
   const [data, setData] = useState<AdminDashboardSummaryDto | null>(null)
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(async () => {
@@ -428,13 +429,32 @@ function DashboardPage() {
     ['فروش غذای امروز', money(today.foodSales)],
   ] : []
   const monthCards: Array<[string, string]> = month ? [
-    ['فروش غذا', money(month.foodSales)],
+    ['فروش غذا (خالص)', money(month.foodSales)],
+    ...(month.refunds > 0 ? [['استرداد', money(month.refunds)] as [string, string]] : []),
     ['خریدها', money(month.purchases)],
     ['فروش منهای خرید', money(month.salesMinusPurchases)],
     ['نسبت خرید به فروش', month.purchaseToSalesPercent === null
       ? '—' : `${formatNumber(month.purchaseToSalesPercent, 1)}٪`],
     ['کارکرد پیک', money(month.courierCost)],
+    ['حاشیه ارسال (هزینه ارسال منهای پیک)', money(month.deliveryMargin)],
     ['تعداد خرید', plainNumber(month.purchaseCount)],
+  ] : []
+  const attention = data?.attention
+  const attentionItems: Array<{ key: string; tone: string; text: string; page: Page }> = attention ? [
+    ...(attention.pendingOrders > 0 ? [{ key: 'pending', tone: 'warn', page: 'orders' as Page,
+      text: `${plainNumber(attention.pendingOrders)} سفارش منتظر تأیید است` }] : []),
+    ...attention.lowStock.map((item) => ({ key: `stock-${item.menuItemId}`, tone: 'warn', page: 'menu' as Page,
+      text: item.pendingPortions > item.remainingPortions
+        ? `«${item.foodName}»: ${plainNumber(item.pendingPortions)} پرس در انتظار تأیید، فقط ${plainNumber(item.remainingPortions)} پرس باقی است`
+        : `«${item.foodName}»: فقط ${plainNumber(item.remainingPortions)} پرس باقی مانده` })),
+    ...(attention.refundDueCount > 0 ? [{ key: 'refund', tone: 'error', page: 'payments' as Page,
+      text: `${money(attention.refundDueAmount)} بابت ${plainNumber(attention.refundDueCount)} سفارش لغوشده باید به مشتری برگردد` }] : []),
+    ...(attention.unpaidOrders > 0 ? [{ key: 'unpaid', tone: 'error', page: 'payments' as Page,
+      text: `${plainNumber(attention.unpaidOrders)} سفارش تحویل‌شده هنوز تسویه نشده (${money(attention.unpaidAmount)})` }] : []),
+    ...(attention.openSupportConversations > 0 ? [{ key: 'support', tone: 'info', page: 'customer-communication' as Page,
+      text: `${plainNumber(attention.openSupportConversations)} گفتگوی پشتیبانی منتظر پاسخ است` }] : []),
+    ...(attention.newReviews > 0 ? [{ key: 'reviews', tone: 'info', page: 'customer-communication' as Page,
+      text: `${plainNumber(attention.newReviews)} نظر تازه بررسی نشده` }] : []),
   ] : []
 
   return <PageFrame
@@ -447,6 +467,17 @@ function DashboardPage() {
     </>}
   >
     <Message error={error} />
+
+    {attention && <section className="dashboard-band attention-band" aria-labelledby="dashboard-attention-title">
+      <h2 id="dashboard-attention-title">نیازمند رسیدگی</h2>
+      {attentionItems.length === 0
+        ? <p className="attention-clear">همه چیز مرتب است؛ کار فوری‌ای در صف نیست.</p>
+        : <ul className="attention-list">{attentionItems.map((item) => <li key={item.key}>
+            <button type="button" className={`attention-item ${item.tone}`} onClick={() => onNavigate?.(item.page)}>
+              <span>{item.text}</span><span aria-hidden="true">‹</span>
+            </button>
+          </li>)}</ul>}
+    </section>}
 
     <section className="dashboard-band" aria-labelledby="dashboard-today-title">
       <h2 id="dashboard-today-title">امروز</h2>
@@ -564,6 +595,18 @@ function OrderDetails({ order }: { order: AdminOrderDetailDto }) {
             : 'خیر؛ فقط پس از «تحویل شد» به کارکرد پیک اضافه می‌شود.'}</dd></div>
         </dl>
       </section>
+      {'paymentSummary' in order && <section className="detail-section">
+        <h3>پرداخت</h3>
+        <dl>
+          <div><dt>دریافت‌شده (پس از استرداد)</dt><dd>{money(order.paymentSummary.paid)}</dd></div>
+          {order.paymentSummary.pending > 0 && <div><dt>در انتظار تأیید</dt><dd>{money(order.paymentSummary.pending)}</dd></div>}
+          {order.paymentSummary.refunded > 0 && <div><dt>مستردشده</dt><dd>{money(order.paymentSummary.refunded)}</dd></div>}
+          <div className={order.paymentSummary.balance !== 0 ? 'detail-total warn' : 'detail-total'}>
+            <dt>{order.paymentSummary.balance < 0 ? 'باید به مشتری برگردد' : 'مانده دریافت'}</dt>
+            <dd>{money(Math.abs(order.paymentSummary.balance))}</dd>
+          </div>
+        </dl>
+      </section>}
       <section className="detail-section">
         <h3>یادداشت‌ها</h3>
         <dl>
@@ -581,10 +624,11 @@ function OrderDetails({ order }: { order: AdminOrderDetailDto }) {
 
     <section className="order-table-section">
       <h3>تاریخچه وضعیت</h3>
-      <div className="table-wrap detail-table"><table><thead><tr><th>از</th><th>به</th><th>زمان</th><th>توضیح</th></tr></thead>
-        <tbody>{order.statusHistories.map((item, index) => <tr key={`${item.changedAt}-${index}`}>
+      <div className="table-wrap detail-table"><table><thead><tr><th>از</th><th>به</th><th>زمان</th><th>توسط</th><th>توضیح</th></tr></thead>
+        <tbody>{('statusChanges' in order && order.statusChanges.length > 0 ? order.statusChanges : order.statusHistories.map((item) => ({ ...item, changedBy: null as string | null })))
+          .map((item, index) => <tr key={`${item.changedAt}-${index}`}>
           <td><Status value={item.fromStatus} /></td><td><Status value={item.toStatus} /></td>
-          <td>{dateTime(item.changedAt)}</td><td>{item.note || '—'}</td>
+          <td>{dateTime(item.changedAt)}</td><td>{item.changedBy ?? '—'}</td><td>{item.note || '—'}</td>
         </tr>)}</tbody></table></div>
     </section>
     {showInvoice && <InvoiceDialog order={order} onClose={() => setShowInvoice(false)} />}
@@ -668,7 +712,10 @@ function OrdersPage() {
       ])
       setResult(rows)
       setSelected(refreshed)
-      setMessage('وضعیت سفارش با موفقیت به‌روزرسانی شد.')
+      // Cancelling does not move money by itself; say so when this order had already been paid.
+      setMessage(newStatus === OrderStatus.Cancelled && refreshed.paymentSummary.balance < 0
+        ? `سفارش لغو شد. ${money(-refreshed.paymentSummary.balance)} از این سفارش پرداخت شده بود؛ استرداد آن را از «پرداخت‌های سفارش» ثبت کنید.`
+        : 'وضعیت سفارش با موفقیت به‌روزرسانی شد.')
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
     } finally {
@@ -1419,10 +1466,14 @@ export function DailyMenuPage({ planning = false, onSetup }: {
         {saveAction.busy ? 'در حال ذخیره…' : 'افزودن به منوی امروز'}
       </button>
     </form>
-    <div className="panel table-wrap compact-grid-panel"><table><thead><tr><RowNumberHead /><th>غذا</th><th>وضعیت</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th /></tr></thead>
+    <div className="panel table-wrap compact-grid-panel"><table><thead><tr><RowNumberHead /><th>غذا</th><th>وضعیت</th><th>قیمت فروش</th><th>نقش برنج</th><th>تخفیف</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده</th><th title="پرس‌هایی که در سفارش‌های در انتظار تأیید هستند">در انتظار تأیید</th><th /></tr></thead>
       <tbody>{pagedMenu.visible.map((item, index) => {
         const needsSetup = item.price <= 0 || item.capacityPortions <= 0 || !item.isAvailable
-        return <tr key={item.id}><RowNumberCell offset={pagedMenu.rowOffset} index={index} /><td>{item.foodName}</td><td>{needsSetup ? <span className="badge status-1">نیازمند تکمیل</span> : <span className="badge open">آماده فروش</span>}</td><td>{item.price > 0 ? (item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)) : '—'}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{item.capacityPortions > 0 ? plainNumber(item.capacityPortions) : '—'}</td><td>{plainNumber(item.soldPortions)}</td><td>{item.capacityPortions > 0 ? plainNumber(item.remainingPortions) : '—'}</td><td className="actions"><button onClick={() => onSetup?.(item.id, false)}>{needsSetup ? 'تعیین قیمت و ظرفیت' : 'ویرایش'}</button>{!needsSetup && <button className="discount-action" onClick={() => onSetup?.(item.id, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button>}<button className="danger" disabled={removeAction.busy} onClick={() => removeItem(item.id)}>{removingId === item.id ? 'در حال حذف…' : 'حذف'}</button></td></tr>
+        return <tr key={item.id}><RowNumberCell offset={pagedMenu.rowOffset} index={index} /><td>{item.foodName}</td><td>{needsSetup ? <span className="badge status-1">نیازمند تکمیل</span> : <span className="badge open">آماده فروش</span>}</td><td>{item.price > 0 ? (item.originalPrice ? <div className="admin-discount-price"><del>{money(item.originalPrice)}</del><strong>{money(item.price)}</strong></div> : money(item.price)) : '—'}</td><td>{persianRice?.menuItemId === item.id ? 'ارتقای مخفی' : item.allowsPersianRice ? 'قابل ارتقا' : 'غذای مستقل'}</td><td>{item.discountPercentage ? <span className="discount-badge">{plainNumber(item.discountPercentage)}٪ تخفیف</span> : <span className="muted-cell">بدون تخفیف</span>}</td><td>{item.capacityPortions > 0 ? plainNumber(item.capacityPortions) : '—'}</td><td>{plainNumber(item.soldPortions)}</td><td>{item.capacityPortions > 0 ? plainNumber(item.remainingPortions) : '—'}</td><td>{(item.pendingPortions ?? 0) > 0
+          ? <span className={(item.pendingPortions ?? 0) > item.remainingPortions ? 'badge closed' : 'badge status-1'}
+              title={(item.pendingPortions ?? 0) > item.remainingPortions ? 'سفارش‌های در انتظار تأیید بیش از ظرفیت باقی‌مانده است.' : undefined}>
+              {plainNumber(item.pendingPortions ?? 0)}</span>
+          : '—'}</td><td className="actions"><button onClick={() => onSetup?.(item.id, false)}>{needsSetup ? 'تعیین قیمت و ظرفیت' : 'ویرایش'}</button>{!needsSetup && <button className="discount-action" onClick={() => onSetup?.(item.id, true)}>{item.discountPercentage ? 'ویرایش تخفیف' : 'تخفیف'}</button>}<button className="danger" disabled={removeAction.busy} onClick={() => removeItem(item.id)}>{removingId === item.id ? 'در حال حذف…' : 'حذف'}</button></td></tr>
       })}</tbody></table></div>
     {!menu?.items.length && <p className="panel muted">برای امروز برنامه‌ای ثبت نشده است؛ غذا را از فرم بالا مستقیم به منوی امروز اضافه کنید.</p>}
     <Pager {...pagedMenu} />
@@ -1995,7 +2046,7 @@ export function App() {
     setPage('foods')
   }
   const pages: Record<Page, ReactNode> = {
-    dashboard: <DashboardPage />,
+    dashboard: <DashboardPage onNavigate={setPage} />,
     'delivery-slots': <DeliverySlotsPage />,
     'delivery-days': <DeliveryDaysPage />,
     couriers: <CouriersPage />,
@@ -2018,6 +2069,7 @@ export function App() {
     purchases: <PurchasesPage />,
     months: <MonthsPage />,
     logs: <LogsPage />,
+    'audit-log': <AuditLogPage />,
     'food-tag-groups': <FoodTagGroupsPage />,
     'support-subjects': <SupportSubjectsPage />,
     customers: <CustomersPage />,

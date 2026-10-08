@@ -802,3 +802,23 @@ td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-ali
 }
 .purchase-form { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
 .orders-empty-detail{padding-inline:18px;text-align:center}
+.payment-view-tabs{display:flex;gap:8px}
+.payment-view-tabs button.active{color:#fff;border-color:var(--olive);background:var(--olive)}
+.refund-note{display:block;margin-top:3px;color:var(--muted);font-size:11px;white-space:normal}
+.refund-note.warn{color:var(--error);font-weight:700}
+.refund-form{display:inline-flex;gap:5px;align-items:center}
+.refund-form input{width:110px;min-height:34px;border:1px solid var(--border);border-radius:8px;padding:4px 8px}
+.amount-due{color:var(--error)}
+.detail-total.warn dd{color:var(--error)}
+.attention-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.attention-item{display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:12px;text-align:right;font-weight:700;font-size:14px}
+.attention-item.warn{border-color:#f2b23399;background:#fff0c8;color:#7a5200}
+.attention-item.error{border-color:#b33a3255;background:#fbe2de;color:var(--error)}
+.attention-item.info{border-color:#496a7044;background:#e2eef0;color:#2f5258}
+.attention-clear{margin:0;padding:12px 14px;border:1px dashed var(--border);border-radius:12px;color:var(--success);background:#f1f4e9}
+.payment-status-overview{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.payment-status-overview .payment-metric{min-height:96px}
+/* In the narrow orders pane the number and its actions stack instead of squeezing each other. */
+.orders-detail-pane .order-detail-heading{flex-direction:column;align-items:stretch;gap:8px}
+.orders-detail-pane .order-detail-heading strong{white-space:nowrap}
+.orders-detail-pane .order-detail-heading>.order-detail-heading-actions{justify-content:space-between}

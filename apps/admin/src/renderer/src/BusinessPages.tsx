@@ -314,11 +314,14 @@ export function MonthMetrics({ report }: { report: MonthlyReportDto }) {
   const { summary } = report
   return <>
     <div className="metric-grid">
-      <article className="metric"><span>فروش غذا</span><strong>{formatMoney(summary.foodSales)}</strong></article>
+      <article className="metric"><span>فروش غذا (خالص)</span><strong>{formatMoney(summary.foodSales)}</strong></article>
+      {summary.refunds > 0 && <article className="metric"><span>استرداد</span><strong>{formatMoney(summary.refunds)}</strong></article>}
       <article className="metric"><span>خریدها</span><strong>{formatMoney(summary.purchases)}</strong></article>
       <article className="metric"><span>فروش منهای خرید</span><strong>{formatMoney(summary.salesMinusPurchases)}</strong></article>
       <article className="metric"><span>نسبت خرید به فروش</span><strong>{percentText(summary.purchaseToSalesPercent)}</strong></article>
       <article className="metric"><span>کارکرد پیک</span><strong>{formatMoney(summary.courierCost)}</strong></article>
+      <article className="metric"><span>هزینه ارسال دریافتی</span><strong>{formatMoney(summary.deliveryFees)}</strong></article>
+      <article className="metric"><span>حاشیه ارسال</span><strong>{formatMoney(summary.deliveryMargin)}</strong></article>
       <article className="metric"><span>تعداد خرید</span><strong>{formatNumber(summary.purchaseCount)}</strong></article>
     </div>
     <Message>{ratioSentence(summary.purchaseToSalesPercent)}</Message>

@@ -546,6 +546,7 @@ export const orderStatusHistories = pgTable('order_status_histories', {
   toStatus: integer('to_status').notNull(),
   note: varchar('note', { length: 1000 }),
   changedAt: utcTimestamp('changed_at').notNull(),
+  changedByUserId: integer('changed_by_user_id').references(() => users.id, { onDelete: 'set null' }),
 }, (table) => [
   index('order_status_histories_order_idx').on(table.orderId),
 ])
@@ -747,10 +748,15 @@ export const payments = pgTable('payments', {
   confirmedAt: utcTimestamp('confirmed_at'),
   confirmedByUserId: integer('confirmed_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
   description: text('description'),
+  refundedAmount: money('refunded_amount').notNull().default(0),
+  refundReason: varchar('refund_reason', { length: 500 }),
+  refundedAt: utcTimestamp('refunded_at'),
+  refundedByUserId: integer('refunded_by_user_id').references(() => users.id, { onDelete: 'restrict' }),
   createdAt: utcTimestamp('created_at').notNull(),
   updatedAt: utcTimestamp('updated_at').notNull(),
 }, (table) => [
   index('payments_order_status_idx').on(table.orderId, table.status),
+  check('payments_refunded_amount_check', sql`${table.refundedAmount} >= 0 AND ${table.refundedAmount} <= ${table.amount}`),
   check('payments_amount_check', sql`${table.amount} > 0`),
   check('payments_method_check', sql`${table.paymentMethod} IN (1, 2, 3, 4)`),
   check('payments_status_check', sql`${table.status} BETWEEN 1 AND 7`),

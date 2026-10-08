@@ -66,8 +66,16 @@ export const monthlySummarySchema = jalaliMonthSchema.extend({
   title: z.string(),
   fromDate: isoDate,
   toDate: isoDate,
-  /** Sum of order subtotals — food only, never the customer's delivery charge. */
+  /**
+   * Food sold, net of refunds: delivered orders' subtotals (food only, never the delivery charge)
+   * minus what was handed back on them. `grossFoodSales` and `refunds` show the two parts.
+   */
   foodSales: z.number().nonnegative(),
+  grossFoodSales: z.number().nonnegative().default(0),
+  refunds: z.number().nonnegative().default(0),
+  /** Delivery charges customers paid on delivered orders, and that minus what couriers earned. */
+  deliveryFees: z.number().nonnegative().default(0),
+  deliveryMargin: z.number().default(0),
   purchases: z.number().nonnegative(),
   salesMinusPurchases: z.number(),
   /** Purchases as a percentage of food sales. Null when the month sold nothing. */

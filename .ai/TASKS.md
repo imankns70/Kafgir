@@ -3,22 +3,22 @@
 ## 2026-10-08 Admin (Electron) review follow-up
 
 UI defects
-- [ ] A1 Order report rows are missing the «زمان تحویل» cell, so every later column is shifted.
-- [ ] A2 Order-review table squeezes the comment to one character per line; actions overflow.
-- [ ] A3 Wide tables (orders, customers, today's menu) are clipped on the left at 1280px.
-- [ ] A4 Purchase and payment entry forms overlap fields; native month select is unstyled.
-- [ ] A5 Order action buttons show before any order is selected.
-- [ ] A6 Dashboard chart has no value axis and runs left-to-right.
-- [ ] A7 Dashboard does not surface urgent work (orders awaiting confirmation, dishes near sell-out).
+- [x] A1 Order report rows are missing the «زمان تحویل» cell, so every later column is shifted.
+- [x] A2 Order-review table squeezes the comment to one character per line; actions overflow.
+- [x] A3 Wide tables (orders, customers, today's menu) are clipped on the left at 1280px.
+- [x] A4 Purchase and payment entry forms overlap fields; native month select is unstyled.
+- [x] A5 Order action buttons show before any order is selected.
+- [x] A6 Dashboard chart has no value axis and runs left-to-right.
+- [x] A7 Dashboard does not surface urgent work (orders awaiting confirmation, dishes near sell-out).
 
 Money and order correctness
-- [ ] B1 Cancelling a paid order leaves its payment «Paid» with no refund prompt.
-- [ ] B2 Order grid, dashboard and kitchen views go by creation date instead of delivery date.
-- [ ] B3 Refunded payments still count as sales; refunds are always full and carry no reason.
-- [ ] B4 No list of delivered-but-unpaid orders and no daily payment reconciliation by method.
-- [ ] B5 Pending orders do not reserve capacity and the operator cannot see that demand.
-- [ ] B6 Order status changes do not record the operator; the audit log has no admin view.
-- [ ] B7 Kitchen role can delete purchases.
+- [x] B1 Cancelling a paid order leaves its payment «Paid» with no refund prompt.
+- [x] B2 Order grid, dashboard and kitchen views go by creation date instead of delivery date.
+- [x] B3 Refunded payments still count as sales; refunds are always full and carry no reason.
+- [x] B4 No list of delivered-but-unpaid orders and no daily payment reconciliation by method.
+- [x] B5 Pending orders do not reserve capacity and the operator cannot see that demand.
+- [x] B6 Order status changes do not record the operator; the audit log has no admin view.
+- [x] B7 Kitchen role can delete purchases.
 
 Operations features
 - [ ] C1 Kitchen production sheet and packing list per delivery date (printable).
@@ -38,7 +38,8 @@ Smaller improvements
 - [ ] D3 Database backup export from Admin.
 - [ ] D4 Auto-cancel pending orders nobody confirmed in time.
 - [ ] D5 Kitchen ticket and bag-label printing.
-- [ ] D6 Delivery-fee margin (customer charge vs courier pay) in reports.
+- [x] D6 Delivery-fee margin (customer charge vs courier pay) in reports.
+- [ ] Apply `0026_order_money_integrity.sql` to Neon and any other deployed database before releasing.
 - [ ] D7 Review what server logs expose to the kitchen role.
 
 ## 2026-10-07 Development startup

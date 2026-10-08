@@ -22,8 +22,9 @@ const kitchenOperations = new Set<AdminOperation>([
   'support.conversations.list', 'support.conversations.get', 'support.conversations.reply',
   'support.conversations.setClosed', 'support.reviews.list', 'support.reviews.setStatus', 'support.reviews.reply',
   'logs.server',
-  // The kitchen does the shopping, so it writes the purchase down and sees the month it lands in.
-  'purchases.month', 'purchases.create', 'purchases.update', 'purchases.delete',
+  // The kitchen does the shopping, so it writes the purchase down, corrects it and sees the month it
+  // lands in. Deleting one changes the month's books, so that stays with Owner.
+  'purchases.month', 'purchases.create', 'purchases.update',
   'months.list', 'months.get',
   'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',
   // The kitchen sees who is delivering on a given day, but never the courier ledger.
@@ -41,6 +42,7 @@ const orderOperations = new Set<AdminOperation>([
   'support.conversations.list', 'support.conversations.get', 'support.conversations.reply',
   'support.conversations.setClosed', 'support.reviews.list', 'support.reviews.setStatus', 'support.reviews.reply',
   'payments.list', 'payments.totals', 'payments.create', 'payments.changeStatus',
+  'payments.unpaid', 'payments.reconciliation',
   'logs.server', 'reports.customers', 'customers.search', 'customers.detail',
   'purchases.month', 'months.list', 'months.get',
   'deliverySlots.list', 'deliveryDays.get', 'deliveryDays.setOverride',

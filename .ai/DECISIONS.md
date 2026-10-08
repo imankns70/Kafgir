@@ -1,5 +1,19 @@
 # Decisions
 
+## 2026-10-08 — Orders belong to their service day; refunds come off sales
+
+- An order's service date is `COALESCE(delivery_date, Tehran day of created_at)`, one indexed
+  expression (`orders_service_date_idx`). The order grid, dashboard and month reports group by it, so
+  an order placed last night for today is today's work. Customer reports keep `created_at`: they
+  measure when customers ordered, not when food was served.
+- Food sales are net of refunds. A refund on an order, capped at its food subtotal, comes off the
+  month the order was served in. Refunds record amount, reason, time and operator; a partial refund
+  leaves the payment «Paid», a full one also sets «Refunded».
+- Cancelling an order cancels its unconfirmed payments but leaves paid ones «Paid»: returning money
+  is a real action, surfaced as «استرداد معوق» on the payments page and the dashboard.
+- Placing an order still does not hold capacity; Admin sees the pending demand per dish instead.
+- Order status changes record the operator; `audit.list` (Owner only) reads them with `audit_logs`.
+
 ## 2026-10-08 — Order numbers are random, not a running counter
 
 - New order numbers are `<Persian year>-<six random digits>`. A sequential counter revealed order

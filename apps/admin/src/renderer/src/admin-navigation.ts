@@ -3,7 +3,7 @@ import { isAdminOperationAllowed } from '../../shared/admin-permissions'
 
 export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' | 'food-photos' | 'food-tags'
   | 'categories' | 'tags' | 'menu' | 'menu-item' | 'menu-plan' | 'report' | 'purchases' | 'months' | 'payments'
-  | 'delivery-slots' | 'delivery-days' | 'logs'
+  | 'delivery-slots' | 'delivery-days' | 'logs' | 'audit-log'
   | 'social-dashboard' | 'social-channels' | 'social-publish' | 'social-templates'
   | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
   | 'food-tag-groups' | 'support-subjects'
@@ -139,6 +139,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { page: 'payment-methods', label: 'روش‌های پرداخت', operation: 'paymentMethods.list' },
       { page: 'delivery-methods', label: 'روش‌های دریافت', operation: 'deliveryMethods.list' },
+      { page: 'audit-log', label: 'گزارش تغییرات', operation: 'audit.list' },
       { page: 'logs', label: 'گزارش رویدادها', operation: 'logs.server' },
     ],
   },

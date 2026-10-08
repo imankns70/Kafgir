@@ -109,6 +109,11 @@ export const dailyMenuItemSchema = z.object({
   soldPortions: z.number().int().nonnegative(),
   remainingPortions: z.number().int(),
   isAvailable: z.boolean(),
+  /**
+   * Admin only: portions in orders still awaiting confirmation. Placing an order does not hold
+   * capacity, so this is the demand that will compete for `remainingPortions` at confirmation.
+   */
+  pendingPortions: z.number().int().nonnegative().optional(),
 })
 
 export const dailyMenuSchema = z.object({
@@ -327,6 +332,19 @@ export const adminOrderDetailSchema = orderSchema.extend({
   courierId: z.number().int().positive().nullable(),
   courierNameSnapshot: z.string().nullable(),
   courierPayableAmount: z.number().nonnegative().nullable(),
+  /** The status history with the operator who made each change, for Admin only. */
+  statusChanges: z.array(orderStatusHistorySchema.extend({ changedBy: z.string().nullable() })).default([]),
+  /**
+   * Money against the order: paid is net of refunds, pending is recorded but not yet confirmed.
+   * `balance` is what is still owed (positive) or owed back to the customer (negative, e.g. a paid
+   * order that was cancelled).
+   */
+  paymentSummary: z.object({
+    paid: z.number(),
+    refunded: z.number(),
+    pending: z.number(),
+    balance: z.number(),
+  }).default({ paid: 0, refunded: 0, pending: 0, balance: 0 }),
 })
 
 type InvoiceSourceItem = z.infer<typeof orderItemSchema>
@@ -742,6 +760,26 @@ export const dashboardSummarySchema = z.object({
   month: monthlySummarySchema,
   /** Daily food sales against daily purchases for the current month, for one compact chart. */
   monthDaily: z.array(monthlyDailyPointSchema),
+  /** What needs a person now, so the dashboard can lead with it instead of with totals. */
+  attention: z.object({
+    pendingOrders: z.number().int().nonnegative(),
+    /** Today's dishes with five or fewer portions left, or more pending demand than room. */
+    lowStock: z.array(z.object({
+      menuItemId: z.number().int(),
+      foodName: z.string(),
+      remainingPortions: z.number().int(),
+      pendingPortions: z.number().int().nonnegative(),
+    })),
+    unpaidOrders: z.number().int().nonnegative(),
+    unpaidAmount: z.number().nonnegative(),
+    refundDueCount: z.number().int().nonnegative(),
+    refundDueAmount: z.number().nonnegative(),
+    openSupportConversations: z.number().int().nonnegative(),
+    newReviews: z.number().int().nonnegative(),
+  }).default({
+    pendingOrders: 0, lowStock: [], unpaidOrders: 0, unpaidAmount: 0,
+    refundDueCount: 0, refundDueAmount: 0, openSupportConversations: 0, newReviews: 0,
+  }),
 })
 
 export const analyticsHeartbeatSchema = z.object({

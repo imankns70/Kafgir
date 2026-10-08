@@ -7,6 +7,7 @@ import {
   foodWriteSchema,
   purchaseWriteSchema,
   paymentStatusWriteSchema,
+  paymentRefundWriteSchema,
   paymentWriteSchema,
   updateDailyMenuItemSchema,
   updateDailyMenuSettingsSchema,
@@ -67,6 +68,9 @@ import {
   searchCustomers,
   getCustomerDetail,
   refundPayment,
+  listUnpaidOrders,
+  paymentReconciliation,
+  listAuditLogs,
   removeMenuItem,
   searchOrdersPaged,
   setFoodActive,
@@ -323,7 +327,19 @@ export async function dispatchAdminOperation(
         paymentStatusWriteSchema.parse({ status: Number(body.status) }),
         principal.userId,
       )
-    case 'payments.refund': return refundPayment(numberField(body, 'id'), principal.userId)
+    case 'payments.refund':
+      return refundPayment(numberField(body, 'id'), paymentRefundWriteSchema.parse(body.value), principal.userId)
+    case 'payments.unpaid':
+      return listUnpaidOrders(body.page == null ? undefined : Number(body.page),
+        body.pageSize == null ? undefined : Number(body.pageSize))
+    case 'payments.reconciliation': return paymentReconciliation(textField(body, 'date'))
+    case 'audit.list':
+      return listAuditLogs({
+        entityType: typeof body.entityType === 'string' ? body.entityType : null,
+        search: searchArg(body) || null,
+        page: pageArg(body),
+        pageSize: sizeArg(body),
+      })
     case 'customers.search': return searchCustomers(customerDirectoryQuerySchema.parse(body.value))
     case 'customers.detail': return getCustomerDetail(numberField(body, 'id'))
     case 'reports.customers': {
