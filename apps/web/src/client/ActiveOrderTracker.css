@@ -472,3 +472,7 @@
     animation: none;
   }
 }
+
+@media (max-width: 768px) {
+  .has-active-order-pill .app-shell { padding-block-end: calc(84px + 76px + env(safe-area-inset-bottom, 0px)); }
+}

@@ -182,6 +182,16 @@ export function ActiveOrderTracker() {
   ), [orders, selectedOrderId])
 
   const primaryOrder = orders[0] ?? null
+  const showsPill = isMobile && primaryOrder != null
+
+  // The pill floats above the tab bar, which is all the room pages reserve at their foot; without
+  // more, the end of every page (a total, a print button) sat under it and could not be scrolled into
+  // view. The class lets the page shell make room only while the pill is on screen.
+  useEffect(() => {
+    if (!showsPill) return
+    document.documentElement.classList.add('has-active-order-pill')
+    return () => document.documentElement.classList.remove('has-active-order-pill')
+  }, [showsPill])
   const primaryIndex = primaryOrder ? activeStepIndex(primaryOrder.status) : 0
   const primaryProgress = ((primaryIndex + 1) / steps.length) * 100
 
