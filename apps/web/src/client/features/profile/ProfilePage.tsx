@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { BrandedState } from '../../design-system/BrandedState'
 import { ButtonLoading } from '../../design-system/ButtonLoading'
 import { Icon } from '../../design-system/Icon'
+import { OtpCodeInput } from '../../design-system/OtpCodeInput'
 import {
   createCustomerAddress,
   deleteCustomerAddress,
@@ -36,10 +37,6 @@ const emptyAddress: CustomerAddressWriteRequest = {
   addressLine: '',
   isDefault: false,
 }
-const asciiDigits = (value: string) => value
-  .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
-  .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
-  .replace(/\D/g, '')
 
 export function ProfilePage({ onBack, onAuthenticationChange }: {
   onBack: () => void
@@ -241,7 +238,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
         </p>
         {loginStep === 'phone'
           ? <label className="field">شماره موبایل<input className="ltr-value" dir="ltr" inputMode="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="09121234567" /></label>
-          : <label className="field">کد تایید<input className="otp-input ltr-value" dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(asciiDigits(event.target.value))} /></label>}
+          : <OtpCodeInput value={code} onChange={setCode} autoFocus />}
         {error && <div className="form-error" role="alert">{error}</div>}
         <button className="primary-button full-width" disabled={isSubmitting}>{isSubmitting ? 'لطفاً صبر کنید…' : loginStep === 'phone' ? 'ارسال کد تایید' : 'ورود'}</button>
         {loginStep === 'code' && <div className="otp-actions">
@@ -286,7 +283,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
             <p className="muted">با تایید شماره، سفارش‌ها و آدرس‌های ثبت‌شده با این موبایل به همین حساب متصل می‌شوند. فقط داشتن یا وارد کردن شماره برای دسترسی کافی نیست.</p>
             {loginStep === 'phone'
               ? <label className="field">شماره موبایل<input className="ltr-value" dir="ltr" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
-              : <label className="field">کد تایید<input className="otp-input ltr-value" dir="ltr" inputMode="numeric" maxLength={6} value={code} onChange={(event) => setCode(asciiDigits(event.target.value))} /></label>}
+              : <OtpCodeInput value={code} onChange={setCode} autoFocus />}
             <button className="primary-button" disabled={isSubmitting}>{loginStep === 'phone' ? 'ارسال کد' : 'تایید شماره'}</button>
           </form>}
 

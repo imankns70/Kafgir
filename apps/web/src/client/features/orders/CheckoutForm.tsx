@@ -11,6 +11,7 @@ import { getTelegramInitData, getTelegramUser } from '../../services/telegram'
 import { cartItemIssue } from '../../services/cartReconciliation'
 import { Icon } from '../../design-system/Icon'
 import { ButtonLoading } from '../../design-system/ButtonLoading'
+import { OtpCodeInput } from '../../design-system/OtpCodeInput'
 import { DeliverySlotPicker } from './DeliverySlotPicker'
 import { SavedAddressPicker } from './SavedAddressPicker'
 import type { CheckoutStep } from '../cart/CartPage'
@@ -33,10 +34,6 @@ const newAddressValue = 'new'
 type AuthenticationState = 'checking' | 'guest' | 'authenticated'
 type LoginStep = 'phone' | 'code'
 type LoginPurpose = 'checkout' | 'link'
-const asciiDigits = (value: string) => value
-  .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
-  .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
-  .replace(/\D/g, '')
 
 export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshCart, onSuccess, onAuthenticationChange, wizardStep, onWizardStepChange, onDeliveryCostChange }: {
   items: CartItem[]
@@ -390,10 +387,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         </button>
       </> : <>
         <p className="muted">کد شش‌رقمی ارسال‌شده به <bdi>{loginPhone}</bdi> را وارد کنید.</p>
-        <label className="field">کد تایید
-          <input className="otp-input ltr-value" dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
-            value={otpCode} onChange={(event) => setOtpCode(asciiDigits(event.target.value))} autoFocus />
-        </label>
+        <OtpCodeInput value={otpCode} onChange={setOtpCode} autoFocus />
         <button type="button" className="primary-button full-width" disabled={isAuthenticating || otpCode.length !== 6} onClick={() => void verifyOtp()}>
           {isAuthenticating ? 'در حال بررسی…' : 'تایید و ادامه'}
         </button>
