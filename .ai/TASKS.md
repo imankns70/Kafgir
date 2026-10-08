@@ -21,7 +21,7 @@ Money and order correctness
 - [x] B7 Kitchen role can delete purchases.
 
 Operations features
-- [ ] C1 Kitchen production sheet and packing list per delivery date (printable).
+- [x] C1 Kitchen production sheet and packing list per delivery date (printable).
 - [ ] C2 Sound and desktop notification for new orders.
 - [ ] C3 CSV export for orders, payments, customers and purchases.
 - [ ] C4 Sales report by dish, average basket, cancellation rate, by delivery slot and payment method.
@@ -37,7 +37,7 @@ Smaller improvements
 - [ ] D2 Record leftover portions per day.
 - [ ] D3 Database backup export from Admin.
 - [ ] D4 Auto-cancel pending orders nobody confirmed in time.
-- [ ] D5 Kitchen ticket and bag-label printing.
+- [x] D5 Kitchen ticket and bag-label printing.
 - [x] D6 Delivery-fee margin (customer charge vs courier pay) in reports.
 - [ ] Apply `0026_order_money_integrity.sql` to Neon and any other deployed database before releasing.
 - [ ] D7 Review what server logs expose to the kitchen role.

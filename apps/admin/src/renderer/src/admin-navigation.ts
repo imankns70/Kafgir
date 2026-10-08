@@ -3,7 +3,7 @@ import { isAdminOperationAllowed } from '../../shared/admin-permissions'
 
 export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' | 'food-photos' | 'food-tags'
   | 'categories' | 'tags' | 'menu' | 'menu-item' | 'menu-plan' | 'report' | 'purchases' | 'months' | 'payments'
-  | 'delivery-slots' | 'delivery-days' | 'logs' | 'audit-log'
+  | 'delivery-slots' | 'delivery-days' | 'logs' | 'audit-log' | 'kitchen'
   | 'social-dashboard' | 'social-channels' | 'social-publish' | 'social-templates'
   | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
   | 'food-tag-groups' | 'support-subjects'
@@ -70,6 +70,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { page: 'menu', label: 'منوی امروز', operation: 'menus.get' },
       { page: 'menu-plan', label: 'برنامه ماهانه', operation: 'menus.get' },
+      { page: 'kitchen', label: 'برگه آشپزخانه و بسته‌بندی', operation: 'kitchen.sheet' },
       { page: 'delivery-days', label: 'ظرفیت ارسال روزانه', operation: 'deliveryDays.get' },
       { page: 'courier-days', label: 'پیک و هزینه ارسال روزانه', operation: 'courierDays.get' },
       { page: 'orders', label: 'سفارش‌ها', operation: 'orders.search' },

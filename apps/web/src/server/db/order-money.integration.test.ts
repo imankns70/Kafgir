@@ -7,6 +7,7 @@ import {
   createPayment,
   getAdminOrderDetail,
   getMonthlyReport,
+  getProductionSheet,
   jalaliMonthRange,
   listAuditLogs,
   listPayments,
@@ -182,5 +183,20 @@ integration.sequential('order money integrity', () => {
     const cash = after.methods.find((row) => row.paymentMethod === PaymentMethod.Cash)
     expect(cash?.received).toBeGreaterThanOrEqual(800_000)
     expect(after.totals.net).toBe(after.totals.received - after.totals.refunded)
+  })
+
+  it('sums the kitchen sheet by dish and status and gives each live order a packing card', async () => {
+    const confirmed = await placeOrder(3)
+    await updateOrderStatus(confirmed.id, { newStatus: OrderStatus.Confirmed }, adminUserId)
+    const pending = await placeOrder(2)
+    const sheet = await getProductionSheet(serviceDay)
+    const dish = sheet.dishes.find((row) => row.foodName === suffix)!
+    // Earlier tests confirmed and cancelled or delivered other orders on this day; only live ones count.
+    expect(dish.toCook).toBeGreaterThanOrEqual(3)
+    expect(dish.pending).toBeGreaterThanOrEqual(2)
+    expect(sheet.orders.find((order) => order.id === confirmed.id)?.lines).toEqual([
+      { foodName: suffix, quantity: 3, withPersianRice: false },
+    ])
+    expect(sheet.orders.find((order) => order.id === pending.id)?.slotTitle).toBe('تحویل حضوری')
   })
 })

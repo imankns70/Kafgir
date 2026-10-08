@@ -37,6 +37,7 @@ import type {
   PaymentReconciliationDto,
   PaymentRefundWriteRequest,
   AuditLogEntryDto,
+  ProductionSheetDto,
   SocialAutomationEvaluationDto,
   SocialChannelDto,
   SocialChannelWriteRequest,
@@ -397,6 +398,7 @@ export const adminApi = {
     socialInvoke<PagedResult<UnpaidOrderDto>>('payments.unpaid', { page: paging?.page, pageSize: paging?.pageSize }),
   paymentReconciliation: (date: string) =>
     socialInvoke<PaymentReconciliationDto>('payments.reconciliation', { date }),
+  productionSheet: (date: string) => socialInvoke<ProductionSheetDto>('kitchen.sheet', { date }),
   auditLog: (query: { entityType?: string | null; search?: string | null; page?: number; pageSize?: number }) =>
     socialInvoke<PagedResult<AuditLogEntryDto>>('audit.list', query),
   createPayment: (value: PaymentWriteRequest) => request<{ id: number }>('/api/admin/payments', 'POST', value),

@@ -39,6 +39,7 @@ import { CourierAccountingPage, CourierDaysPage, CouriersPage } from './CourierP
 import { MonthTrend } from './BusinessPages'
 import { LogsPage } from './LogsPage'
 import { AuditLogPage } from './AuditLogPage'
+import { KitchenPage } from './KitchenPage'
 import { CustomerCommunicationPage } from './CustomerCommunicationPage'
 import { FoodTagGroupsPage, SupportSubjectsPage } from './ReferenceDataPages'
 import { DeliveryMethodsPage, PaymentMethodsPage } from './SettingsPages'
@@ -2070,6 +2071,7 @@ export function App() {
     months: <MonthsPage />,
     logs: <LogsPage />,
     'audit-log': <AuditLogPage />,
+    kitchen: <KitchenPage />,
     'food-tag-groups': <FoodTagGroupsPage />,
     'support-subjects': <SupportSubjectsPage />,
     customers: <CustomersPage />,

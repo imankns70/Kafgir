@@ -76,6 +76,7 @@ export const adminOperations = [
   'payments.unpaid',
   'payments.reconciliation',
   'audit.list',
+  'kitchen.sheet',
   'reports.customers',
   'customers.search',
   'customers.detail',
