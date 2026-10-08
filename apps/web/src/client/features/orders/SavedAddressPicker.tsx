@@ -22,6 +22,7 @@ function AddressCopy({ address }: { address: CustomerAddressDto }) {
 
 export function SavedAddressPicker({ addresses, selectedAddressId, newAddressValue, onSelect }: Props) {
   const detailsRef = useRef<HTMLDetailsElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   const selectedAddress = addresses.find((address) => address.id.toString() === selectedAddressId)
 
   const select = (value: string) => {
@@ -31,7 +32,10 @@ export function SavedAddressPicker({ addresses, selectedAddressId, newAddressVal
 
   return <label className={styles.field}>
     <span className={styles.label}>آدرس‌های ذخیره‌شده</span>
-    <details ref={detailsRef} className={styles.picker}>
+    <details ref={detailsRef} className={styles.picker} onToggle={(event) => {
+      // Bring the whole list, down to «افزودن آدرس جدید», into view above the bottom navigation.
+      if (event.currentTarget.open) menuRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    }}>
       <summary className={styles.summary}>
         <span className={styles.locationIcon}><Icon name={selectedAddress ? 'location' : 'add'} size="sm" /></span>
         {selectedAddress
@@ -43,7 +47,7 @@ export function SavedAddressPicker({ addresses, selectedAddressId, newAddressVal
         <span className={styles.chevron} aria-hidden="true">⌄</span>
       </summary>
 
-      <div className={styles.menu} role="listbox" aria-label="انتخاب آدرس تحویل">
+      <div ref={menuRef} className={styles.menu} role="listbox" aria-label="انتخاب آدرس تحویل">
         {addresses.map((address) => {
           const selected = address.id.toString() === selectedAddressId
           return <button

@@ -179,8 +179,16 @@
     height: 36px;
   }
 
+  /* On phones the list opens in the page flow instead of floating: a floating list ran under the
+     fixed bottom navigation and the page could not scroll its last option («افزودن آدرس جدید») into
+     reach. In flow it pushes the form down, and the scroll margin keeps it clear of the bar. */
   .menu {
-    max-height: min(330px, 52vh);
+    position: static;
+    margin-block-start: 7px;
+    max-height: none;
+    overflow: visible;
+    box-shadow: none;
+    scroll-margin-block-end: calc(96px + env(safe-area-inset-bottom));
   }
 
   .option {
