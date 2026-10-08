@@ -173,6 +173,7 @@ function App() {
         foodId: item.foodId,
         slug: item.slug,
         foodName: item.foodName,
+        imageUrl: item.imageUrl ?? null,
         withPersianRice: upgraded,
         persianRiceTitle: rice?.title ?? null,
         persianRicePrice: rice?.price ?? 0,

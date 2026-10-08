@@ -158,6 +158,7 @@ export const menuCartSnapshotSchema = z.object({
     id: true,
     foodId: true,
     foodName: true,
+    imageUrl: true,
     price: true,
     originalPrice: true,
     discountPercentage: true,
@@ -845,6 +846,8 @@ export interface CartItem {
   persianRiceTitle?: string | null
   persianRicePrice?: number
   foodName: string
+  /** The food's primary photo, refreshed on reconciliation like the price. */
+  imageUrl?: string | null
   unitPrice: number
   originalUnitPrice?: number | null
   discountPercentage?: number | null

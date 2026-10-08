@@ -31,14 +31,21 @@ describe('empty-cart confirmation', () => {
 })
 
 describe('cart item presentation', () => {
-  it('pairs the detail and remove actions in the corner opposite the food name', () => {
+  it('shows the photo beside the name, remove, price, and quantity with the line total', () => {
     const html = renderToStaticMarkup(createElement(CartSummary, {
-      items: [{ ...item(1), slug: 'food-1' }],
+      items: [{ ...item(1), slug: 'food-1', imageUrl: '/api/media/foods/a.webp' }],
       onQuantityChange: vi.fn(),
     }))
 
-    // Name and price, then the paired item actions, then quantity and the line total beneath them.
-    expect(html).toMatch(/cart-name[\s\S]*cart-unit-price[\s\S]*cart-item-buttons[\s\S]*cart-detail-button[\s\S]*cart-remove-button[\s\S]*cart-item-actions[\s\S]*quantity-controls[\s\S]*cart-line-total/)
+    expect(html).toMatch(/cart-thumb[\s\S]*a\.webp[\s\S]*cart-item-head[\s\S]*cart-name[\s\S]*cart-remove-button[\s\S]*cart-unit-price[\s\S]*cart-item-actions[\s\S]*quantity-controls[\s\S]*cart-line-total/)
+    // The photo and the name open the food's page; there is no separate «جزئیات» button.
+    expect(html.match(/href="\/foods\/food-1\?menuItemId=1"/g)).toHaveLength(2)
+    expect(html).not.toContain('cart-detail-button')
+  })
+
+  it('falls back to a quiet placeholder when the food has no photo', () => {
+    const html = renderToStaticMarkup(createElement(CartSummary, { items: [item(1)], onQuantityChange: vi.fn() }))
+    expect(html).toContain('cart-thumb-placeholder')
   })
 
   it('keeps the item list in its own scroll area, with the total outside it', () => {

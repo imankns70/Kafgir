@@ -391,6 +391,7 @@ export async function getMenuCartSnapshotByDate(
 
   const items = await sqlClient<MenuCartSnapshotDto['items']>`
     SELECT i.id, f.id AS "foodId", f.slug, f.name AS "foodName",
+           COALESCE(fi.image_url, f.image_url) AS "imageUrl",
            COALESCE(i.discount_price, i.price)::float8 AS price,
            CASE WHEN i.discount_price IS NOT NULL THEN i.price::float8 ELSE NULL END AS "originalPrice",
            CASE WHEN i.discount_price IS NOT NULL
@@ -402,6 +403,13 @@ export async function getMenuCartSnapshotByDate(
     FROM daily_menu_items i
     JOIN foods f ON f.id = i.food_id
     JOIN food_categories c ON c.id = f.category_id
+    LEFT JOIN LATERAL (
+      SELECT image_url
+      FROM food_images
+      WHERE food_id = f.id
+      ORDER BY is_primary DESC, display_order, id
+      LIMIT 1
+    ) fi ON true
     WHERE i.daily_menu_id = ${menu.id}
       AND (
         i.id IN ${sqlClient(itemIds)}

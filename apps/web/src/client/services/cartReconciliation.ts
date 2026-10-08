@@ -97,6 +97,7 @@ export function reconcileCart(
       foodId: latest?.foodId ?? cartItem.foodId,
       slug: latest?.slug ?? cartItem.slug,
       foodName: latest?.foodName ?? cartItem.foodName,
+      imageUrl: latest ? latest.imageUrl ?? null : cartItem.imageUrl ?? null,
       persianRiceTitle: latestRice?.title ?? cartItem.persianRiceTitle,
       persianRicePrice: latestRice?.price ?? cartItem.persianRicePrice ?? 0,
       unitPrice: latest ? latest.price : cartItem.unitPrice,

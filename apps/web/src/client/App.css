@@ -992,16 +992,42 @@ select:disabled {
 .cart-sync-panel button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; }
 .cart-sync-icon { display: inline-grid; width: 38px; height: 38px; place-items: center; border-radius: 50%; color: var(--kafgir-color-warning); background: var(--kafgir-color-surface); }
 
-/* The cart panel is ~425px even on desktop, so squeezing name, price, quantity controls, remove and
-   total onto one row left the info column at ~90px and wrapped it to shreds. Two rows instead:
-   name/price beside the line total, then a single control row underneath. */
+/* A basket line is the food's photo beside everything else about it: name and remove on the first
+   row, the unit price and any rice upgrade beneath, then quantity and the line total at the foot.
+   The photo and name open the food's page, so there is no separate «جزئیات» button. */
 .cart-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 76px minmax(0, 1fr);
   align-items: start;
-  column-gap: 10px;
+  column-gap: 12px;
   row-gap: 6px;
 }
+.cart-thumb {
+  display: block;
+  width: 76px;
+  height: 76px;
+  overflow: hidden;
+  border-radius: var(--kafgir-radius-md);
+  background: var(--kafgir-color-background-secondary);
+}
+.cart-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.cart-thumb-placeholder { display: grid; width: 100%; height: 100%; place-items: center; color: var(--kafgir-color-border-strong); }
+.cart-item-main { display: grid; gap: 2px; min-width: 0; }
+.cart-item-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px; }
+.cart-item-head .cart-name { min-width: 0; color: var(--kafgir-color-text-primary); font-weight: 700; line-height: 1.6; text-decoration: none; overflow-wrap: anywhere; }
+.cart-item-head a.cart-name:hover { color: var(--kafgir-color-primary); }
+.cart-remove-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  padding: 0;
+  color: var(--kafgir-color-text-muted);
+  background: transparent;
+}
+.cart-remove-button:hover, .cart-remove-button:focus-visible { color: var(--kafgir-color-error); border-color: color-mix(in srgb, var(--kafgir-color-error) 30%, transparent); background: var(--kafgir-color-error-soft); }
 
 .cart-row-invalid {
   margin-inline: -10px;
@@ -1019,11 +1045,8 @@ select:disabled {
 .cart-item-warning { display: inline-flex; align-items: center; gap: 5px; color: var(--kafgir-color-error); font-size: var(--kafgir-type-caption); font-weight: 700; }
 /* «جزئیات» and «حذف» pair in the corner opposite the food name; quantity and the line total share
    the row beneath, so the two kinds of control never sit in one undifferentiated strip. */
-.cart-item-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; grid-column: 1 / -1; }
-.cart-item-buttons { display: flex; align-items: start; justify-content: end; gap: 6px; }
-.cart-detail-button,
-.cart-remove-button { flex:none;min-height:36px;gap:5px;padding:6px 12px;font-size:var(--kafgir-type-body-sm) }
-.cart-detail-button { text-decoration:none }
+.cart-item-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-block-start: 4px; }
+.cart-item-actions .quantity-button { width: 34px; height: 34px; min-height: 34px; }
 .cart-line-total { display: grid; justify-items: end; gap: 2px; margin-inline-start: auto; color: var(--kafgir-color-primary); font-weight: 700; white-space: nowrap; }
 .cart-line-total small { max-width: 160px; color: var(--kafgir-color-error); font-size: .68rem; font-weight: 500; line-height: 1.45; text-align: end; white-space: normal; }
 /* The cart panel is narrow even on desktop, so an icon | text | actions row let the buttons claim
@@ -1644,11 +1667,11 @@ select:disabled {
   .food-placeholder-art { width: 104px; height: 68px; }
   .page-actions { align-items: center; }
   .page-actions .outline-button { min-height: 40px; padding: 7px 10px; font-size: .78rem; }
-  .cart-item-actions { display:flex;flex-wrap:wrap;width:auto }
-  /* The action pair shares the top row with the food name, so on a phone it is kept as small as it
-     can be while still carrying its labels. */
-  .cart-detail-button,.cart-remove-button { justify-content:center;min-height:32px;gap:4px;padding:4px 8px;font-size:.72rem }
-  .cart-item-buttons { gap:5px }
+  /* On a phone the cart is its own wizard step, so the list grows with the page instead of scrolling
+     inside the card; a nested scroll there cut the last food off behind the totals. */
+  .cart-items { max-height: none; margin-inline: 0; padding-inline: 0; overflow: visible; }
+  .cart-row { grid-template-columns: 68px minmax(0, 1fr); column-gap: 10px; }
+  .cart-thumb { width: 68px; height: 68px; }
   .cart-sync-panel { grid-template-columns: auto minmax(0, 1fr); }
   .cart-sync-panel > button { grid-column: 1 / -1; width: 100%; }
   /* The container already stacks; on phones give each button its own full-width row too, so the
