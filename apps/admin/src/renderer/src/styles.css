@@ -856,3 +856,9 @@ td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-ali
   body[data-kitchen-print] .panel{box-shadow:none;border-color:#999}
   body[data-kitchen-print="pack"] .kitchen-labels{grid-template-columns:repeat(2,1fr);gap:5mm}
 }
+.sidebar-alerts{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;padding-top:12px}
+.sidebar-alerts button{color:#fff;border-color:#ffffff55;background:transparent;font-size:13px}
+.sidebar-alerts button.has-unseen{border-color:#f2b233;background:#f2b23333}
+.sidebar-alerts b{display:inline-grid;min-width:20px;height:20px;place-items:center;margin-inline-start:4px;border-radius:999px;color:#3d2a06;background:#f2b233;font-size:12px}
+.sidebar-alerts .switch{color:#fff;font-size:13px}
+.sidebar-alerts+.sidebar-user{margin-top:10px}

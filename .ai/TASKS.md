@@ -22,7 +22,7 @@ Money and order correctness
 
 Operations features
 - [x] C1 Kitchen production sheet and packing list per delivery date (printable).
-- [ ] C2 Sound and desktop notification for new orders.
+- [x] C2 Sound and desktop notification for new orders.
 - [ ] C3 CSV export for orders, payments, customers and purchases.
 - [ ] C4 Sales report by dish, average basket, cancellation rate, by delivery slot and payment method.
 - [ ] C5 Edit an order's items and address before it is prepared; Owner can revert a wrong final status.

@@ -40,6 +40,8 @@ import { MonthTrend } from './BusinessPages'
 import { LogsPage } from './LogsPage'
 import { AuditLogPage } from './AuditLogPage'
 import { KitchenPage } from './KitchenPage'
+import { useNewOrderAlerts } from './new-order-alerts'
+import { isAdminOperationAllowed } from '../../shared/admin-permissions'
 import { CustomerCommunicationPage } from './CustomerCommunicationPage'
 import { FoodTagGroupsPage, SupportSubjectsPage } from './ReferenceDataPages'
 import { DeliveryMethodsPage, PaymentMethodsPage } from './SettingsPages'
@@ -2013,6 +2015,9 @@ export function App() {
     if (!session || isPageAllowed(page, session.roles)) return
     setPage(firstAllowedPage(session.roles) ?? 'dashboard')
   }, [session, page])
+  const canWatchOrders = Boolean(session && isAdminOperationAllowed('orders.since', session.roles))
+  const orderAlerts = useNewOrderAlerts(canWatchOrders, () => setPage('orders'))
+  useEffect(() => { if (page === 'orders') orderAlerts.clearUnseen() }, [page, orderAlerts.unseen])
   if (!session) return <Login onLogin={setSession} />
   const openFoodEditor = (foodId: number | null) => {
     setFoodEditorId(foodId)
@@ -2153,6 +2158,14 @@ export function App() {
           </section>
         })}
       </nav>
+      {canWatchOrders && <div className="sidebar-alerts">
+        <button type="button" className={orderAlerts.unseen > 0 ? 'has-unseen' : ''} onClick={() => setPage('orders')}>
+          سفارش تازه {orderAlerts.unseen > 0 && <b>{orderAlerts.unseen}</b>}
+        </button>
+        <label className="switch" title="صدا و اعلان دسکتاپ برای سفارش تازه">
+          <input type="checkbox" checked={orderAlerts.enabled} onChange={(event) => orderAlerts.setEnabled(event.target.checked)} />هشدار
+        </label>
+      </div>}
       <div className="sidebar-user"><span>{session.fullName}</span><button disabled={logoutAction.busy} onClick={() => void logoutAction.run(async () => {
         // Signing out always ends the session locally, even if the main process call fails; leaving
         // the operator logged in after they asked to leave is the worse outcome.

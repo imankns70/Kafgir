@@ -72,6 +72,7 @@ import {
   paymentReconciliation,
   listAuditLogs,
   getProductionSheet,
+  listOrdersSince,
   removeMenuItem,
   searchOrdersPaged,
   setFoodActive,
@@ -334,6 +335,7 @@ export async function dispatchAdminOperation(
       return listUnpaidOrders(body.page == null ? undefined : Number(body.page),
         body.pageSize == null ? undefined : Number(body.pageSize))
     case 'payments.reconciliation': return paymentReconciliation(textField(body, 'date'))
+    case 'orders.since': return listOrdersSince(body.afterId == null ? null : Number(body.afterId))
     case 'kitchen.sheet': return getProductionSheet(textField(body, 'date'))
     case 'audit.list':
       return listAuditLogs({

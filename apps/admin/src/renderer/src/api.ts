@@ -398,6 +398,10 @@ export const adminApi = {
     socialInvoke<PagedResult<UnpaidOrderDto>>('payments.unpaid', { page: paging?.page, pageSize: paging?.pageSize }),
   paymentReconciliation: (date: string) =>
     socialInvoke<PaymentReconciliationDto>('payments.reconciliation', { date }),
+  ordersSince: (afterId: number | null) => socialInvoke<{
+    latestId: number
+    orders: Array<{ id: number; orderNumber: string; customerFullName: string; totalAmount: number; status: number }>
+  }>('orders.since', { afterId }),
   productionSheet: (date: string) => socialInvoke<ProductionSheetDto>('kitchen.sheet', { date }),
   auditLog: (query: { entityType?: string | null; search?: string | null; page?: number; pageSize?: number }) =>
     socialInvoke<PagedResult<AuditLogEntryDto>>('audit.list', query),

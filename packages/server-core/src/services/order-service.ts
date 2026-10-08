@@ -807,3 +807,24 @@ export async function updateOrderStatus(id: number, request: UpdateOrderStatusRe
   })
   logger.info({ event: 'order.status.changed', orderId: id, userId, newStatus: request.newStatus }, 'وضعیت سفارش تغییر کرد')
 }
+
+/**
+ * Orders newer than the one the operator last saw, for the new-order alert. With no marker it only
+ * returns the current newest id, so opening Admin never replays the day's orders as "new".
+ */
+export async function listOrdersSince(afterId: number | null): Promise<{
+  latestId: number
+  orders: Array<{ id: number; orderNumber: string; customerFullName: string; totalAmount: number; status: OrderStatus }>
+}> {
+  const latest = await sqlClient<{ id: number | null }[]>`SELECT MAX(id) AS id FROM orders`
+  const latestId = latest[0]?.id ?? 0
+  if (afterId == null) return { latestId, orders: [] }
+  const orders = await sqlClient<Array<{ id: number; orderNumber: string; customerFullName: string; totalAmount: number; status: OrderStatus }>>`
+    SELECT id, order_number AS "orderNumber", delivery_full_name AS "customerFullName",
+           total_amount::float8 AS "totalAmount", status
+    FROM orders WHERE id > ${afterId}
+    ORDER BY id DESC
+    LIMIT 10
+  `
+  return { latestId, orders }
+}

@@ -18,7 +18,7 @@ const kitchenOperations = new Set<AdminOperation>([
   'supportSubjects.list',
   'foods.list', 'foods.create', 'foods.update', 'foods.setActive',
   'menus.get', 'menus.settings', 'menus.addItem', 'menus.updateItem', 'menus.removeItem',
-  'kitchen.sheet',
+  'kitchen.sheet', 'orders.since',
   'customers.lookup', 'orders.search', 'orders.get', 'orders.create', 'orders.updateStatus',
   'support.conversations.list', 'support.conversations.get', 'support.conversations.reply',
   'support.conversations.setClosed', 'support.reviews.list', 'support.reviews.setStatus', 'support.reviews.reply',
@@ -36,7 +36,7 @@ const kitchenOperations = new Set<AdminOperation>([
 ])
 
 const orderOperations = new Set<AdminOperation>([
-  'dashboard.today', 'dashboard.analytics', 'menus.get', 'kitchen.sheet',
+  'dashboard.today', 'dashboard.analytics', 'menus.get', 'kitchen.sheet', 'orders.since',
   // Manual order taking needs to know which methods are open to it, but not to change their terms.
   'paymentMethods.list', 'deliveryMethods.list', 'supportSubjects.list',
   'customers.lookup', 'orders.search', 'orders.get', 'orders.create', 'orders.updateStatus',
