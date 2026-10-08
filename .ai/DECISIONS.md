@@ -961,3 +961,12 @@
   an order frees its use. The coupon row is locked while an order applies it. A used coupon cannot
   be deleted, only deactivated. Correcting an order's basket re-prices its coupon under its own rules.
 - Blocking a customer stops orders from the customer app only; staff can still place a manual order.
+
+## 2026-10-08 — Several couriers per day and courier cash
+
+- A day still has one priced courier configuration (the default courier and the per-order rates).
+  Dispatch can move a not-yet-delivered order to any active courier; the order keeps its payable
+  snapshot, so only who earns the day's rate changes.
+- A courier is treated as holding the total of every delivered cash-paid order they carried. Cash they
+  bring back is an append-only `courier_cash_handovers` row; what they still hold is derived. Recording
+  cash coming in is open to order managers; paying a courier out (settlement) stays Owner-only.

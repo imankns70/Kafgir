@@ -2,7 +2,10 @@ import { DeliveryMethod, OrderStatus, PaymentMethod } from '@kafgir/contracts'
 import {
   closeDatabase,
   configureDatabase,
+  assignOrderCourier,
   courierAccountSummary,
+  listCourierCashHandovers,
+  recordCourierCashHandover,
   createOrder,
   getAdminOrderDetail,
   getDeliveryPricing,
@@ -34,6 +37,7 @@ let otherMenuItemId = 0
 let slotId = 0
 let aliId = 0
 let hassanId = 0
+let operatorId = 0
 const createdOrderIds: number[] = []
 
 const orderRequest = (
@@ -107,6 +111,9 @@ integration.sequential('courier delivery pricing and accounting', () => {
     const digits = suffix.replace(/\D/g, '').padEnd(8, '0')
     aliId = await courier(`علی ${suffix}`, `0911${digits.slice(0, 7)}`)
     hassanId = await courier(`حسن ${suffix}`, `0913${digits.slice(0, 7)}`)
+    operatorId = (await sql<{ id: number }[]>`
+      INSERT INTO users (username,normalized_username,full_name,is_active,created_at)
+      VALUES (${`ca-${suffix}`},${`CA-${suffix}`},'اپراتور پیک',true,NOW()) RETURNING id`)[0]!.id
   })
 
   afterAll(async () => {
@@ -116,6 +123,9 @@ integration.sequential('courier delivery pricing and accounting', () => {
       await sql`DELETE FROM orders WHERE id = ${id}`
     }
     await sql`DELETE FROM courier_settlements WHERE courier_id IN (${aliId}, ${hassanId})`
+    await sql`DELETE FROM courier_cash_handovers WHERE courier_id IN (${aliId}, ${hassanId})`
+    await sql`DELETE FROM audit_logs WHERE user_id = ${operatorId}`
+    await sql`DELETE FROM users WHERE id = ${operatorId}`
     await sql`DELETE FROM courier_delivery_days WHERE courier_id IN (${aliId}, ${hassanId})`
     await sql`DELETE FROM couriers WHERE id IN (${aliId}, ${hassanId})`
     await sql`DELETE FROM delivery_time_slots WHERE id = ${slotId}`
@@ -300,5 +310,28 @@ integration.sequential('courier delivery pricing and accounting', () => {
       SELECT COUNT(*)::int AS count FROM courier_delivery_days
       WHERE delivery_date = ${menuDate} AND is_active`
     expect(active[0]!.count).toBe(1)
+  })
+
+  it('splits a day between couriers and tracks the cash each one collected and handed back', async () => {
+    const aliBefore = await courierAccountSummary(aliId)
+    const hassanBefore = await courierAccountSummary(hassanId)
+    const order = await place(menuItemId, DeliveryMethod.Delivery, slotId)
+    await updateOrderStatus(order.id, { newStatus: OrderStatus.Confirmed })
+    await assignOrderCourier(order.id, hassanId, operatorId)
+    await updateOrderStatus(order.id, { newStatus: OrderStatus.Delivered })
+    await expect(assignOrderCourier(order.id, aliId, operatorId)).rejects.toThrow(/تحویل‌شده/u)
+
+    const detail = await getAdminOrderDetail(order.id)
+    const hassan = await courierAccountSummary(hassanId)
+    // Hassan earns the day's rate for it and is holding the customer's cash.
+    expect(hassan.earnedAmount).toBe(hassanBefore.earnedAmount + detail.courierPayableAmount!)
+    expect(hassan.cashCollected).toBe(hassanBefore.cashCollected + detail.totalAmount)
+    expect((await courierAccountSummary(aliId)).cashCollected).toBe(aliBefore.cashCollected)
+
+    await expect(recordCourierCashHandover({ courierId: hassanId, amount: hassan.cashOutstanding + 1 }, operatorId))
+      .rejects.toThrow(/نقدی نزد پیک/u)
+    const after = await recordCourierCashHandover({ courierId: hassanId, amount: detail.totalAmount, note: 'پایان شیفت' }, operatorId)
+    expect(after.cashOutstanding).toBe(hassan.cashOutstanding - detail.totalAmount)
+    expect((await listCourierCashHandovers(hassanId))[0]).toMatchObject({ amount: detail.totalAmount, note: 'پایان شیفت', receivedBy: 'اپراتور پیک' })
   })
 })

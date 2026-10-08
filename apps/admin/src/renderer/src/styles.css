@@ -949,3 +949,9 @@ td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-ali
 .staff-role input{margin-top:4px}
 .staff-role span{display:grid;gap:2px}.staff-role small{color:var(--muted);font-size:12px;line-height:1.7}
 .staff-reset .staff-password{max-width:420px}
+
+/* Courier cash collection. */
+.courier-cash-due,.courier-cash-due dd{color:var(--error);font-weight:700}
+.courier-cash-title{margin:6px 0 0;font-size:16px}
+.courier-cash-hint{margin:0;font-size:13px}
+.order-courier-select{min-height:34px;max-width:100%;border:1px solid var(--border);border-radius:8px;padding:4px 8px;background:#fff}

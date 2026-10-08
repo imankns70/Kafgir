@@ -105,6 +105,31 @@ export const courierAccountSummarySchema = z.object({
   earnedAmount: z.number().nonnegative(),
   settledAmount: z.number().nonnegative(),
   outstandingAmount: z.number(),
+  /** Cash-paid orders this courier delivered: money they took at the door. */
+  cashCollected: z.number().nonnegative().default(0),
+  cashHandedOver: z.number().nonnegative().default(0),
+  /** Cash the courier still holds for the business. */
+  cashOutstanding: z.number().default(0),
+})
+
+export const courierCashHandoverSchema = z.object({
+  id: z.number().int().positive(),
+  courierId: z.number().int().positive(),
+  amount: tomanAmount,
+  receivedAt: z.string(),
+  note: z.string().nullable(),
+  receivedBy: z.string().nullable(),
+})
+
+export const courierCashHandoverWriteSchema = z.object({
+  courierId: z.number().int().positive(),
+  amount: tomanAmount.refine((value) => value > 0, 'مبلغ تحویلی باید بیشتر از صفر باشد.'),
+  note: z.string().trim().max(1000).nullable().optional(),
+})
+
+/** Moving one delivery order to another courier of the same day. */
+export const orderCourierAssignSchema = z.object({
+  courierId: z.number().int().positive(),
 })
 
 export type CourierDto = z.infer<typeof courierSchema>
@@ -114,4 +139,7 @@ export type CourierDeliveryDayWriteRequest = z.infer<typeof courierDeliveryDayWr
 export type CourierDeliveryDayViewDto = z.infer<typeof courierDeliveryDayViewSchema>
 export type CourierSettlementDto = z.infer<typeof courierSettlementSchema>
 export type CourierSettlementWriteRequest = z.infer<typeof courierSettlementWriteSchema>
+export type CourierCashHandoverDto = z.infer<typeof courierCashHandoverSchema>
+export type CourierCashHandoverWriteRequest = z.infer<typeof courierCashHandoverWriteSchema>
+export type OrderCourierAssignRequest = z.infer<typeof orderCourierAssignSchema>
 export type CourierAccountSummaryDto = z.infer<typeof courierAccountSummarySchema>

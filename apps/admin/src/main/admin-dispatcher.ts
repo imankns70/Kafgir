@@ -19,6 +19,8 @@ import {
   courierWriteSchema,
   courierDeliveryDayWriteSchema,
   courierSettlementWriteSchema,
+  courierCashHandoverWriteSchema,
+  orderCourierAssignSchema,
   socialChannelWriteSchema,
   socialPostWriteSchema,
   socialRuleWriteSchema,
@@ -156,6 +158,9 @@ import {
   courierAccountSummaries,
   listCourierSettlements,
   recordCourierSettlement,
+  listCourierCashHandovers,
+  recordCourierCashHandover,
+  assignOrderCourier,
   getAdminOrderDetail,
 } from '@kafgir/server-core'
 import { readServerLogs } from '@kafgir/server-core/logging/read-logs'
@@ -276,6 +281,11 @@ export async function dispatchAdminOperation(
       return listCourierSettlements(numberField(body, 'courierId'))
     case 'courierAccounting.settle':
       return recordCourierSettlement(courierSettlementWriteSchema.parse(body.value))
+    case 'courierAccounting.cashHandovers': return listCourierCashHandovers(numberField(body, 'courierId'))
+    case 'courierAccounting.recordCash':
+      return recordCourierCashHandover(courierCashHandoverWriteSchema.parse(body.value), principal.userId)
+    case 'orders.assignCourier':
+      return assignOrderCourier(numberField(body, 'id'), orderCourierAssignSchema.parse(body.value).courierId, principal.userId)
     case 'customers.lookup': return findCustomerByPhone(textField(body, 'phoneNumber'))
     case 'orders.search': return searchOrdersPaged((body.query ?? {}) as OrderReportQuery)
     // Admin's detail view, which adds the courier and the courier payable snapshot on top of the

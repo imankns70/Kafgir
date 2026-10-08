@@ -22,6 +22,7 @@ import {
   type FoodTagWriteRequest,
   type FoodWriteRequest,
   type AdminOrderDetailDto,
+  type CourierDto,
   type OrderDto,
   type OrderReportQuery,
   type OrderSummaryDto,
@@ -551,8 +552,19 @@ function OrderStatusActions({ status, busy, onChange }: {
   </div>
 }
 
-function OrderDetails({ order }: { order: AdminOrderDetailDto }) {
+function OrderDetails({ order, onAssignCourier }: {
+  order: AdminOrderDetailDto
+  /** Present when the operator may move this order to another courier of the day. */
+  onAssignCourier?: (courierId: number) => Promise<void>
+}) {
   const [showInvoice, setShowInvoice] = useState(false)
+  const [couriers, setCouriers] = useState<CourierDto[] | null>(null)
+  const [assigning, setAssigning] = useState(false)
+  const canReassign = Boolean(onAssignCourier && order.courierId != null
+    && order.status !== OrderStatus.Delivered && order.status !== OrderStatus.Cancelled)
+  useEffect(() => {
+    if (canReassign && !couriers) void adminApi.couriers().then(setCouriers).catch(() => setCouriers([]))
+  }, [canReassign, couriers])
   return <div className="order-detail">
     <div className="order-detail-heading">
       <div>
@@ -592,7 +604,16 @@ function OrderDetails({ order }: { order: AdminOrderDetailDto }) {
       <section className="detail-section">
         <h3>پیک و کارکرد</h3>
         <dl>
-          <div><dt>پیک</dt><dd>{order.courierNameSnapshot ?? '—'}</dd></div>
+          <div><dt>پیک</dt><dd>{canReassign && couriers && couriers.some((courier) => courier.isActive && courier.id !== order.courierId)
+            ? <select className="order-courier-select" aria-label="پیک این سفارش" value={order.courierId ?? ''} disabled={assigning}
+                onChange={(event) => {
+                  setAssigning(true)
+                  void onAssignCourier!(Number(event.target.value)).finally(() => setAssigning(false))
+                }}>
+                {couriers.filter((courier) => courier.isActive || courier.id === order.courierId).map((courier) =>
+                  <option key={courier.id} value={courier.id}>{courier.fullName}</option>)}
+              </select>
+            : order.courierNameSnapshot ?? '—'}</dd></div>
           <div><dt>روز تحویل</dt><dd>{order.deliveryDate ? persianDay(order.deliveryDate) : 'ثبت نشده'}</dd></div>
           <div><dt>بازه تحویل</dt><dd>{deliveryWindowLabel(order)}</dd></div>
           <div><dt>وضعیت سفارش</dt><dd><Status value={order.status} /></dd></div>
@@ -664,6 +685,7 @@ function OrdersPage({ roles }: { roles: string[] }) {
   const [dialog, setDialog] = useState<'edit' | 'reopen' | null>(null)
   const canEdit = isAdminOperationAllowed('orders.edit', roles)
   const canReopen = isAdminOperationAllowed('orders.reopen', roles)
+  const canAssignCourier = isAdminOperationAllowed('orders.assignCourier', roles)
   const selectedId = selected?.id
   const load = useCallback(async (showBusy = true) => {
     if (showBusy) setBusy(true)
@@ -769,7 +791,11 @@ function OrdersPage({ roles }: { roles: string[] }) {
           onSaved={(next) => { setDialog(null); setMessage(`وضعیت سفارش به «${statusLabel[next]}» برگشت.`); void load() }} />}
         <h2>جزئیات سفارش</h2>
         {selected
-          ? <OrderDetails order={selected} />
+          ? <OrderDetails order={selected} onAssignCourier={canAssignCourier ? async (courierId) => {
+              setError(null)
+              try { await adminApi.assignOrderCourier(selected.id, courierId); setMessage('پیک سفارش عوض شد.'); await load() }
+              catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+            } : undefined} />
           : <div className="orders-empty-detail">برای مشاهده اطلاعات، یک سفارش را انتخاب کنید.</div>}
       </aside>
       <section className="orders-main">

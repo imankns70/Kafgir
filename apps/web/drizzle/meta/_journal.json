@@ -211,6 +211,13 @@
       "when": 1791500000000,
       "tag": "0029_sms_status_notifications",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1791510000000,
+      "tag": "0030_courier_cash_handovers",
+      "breakpoints": true
     }
   ]
 }

@@ -5,6 +5,7 @@ import type {
   CourierDeliveryDayViewDto,
   CourierDto,
   CourierSettlementDto,
+  CourierCashHandoverDto,
 } from '@kafgir/contracts'
 import { adminApi } from './api'
 import {
@@ -301,10 +302,20 @@ export function CourierDaysPage() {
  * actually Delivered, «تسویه‌شده» sums the settlement records, and «مانده» is the difference.
  * Registering a settlement adds a record — it never edits what an order says the courier earned.
  */
+/** Earnings owed to the courier against cash the courier still holds, said as who owes whom. */
+export function courierNetLabel(net: number) {
+  if (net > 0) return `کفگیر ${money(net)} به پیک بدهکار است`
+  if (net < 0) return `پیک ${money(-net)} به کفگیر بدهکار است`
+  return 'بی‌حساب'
+}
+
 export function CourierAccountingPage() {
   const [accounts, setAccounts] = useState<CourierAccountSummaryDto[]>([])
   const [selected, setSelected] = useState<CourierAccountSummaryDto | null>(null)
   const [settlements, setSettlements] = useState<CourierSettlementDto[]>([])
+  const [handovers, setHandovers] = useState<CourierCashHandoverDto[]>([])
+  const [cashAmount, setCashAmount] = useState('')
+  const [cashNote, setCashNote] = useState('')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -324,8 +335,35 @@ export function CourierAccountingPage() {
     setAmount('')
     setNote('')
     setNotice(null)
-    try { setSettlements(await adminApi.courierSettlements(account.courierId)) }
-    catch (reason) { setError(errorText(reason)) }
+    setCashAmount('')
+    setCashNote('')
+    const [settled, cash] = await Promise.allSettled([
+      adminApi.courierSettlements(account.courierId),
+      adminApi.courierCashHandovers(account.courierId),
+    ])
+    if (settled.status === 'fulfilled') setSettlements(settled.value)
+    else setError(errorText(settled.reason))
+    if (cash.status === 'fulfilled') setHandovers(cash.value)
+  }
+
+  const parsedCash = parseMoney(cashAmount)
+  const receiveCash = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!selected) return
+    setError(null)
+    setNotice(null)
+    if (parsedCash === null || parsedCash <= 0) return setError('مبلغ دریافتی باید عددی صحیح و بیشتر از صفر باشد.')
+    setBusy(true)
+    try {
+      const updated = await adminApi.recordCourierCash({ courierId: selected.courierId, amount: parsedCash, note: cashNote.trim() || null })
+      setSelected(updated)
+      setCashAmount('')
+      setCashNote('')
+      setNotice(`دریافت ${money(parsedCash)} نقدی از ${updated.fullName} ثبت شد. نقدی نزد پیک: ${money(updated.cashOutstanding)}`)
+      setHandovers(await adminApi.courierCashHandovers(updated.courierId))
+      await load()
+    } catch (reason) { setError(errorText(reason)) }
+    finally { setBusy(false) }
   }
 
   const parsedAmount = parseMoney(amount)
@@ -370,7 +408,7 @@ export function CourierAccountingPage() {
         ? <p className="muted">هنوز پیکی ثبت نشده است.</p>
         : <><table>
             <thead><tr><RowNumberHead />
-              <th>نام</th><th>وضعیت</th><th>تاریخ کارکرد</th><th>تحویل موفق</th><th>کارکرد</th><th>تسویه‌شده</th><th>مانده</th><th>عملیات</th>
+              <th>نام</th><th>وضعیت</th><th>تاریخ کارکرد</th><th>تحویل موفق</th><th>کارکرد</th><th>تسویه‌شده</th><th>مانده</th><th>نقدی نزد پیک</th><th>عملیات</th>
             </tr></thead>
             <tbody>
               {paged.visible.map((account, index) => <tr key={account.courierId}>
@@ -382,9 +420,10 @@ export function CourierAccountingPage() {
                 <td>{money(account.earnedAmount)}</td>
                 <td>{money(account.settledAmount)}</td>
                 <td>{money(account.outstandingAmount)}</td>
+                <td className={account.cashOutstanding > 0 ? 'courier-cash-due' : undefined}>{money(account.cashOutstanding)}</td>
                 <td>
                   <button type="button" onClick={() => void open(account)}>
-                    تسویه و سوابق
+                    جزئیات
                   </button>
                 </td>
               </tr>)}
@@ -406,6 +445,10 @@ export function CourierAccountingPage() {
           <div><dt>کارکرد</dt><dd>{money(selected.earnedAmount)}</dd></div>
           <div><dt>تسویه‌شده</dt><dd>{money(selected.settledAmount)}</dd></div>
           <div><dt>مانده</dt><dd>{money(selected.outstandingAmount)}</dd></div>
+          <div><dt>نقدی دریافتی از مشتری</dt><dd>{money(selected.cashCollected)}</dd></div>
+          <div><dt>نقدی تحویل‌داده</dt><dd>{money(selected.cashHandedOver)}</dd></div>
+          <div className={selected.cashOutstanding > 0 ? 'courier-cash-due' : undefined}><dt>نقدی نزد پیک</dt><dd>{money(selected.cashOutstanding)}</dd></div>
+          <div><dt>خالص حساب</dt><dd>{courierNetLabel(selected.outstandingAmount - selected.cashOutstanding)}</dd></div>
         </dl>
 
         <form className="form-grid compact-entry-form settlement-entry-form" onSubmit={submitSettlement}>
@@ -422,6 +465,29 @@ export function CourierAccountingPage() {
         </div>
         </form>
       {selected.outstandingAmount <= 0 && <p className="muted">مانده‌ای برای تسویه وجود ندارد.</p>}
+
+        <h3 className="courier-cash-title">دریافت نقدی از پیک</h3>
+        <p className="muted courier-cash-hint">پولی که پیک از مشتریان سفارش‌های نقدی گرفته و به کفگیر برمی‌گرداند.</p>
+        <form className="form-grid compact-entry-form settlement-entry-form" onSubmit={(event) => void receiveCash(event)}>
+          <AmountField label="مبلغ دریافتی (تومان)" placeholder="1,200,000" value={cashAmount}
+            hint={`حداکثر تا نقدی نزد پیک: ${money(Math.max(0, selected.cashOutstanding))}`}
+            onChange={setCashAmount} />
+          <label className="field">توضیح
+            <input value={cashNote} onChange={(e) => setCashNote(e.target.value)} maxLength={1000} placeholder="اختیاری" />
+          </label>
+          <div className="form-actions">
+            <button className="secondary" disabled={busy || selected.cashOutstanding <= 0}>{busy ? 'در حال ثبت…' : 'ثبت دریافت نقدی'}</button>
+          </div>
+        </form>
+        {handovers.length > 0 && <div className="table-wrap settlement-history">
+          <div className="table-summary"><strong>سوابق دریافت نقدی</strong><span>{count(handovers.length)} مورد</span></div>
+          <table>
+            <thead><tr><th>زمان</th><th>مبلغ</th><th>گیرنده</th><th>توضیح</th></tr></thead>
+            <tbody>{handovers.map((row) => <tr key={row.id}>
+              <td>{dateTime(row.receivedAt)}</td><td>{money(row.amount)}</td><td>{row.receivedBy ?? '—'}</td><td>{row.note || '—'}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
 
         <div className="table-wrap settlement-history">
           <div className="table-summary"><strong>سوابق تسویه</strong><span>{count(settlements.length)} مورد</span></div>

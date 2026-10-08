@@ -20,6 +20,9 @@ export const adminOperations = [
   'courierAccounting.summary',
   'courierAccounting.settlements',
   'courierAccounting.settle',
+  'courierAccounting.cashHandovers',
+  'courierAccounting.recordCash',
+  'orders.assignCourier',
   // Purchases and the monthly picture. What used to be a procurement and accounting subsystem is now
   // four operations: write a purchase down, read a month's purchases, read a month, list months.
   'purchases.month',

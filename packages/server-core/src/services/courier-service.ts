@@ -1,5 +1,7 @@
 import type {
   CourierAccountSummaryDto,
+  CourierCashHandoverDto,
+  CourierCashHandoverWriteRequest,
   CourierDeliveryDayDto,
   CourierDeliveryDayViewDto,
   CourierDeliveryDayWriteRequest,
@@ -9,7 +11,8 @@ import type {
   CourierWriteRequest,
   DeliveryPricingDto,
 } from '@kafgir/contracts'
-import { OrderStatus } from '@kafgir/contracts'
+import { OrderStatus, PaymentMethod } from '@kafgir/contracts'
+import { formatToman } from '../domain/money'
 import type { Sql, TransactionSql } from 'postgres'
 import { sqlClient } from '../db/client'
 import { AppError, NotFoundError } from '../errors'
@@ -292,11 +295,14 @@ type AccountRow = {
   lastWorkDate: string | null
   earnedAmount: number
   settledAmount: number
+  cashCollected: number
+  cashHandedOver: number
 }
 
 const summaryOf = (row: AccountRow): CourierAccountSummaryDto => ({
   ...row,
   outstandingAmount: courierOutstanding(row),
+  cashOutstanding: row.cashCollected - row.cashHandedOver,
 })
 
 /**
@@ -313,10 +319,13 @@ async function selectAccounts(courierId: number | null): Promise<AccountRow[]> {
            work.first_work_date::text AS "firstWorkDate",
            work.last_work_date::text AS "lastWorkDate",
            COALESCE(work.earned, 0)::float8 AS "earnedAmount",
-           COALESCE(paid.settled, 0)::float8 AS "settledAmount"
+           COALESCE(paid.settled, 0)::float8 AS "settledAmount",
+           COALESCE(work.cash, 0)::float8 AS "cashCollected",
+           COALESCE(handed.amount, 0)::float8 AS "cashHandedOver"
     FROM couriers c
     LEFT JOIN LATERAL (
       SELECT COUNT(*) AS delivered, SUM(o.courier_payable_amount) AS earned,
+             SUM(o.total_amount) FILTER (WHERE o.payment_method = ${PaymentMethod.Cash}) AS cash,
              MIN(o.delivery_date) AS first_work_date,
              MAX(o.delivery_date) AS last_work_date
       FROM orders o
@@ -328,6 +337,9 @@ async function selectAccounts(courierId: number | null): Promise<AccountRow[]> {
       SELECT SUM(s.amount) AS settled
       FROM courier_settlements s WHERE s.courier_id = c.id
     ) paid ON true
+    LEFT JOIN LATERAL (
+      SELECT SUM(h.amount) AS amount FROM courier_cash_handovers h WHERE h.courier_id = c.id
+    ) handed ON true
     WHERE ${courierId}::int IS NULL OR c.id = ${courierId}
     ORDER BY c.is_active DESC, c.full_name, c.id
   `
@@ -395,4 +407,81 @@ export async function recordCourierSettlement(
     `
   })
   return courierAccountSummary(request.courierId)
+}
+
+type HandoverRow = Omit<CourierCashHandoverDto, 'receivedAt'> & { receivedAt: DbTimestamp }
+
+export async function listCourierCashHandovers(courierId: number): Promise<CourierCashHandoverDto[]> {
+  const rows = await sqlClient<HandoverRow[]>`
+    SELECT h.id, h.courier_id AS "courierId", h.amount::float8 AS amount, h.received_at AS "receivedAt", h.note,
+           u.full_name AS "receivedBy"
+    FROM courier_cash_handovers h LEFT JOIN users u ON u.id = h.received_by_user_id
+    WHERE h.courier_id = ${courierId}
+    ORDER BY h.received_at DESC, h.id DESC
+  `
+  return rows.map((row) => ({ ...row, receivedAt: iso(row.receivedAt) }))
+}
+
+/**
+ * Records cash a courier brought back from cash-paying customers. Like settlements, the remaining
+ * figure is re-derived under a courier lock, and handing back more than the courier holds is refused.
+ */
+export async function recordCourierCashHandover(
+  request: CourierCashHandoverWriteRequest,
+  userId: number,
+): Promise<CourierAccountSummaryDto> {
+  await sqlClient.begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(hashtext(${`kafgir-courier-cash-${request.courierId}`}))`
+    const rows = await tx<{ collected: number; handed: number }[]>`
+      SELECT COALESCE((
+        SELECT SUM(o.total_amount) FROM orders o
+        WHERE o.courier_id = ${request.courierId} AND o.status = ${OrderStatus.Delivered}
+          AND o.payment_method = ${PaymentMethod.Cash}
+      ), 0)::float8 AS collected,
+      COALESCE((
+        SELECT SUM(h.amount) FROM courier_cash_handovers h WHERE h.courier_id = ${request.courierId}
+      ), 0)::float8 AS handed
+      FROM couriers WHERE id = ${request.courierId}
+    `
+    if (!rows[0]) throw new NotFoundError('پیک پیدا نشد.')
+    const holding = rows[0].collected - rows[0].handed
+    if (request.amount > holding) {
+      throw new AppError(`مبلغ تحویلی از نقدی نزد پیک بیشتر است. نقدی نزد پیک ${formatToman(Math.max(0, holding))} است.`)
+    }
+    await tx`
+      INSERT INTO courier_cash_handovers (courier_id, amount, received_at, note, received_by_user_id, created_at)
+      VALUES (${request.courierId}, ${request.amount}, NOW(), ${optionalText(request.note)}, ${userId > 0 ? userId : null}, NOW())
+    `
+    await tx`
+      INSERT INTO audit_logs (action, entity_type, entity_id, user_id, details, created_at)
+      VALUES ('courier.cash', 'courier', ${request.courierId}, ${userId}, ${formatToman(request.amount)}, NOW())
+    `
+  })
+  return courierAccountSummary(request.courierId)
+}
+
+/**
+ * Moves one delivery order to another active courier — a busy day split between two couriers. The
+ * order keeps its payable snapshot, which is the day's per-order rate whoever rides; only who earns it
+ * changes. Delivered and cancelled orders are history and stay where they are.
+ */
+export async function assignOrderCourier(orderId: number, courierId: number, userId: number): Promise<void> {
+  await sqlClient.begin(async (tx) => {
+    const orders = await tx<{ status: OrderStatus; courierId: number | null; previous: string | null }[]>`
+      SELECT status, courier_id AS "courierId", courier_name_snapshot AS previous FROM orders WHERE id = ${orderId} FOR UPDATE`
+    const order = orders[0]
+    if (!order) throw new NotFoundError('سفارش پیدا نشد.')
+    if (order.courierId == null) throw new AppError('این سفارش پیک ندارد (تحویل حضوری).')
+    if (order.status === OrderStatus.Delivered || order.status === OrderStatus.Cancelled) {
+      throw new AppError('پیک سفارش تحویل‌شده یا لغوشده را نمی‌توان عوض کرد.')
+    }
+    const couriers = await tx<{ fullName: string }[]>`
+      SELECT full_name AS "fullName" FROM couriers WHERE id = ${courierId} AND is_active`
+    if (!couriers[0]) throw new AppError('پیک انتخاب‌شده فعال نیست.')
+    await tx`UPDATE orders SET courier_id = ${courierId}, courier_name_snapshot = ${couriers[0].fullName} WHERE id = ${orderId}`
+    await tx`
+      INSERT INTO audit_logs (action, entity_type, entity_id, user_id, details, created_at)
+      VALUES ('order.courier', 'order', ${orderId}, ${userId}, ${`${order.previous ?? '—'} ← ${couriers[0].fullName}`}, NOW())
+    `
+  })
 }

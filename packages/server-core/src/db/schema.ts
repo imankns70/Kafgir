@@ -446,6 +446,23 @@ export const courierSettlements = pgTable('courier_settlements', {
   check('courier_settlements_amount_check', sql`${table.amount} > 0`),
 ])
 
+/**
+ * Cash a courier collected from cash-paying customers and handed back. Append-only; the cash a
+ * courier still holds is derived from delivered cash orders minus these rows.
+ */
+export const courierCashHandovers = pgTable('courier_cash_handovers', {
+  id: serial('id').primaryKey(),
+  courierId: integer('courier_id').notNull().references(() => couriers.id, { onDelete: 'restrict' }),
+  amount: money('amount').notNull(),
+  receivedAt: utcTimestamp('received_at').notNull(),
+  note: varchar('note', { length: 1000 }),
+  receivedByUserId: integer('received_by_user_id').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: utcTimestamp('created_at').notNull(),
+}, (table) => [
+  index('courier_cash_handovers_courier_idx').on(table.courierId, table.receivedAt),
+  check('courier_cash_handovers_amount_check', sql`${table.amount} > 0`),
+])
+
 /** Discount codes. `discount_type` 1 is a percentage of the food, 2 a fixed toman amount. */
 export const coupons = pgTable('coupons', {
   id: serial('id').primaryKey(),

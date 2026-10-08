@@ -38,6 +38,8 @@ import type {
   CustomerNotificationSettings,
   NotificationLogItemDto,
   StaffUserDto,
+  CourierCashHandoverDto,
+  CourierCashHandoverWriteRequest,
   StaffCreateRequest,
   StaffUpdateRequest,
   StaffPasswordRequest,
@@ -330,6 +332,12 @@ export const adminApi = {
     socialInvoke<CourierSettlementDto[]>('courierAccounting.settlements', { courierId }),
   settleCourier: (value: CourierSettlementWriteRequest) =>
     socialInvoke<CourierAccountSummaryDto>('courierAccounting.settle', { value }, true),
+  courierCashHandovers: (courierId: number) =>
+    socialInvoke<CourierCashHandoverDto[]>('courierAccounting.cashHandovers', { courierId }),
+  recordCourierCash: (value: CourierCashHandoverWriteRequest) =>
+    socialInvoke<CourierAccountSummaryDto>('courierAccounting.recordCash', { value }, true),
+  assignOrderCourier: (id: number, courierId: number) =>
+    socialInvoke<void>('orders.assignCourier', { id, value: { courierId } }, true),
   foodCategories: () => request<FoodCategoryDto[]>('/api/admin/food-categories'),
   createFoodCategory: (category: FoodCategoryWriteRequest) =>
     request<FoodCategoryDto>('/api/admin/food-categories', 'POST', category),

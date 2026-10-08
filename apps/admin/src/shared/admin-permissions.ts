@@ -51,6 +51,8 @@ const orderOperations = new Set<AdminOperation>([
   // settlement history. Recording a settlement is money leaving the business, and stays with Owner.
   'couriers.list', 'courierDays.get', 'courierDays.list', 'courierDays.save',
   'courierAccounting.summary', 'courierAccounting.settlements',
+  // Cash coming back from a courier is money arriving, so dispatch records it; paying out stays Owner.
+  'courierAccounting.cashHandovers', 'courierAccounting.recordCash', 'orders.assignCourier',
 ])
 
 export function isAdminOperationAllowed(operation: AdminOperation, roles: readonly string[]): boolean {
