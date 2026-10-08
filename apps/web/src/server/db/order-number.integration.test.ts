@@ -3,22 +3,20 @@ import {
   closeDatabase,
   configureDatabase,
   createOrder,
+  formatOrderNumber,
+  generateOrderNumber,
+  orderNumberPattern,
   persianBusinessYear,
 } from '@kafgir/server-core'
 import postgres from 'postgres'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 
 /**
- * Regression cover for the order-number counter in `createOrder`.
+ * Cover for order numbers in `createOrder`: `<Persian year>-<six random digits>`.
  *
- * The counter is `MAX(numeric suffix) + 1` over every order sharing the current Persian year prefix,
- * taken under `pg_advisory_xact_lock`. It has already failed once in production: bound untyped, the
- * `substring(order_number from N)` offset resolved to the POSIX-regex overload, so every order in a
- * year collapsed onto the same counter value. Nothing guarded that until this file.
- *
- * The suffixes seeded below are deliberately huge (1e8–2e9) so they dominate whatever real orders the
- * test database already holds for the current year — the counter is global per year, so a test cannot
- * carve out a private namespace. They stay under 2^31 because the expression casts to `int`.
+ * Numbers used to be the year plus a running counter, which let any customer count Kafgir's orders.
+ * These tests pin the random format, the retry on a taken number, and uniqueness under concurrent
+ * checkouts. Old counter-style numbers stay in the table and must not influence new ones.
  */
 
 const connectionString = process.env.TEST_DATABASE_URL
@@ -147,62 +145,45 @@ integration.sequential('order number generation', () => {
     await closeDatabase()
   })
 
-  it('prefixes the number with the current Persian year and advances by one', async () => {
+  it('formats new numbers as the Persian year, a dash and six digits', async () => {
+    const orderNumber = await placeOrder()
+    expect(orderNumber).toMatch(orderNumberPattern)
+    expect(orderNumber.startsWith(`${year}-`)).toBe(true)
+  })
+
+  it('does not continue the old running counter', async () => {
+    // A counter-style number from before the change must not become the base for the next one.
     await seedOrderNumber(`${year}400000010`)
-
-    expect(await placeOrder()).toBe(`${year}400000011`)
+    const orderNumber = await placeOrder()
+    expect(orderNumber).not.toBe(`${year}400000011`)
+    expect(orderNumber).toMatch(orderNumberPattern)
   })
 
-  it('treats the suffix as a number, not text, across the 9 to 10 boundary', async () => {
-    // Numerically 1000000010 > 100000009. Lexicographically '100000009' sorts higher, because the
-    // ninth character is '9' against '1'. A text MAX would therefore pick the smaller counter and
-    // hand out a number that is already taken.
-    await seedOrderNumber(`${year}100000009`)
-    await seedOrderNumber(`${year}1000000010`)
-
-    expect(await placeOrder()).toBe(`${year}1000000011`)
+  it('gives consecutive checkouts numbers that do not reveal how many orders came between', async () => {
+    const created: string[] = []
+    for (let index = 0; index < 6; index += 1) created.push(await placeOrder())
+    const suffixes = created.map((value) => Number(value.slice(year.length + 1)))
+    const steps = suffixes.slice(1).map((value, index) => value - suffixes[index]!)
+    // A counter would step by exactly one every time.
+    expect(steps.every((step) => step === 1)).toBe(false)
   })
 
-  it('treats the suffix as a number across the 99 to 100 boundary', async () => {
-    // Same disagreement one digit further along: 2000000100 > 200000099 numerically, while
-    // '200000099' sorts higher as text.
-    await seedOrderNumber(`${year}200000099`)
-    await seedOrderNumber(`${year}2000000100`)
-
-    expect(await placeOrder()).toBe(`${year}2000000101`)
-  })
-
-  it('ignores order numbers belonging to a different Persian year', async () => {
-    const nextYear = String(Number(year) + 1)
-    const previousYear = String(Number(year) - 1)
-    await seedOrderNumber(`${nextYear}999999999`)
-    await seedOrderNumber(`${previousYear}999999999`)
-    await seedOrderNumber(`${year}500000007`)
-
-    expect(await placeOrder()).toBe(`${year}500000008`)
-  })
-
-  it('ignores rows whose suffix is not numeric', async () => {
-    await seedOrderNumber(`${year}ABCDEF`)
-    await seedOrderNumber(`LEGACY-${suffix}`)
-    await seedOrderNumber(`${year}600000004`)
-
-    expect(await placeOrder()).toBe(`${year}600000005`)
+  it('draws again when the random number is already taken', async () => {
+    const taken = formatOrderNumber(year, 777777)
+    await seedOrderNumber(taken)
+    const draws = [777777, 777777, 123456]
+    const orderNumber = await sql.begin((tx) => generateOrderNumber(tx, year, () => draws.shift()!))
+    expect(orderNumber).toBe(formatOrderNumber(year, 123456))
+    expect(draws).toEqual([])
   })
 
   it('assigns one unique number per order under concurrent checkouts', async () => {
-    const base = 700000000
-    await seedOrderNumber(`${year}${base}`)
-
-    // Eight simultaneous checkouts. The advisory lock must serialise the read-modify-write, so the
-    // numbers form a contiguous run with no repeats — a duplicate would otherwise be rejected by
+    // Eight simultaneous checkouts under the year's advisory lock; a duplicate would be rejected by
     // `orders_order_number_uidx` and surface as a failed checkout.
     const created = await Promise.all(Array.from({ length: 8 }, () => placeOrder()))
 
     expect(new Set(created).size).toBe(8)
-    const counters = created.map((value) => Number(value.slice(year.length))).sort((a, b) => a - b)
-    expect(counters).toEqual(Array.from({ length: 8 }, (_, index) => base + index + 1))
-    for (const value of created) expect(value.startsWith(year)).toBe(true)
+    for (const value of created) expect(value).toMatch(orderNumberPattern)
   })
 
   it('keeps every order number unique in the table', async () => {

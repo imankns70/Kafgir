@@ -28,6 +28,7 @@ import {
 } from '../domain/courier-rules'
 import { logger } from '../logging/logger'
 import { formatTelegramOrderInvoice } from '../domain/order-invoice'
+import { generateOrderNumber } from '../domain/order-number'
 import { formatToman } from '../domain/money'
 
 const defaultCity = 'اندیمشک'
@@ -405,18 +406,7 @@ export async function createOrder(
 
     const year = String(persianBusinessYear(now))
     await tx`SELECT pg_advisory_xact_lock(hashtext(${`kafgir-order-${year}`}))`
-    // The offset MUST be cast to int. Bound untyped, PostgreSQL resolves the POSIX-regex overload
-    // `substring(text FROM text)` instead of the positional one, so '14051' matched '5' and every
-    // order in the year collapsed to the same counter value.
-    const counters = await tx<{ value: number }[]>`
-      SELECT COALESCE(MAX(
-        CASE WHEN substring(order_number from ${year.length + 1}::int) ~ '^[0-9]+$'
-          THEN substring(order_number from ${year.length + 1}::int)::int ELSE 0 END
-      ), 0)::int AS value
-      FROM orders
-      WHERE order_number LIKE ${`${year}%`}
-    `
-    const orderNumber = `${year}${(counters[0]?.value ?? 0) + 1}`
+    const orderNumber = await generateOrderNumber(tx, year)
     const subtotal = orderLines.reduce((sum, line) => sum + line.menuItem.price * line.quantity, 0)
     // Authoritative: the fee is recalculated here from server state regardless of anything the
     // client displayed. `reserveCourierDay` has already refused a courier order on an unpriced day,

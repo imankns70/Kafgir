@@ -1,5 +1,13 @@
 # Decisions
 
+## 2026-10-08 — Order numbers are random, not a running counter
+
+- New order numbers are `<Persian year>-<six random digits>`. A sequential counter revealed order
+  volume to customers; a random suffix reveals neither count nor order.
+- Digits only, so the number is easy to read out by phone. Uniqueness comes from a redraw under the
+  year's advisory lock plus the existing unique index, not from a keyed permutation or extra table.
+- Existing orders keep their numbers; the dash keeps the two formats from colliding.
+
 ## 2026-10-08 — The phone checkout wizard is one card per step
 
 - On phones a checkout step is one card: a «مرحله N از ۴» caption, the step title, its fields and the

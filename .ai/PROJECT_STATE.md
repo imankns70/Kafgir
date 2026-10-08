@@ -1,5 +1,15 @@
 # Project state
 
+## 2026-10-08 — Cart photos, order item list, random order numbers
+
+- Cart lines carry the food's primary photo (from the add and refreshed by the cart snapshot). Each
+  row shows the photo, the name and photo linking to the food page, an icon-only remove button, the
+  unit price, then quantity and line total. On phones the list grows with the page.
+- The active-order sheet lists items one per row with a quantity badge, folding the Persian-rice
+  add-on into its dish; customer order summaries return structured `foodItems` for this.
+- New order numbers are `<Persian year>-<six random digits>` (e.g. `1405-482917`) instead of a
+  running counter that exposed order volume. Existing orders keep their old numbers.
+
 ## 2026-10-08 — Order success page and active-order pill spacing
 
 - The success page leads with the order number, delivery time (window or «ارسال فوری»), total and
