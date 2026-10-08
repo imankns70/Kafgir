@@ -25,7 +25,7 @@ import {
  *
  * Three rules, all deliberate:
  *
- * - **Food sales are order subtotals**, never totals. The customer's delivery charge is money that
+ * - **Food sales are order subtotals less any coupon discount**, never totals. The customer's delivery charge is money that
  *   passes through to a courier; counting it as food revenue would flatter every comparison against
  *   what the kitchen spent on ingredients.
  * - **Delivered orders only.** This is the revenue rule the customer report already states: a
@@ -54,7 +54,7 @@ type MonthTotals = {
  * What was handed back on an order, capped at its food subtotal: a refund comes off food sales, and
  * any part of it beyond the food (the delivery charge) is not a food sale to begin with.
  */
-const refundedFood = (alias: string) => sqlClient.unsafe(`LEAST(${alias}.subtotal_amount, COALESCE((
+const refundedFood = (alias: string) => sqlClient.unsafe(`LEAST(${alias}.subtotal_amount - ${alias}.discount_amount, COALESCE((
   SELECT SUM(p.refunded_amount) FROM payments p WHERE p.order_id = ${alias}.id), 0))`)
 
 /**
@@ -76,7 +76,7 @@ async function monthTotals(range: JalaliMonthRange): Promise<MonthTotals> {
       COALESCE(bought.count, 0)::int AS "purchaseCount"
     FROM
       (SELECT
-         SUM(o.subtotal_amount) AS food_sales,
+         SUM(o.subtotal_amount - o.discount_amount) AS food_sales,
          SUM(${refundedFood('o')}) AS refunds,
          SUM(o.delivery_fee) AS delivery_fees,
          SUM(o.courier_payable_amount) AS courier_cost,
@@ -126,7 +126,7 @@ async function dailySeries(range: JalaliMonthRange): Promise<MonthlyDailyPointDt
     SELECT
       days.day::text AS date,
       COALESCE((
-        SELECT SUM(o.subtotal_amount - ${refundedFood('o')}) FROM orders o
+        SELECT SUM(o.subtotal_amount - o.discount_amount - ${refundedFood('o')}) FROM orders o
         WHERE o.status = ${soldStatus}
           AND ${orderServiceDate('o')} = days.day
       ), 0)::float8 AS "foodSales",
@@ -166,7 +166,7 @@ async function salesAnalysis(range: JalaliMonthRange): Promise<SalesAnalysisDto>
       SELECT
         COUNT(*) FILTER (WHERE m.status = ${soldStatus})::int AS delivered,
         COUNT(*) FILTER (WHERE m.status = ${OrderStatus.Cancelled})::int AS cancelled,
-        COALESCE(SUM(m.subtotal_amount - ${refundedFood('m')}) FILTER (WHERE m.status = ${soldStatus}), 0)::float8 AS "netSales",
+        COALESCE(SUM(m.subtotal_amount - m.discount_amount - ${refundedFood('m')}) FILTER (WHERE m.status = ${soldStatus}), 0)::float8 AS "netSales",
         COALESCE((SELECT SUM(i.quantity) FROM order_items i JOIN (${monthOrders()}) d ON d.id = i.order_id
           WHERE d.status = ${soldStatus}), 0)::int AS portions
       FROM (${monthOrders()}) m`,
@@ -264,7 +264,7 @@ export async function getDashboard(): Promise<AdminDashboardSummaryDto> {
           ))::int AS "activeOrders",
           COUNT(*) FILTER (WHERE status = ${OrderStatus.Delivered})::int AS "deliveredOrders",
           COUNT(*) FILTER (WHERE status = ${OrderStatus.Cancelled})::int AS "cancelledOrders",
-          COALESCE(SUM(subtotal_amount - ${refundedFood('today_orders')}) FILTER (WHERE status = ${soldStatus}), 0)::float8 AS "foodSales"
+          COALESCE(SUM(subtotal_amount - discount_amount - ${refundedFood('today_orders')}) FILTER (WHERE status = ${soldStatus}), 0)::float8 AS "foodSales"
         FROM today_orders
       ),
       portion_stats AS (

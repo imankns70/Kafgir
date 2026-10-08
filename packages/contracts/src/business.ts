@@ -95,8 +95,8 @@ export const monthlyDailyPointSchema = z.object({
 })
 
 /**
- * What sold and how, for the month's delivered orders. Dish and slot sales are food subtotals before
- * refunds, because a refund is recorded against the order, not against one dish.
+ * What sold and how, for the month's delivered orders. Dish, slot and payment-method sales are food
+ * subtotals before coupons and refunds, because both are recorded against the order, not one dish.
  */
 export const salesAnalysisSchema = z.object({
   deliveredOrders: z.number().int().nonnegative(),

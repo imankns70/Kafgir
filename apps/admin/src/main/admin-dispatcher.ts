@@ -32,6 +32,7 @@ import {
   customerReportQuerySchema,
   customerDirectoryQuerySchema,
   customerCrmWriteSchema,
+  couponWriteSchema,
   paymentMethodSettingWriteSchema,
   deliveryMethodSettingWriteSchema,
   PaymentMethod,
@@ -72,6 +73,10 @@ import {
   getCustomerDetail,
   updateCustomerCrm,
   listCustomerTags,
+  listCoupons,
+  createCoupon,
+  updateCoupon,
+  deleteCoupon,
   refundPayment,
   listUnpaidOrders,
   paymentReconciliation,
@@ -360,6 +365,11 @@ export async function dispatchAdminOperation(
     case 'customers.update':
       return updateCustomerCrm(numberField(body, 'id'), customerCrmWriteSchema.parse(body.value), principal.userId)
     case 'customers.tags': return listCustomerTags()
+    case 'coupons.list': return listCoupons()
+    case 'coupons.create': return createCoupon(couponWriteSchema.parse(body.value), principal.userId)
+    case 'coupons.update':
+      return updateCoupon(numberField(body, 'id'), couponWriteSchema.parse(body.value), principal.userId)
+    case 'coupons.delete': return deleteCoupon(numberField(body, 'id'), principal.userId)
     case 'reports.customers': {
       const query = customerReportQuerySchema.parse(body.value)
       return getCustomerReport(query.from, query.to)

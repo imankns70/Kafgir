@@ -59,6 +59,7 @@ export function OrderInvoice({ order, allowPrint = true }: { order: OrderDto; al
     <div className="invoice-summary">
       <div><span>جمع اقلام</span><strong>{formatMoney(order.subtotalAmount)}</strong></div>
       <div><span>هزینه ارسال</span><strong>{formatMoney(order.deliveryFee)}</strong></div>
+      {order.discountAmount > 0 && <div><span>کد تخفیف {order.couponCode && <bdi dir="ltr">{order.couponCode}</bdi>}</span><strong>−{formatMoney(order.discountAmount)}</strong></div>}
       <div className="invoice-grand-total"><span>مبلغ نهایی</span><strong>{formatMoney(order.totalAmount)}</strong></div>
     </div>
     {order.customerNote && <div className="invoice-note"><span>یادداشت مشتری</span><p>{order.customerNote}</p></div>}

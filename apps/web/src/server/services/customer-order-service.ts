@@ -136,7 +136,7 @@ export async function getCustomerOrderDetail(userId: number, orderId: number): P
            o.delivery_phone_number AS "customerPhoneNumber", o.delivery_city AS "deliveryCity",
            o.delivery_address_line AS "addressLine", o.status,
            o.payment_method AS "paymentMethod", o.delivery_method AS "deliveryMethod",
-           o.subtotal_amount::float8 AS "subtotalAmount", o.delivery_fee::float8 AS "deliveryFee",
+           o.subtotal_amount::float8 AS "subtotalAmount", o.delivery_fee::float8 AS "deliveryFee", o.discount_amount::float8 AS "discountAmount", o.coupon_code AS "couponCode",
            o.total_amount::float8 AS "totalAmount", o.customer_note AS "customerNote",
            o.created_at AS "createdAt", o.confirmed_at AS "confirmedAt",
            o.delivered_at AS "deliveredAt", o.cancelled_at AS "cancelledAt",

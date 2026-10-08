@@ -17,6 +17,9 @@ export type InvoiceMessageInput = {
   paymentMethod: PaymentMethod
   subtotalAmount: number
   deliveryFee: number
+  /** Coupon discount, if any; shown as its own line. */
+  discountAmount?: number
+  couponCode?: string | null
   totalAmount: number
   items: InvoiceMessageLine[]
 }
@@ -61,11 +64,12 @@ export function formatTelegramOrderInvoice(input: InvoiceMessageInput): string {
     '━━━━━━━━━━━━━━',
     `جمع اقلام: ${money(input.subtotalAmount)}`,
     `هزینه ارسال: ${money(input.deliveryFee)}`,
+    input.discountAmount ? `تخفیف${input.couponCode ? ` (${input.couponCode})` : ''}: −${money(input.discountAmount)}` : null,
     `مبلغ نهایی: ${money(input.totalAmount)}`,
     '',
     'وضعیت: در انتظار تایید',
     'از خرید شما سپاسگزاریم 🌿',
-  ]
+  ].filter((line): line is string => line !== null)
 
   const itemLines: string[] = []
   let omitted = 0

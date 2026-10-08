@@ -271,6 +271,7 @@ export function CustomerOrderDetails({ order, onBack, onReview }: {
           {/* Always shown, even at zero: an explicit ۰ تومان reads as free delivery. The value is the
               order's own snapshot, so a later price change never rewrites this receipt. */}
           <div><dt>هزینه ارسال</dt><dd>{order.deliveryFee > 0 ? formatMoney(order.deliveryFee) : 'رایگان'}</dd></div>
+          {order.discountAmount > 0 && <div><dt>کد تخفیف {order.couponCode && <bdi dir="ltr">{order.couponCode}</bdi>}</dt><dd className="discount-value">− {formatMoney(order.discountAmount)}</dd></div>}
           <div className="grand-total"><dt>جمع فاکتور</dt><dd>{formatMoney(order.totalAmount)}</dd></div>
         </dl>
       </section>

@@ -33,6 +33,8 @@ import type {
   CustomerDirectoryPageDto,
   CustomerDetailDto,
   CustomerCrmWriteRequest,
+  CouponDto,
+  CouponWriteRequest,
   PageRequest,
   PagedResult,
   CustomerPaymentDto,
@@ -421,6 +423,10 @@ export const adminApi = {
   updateCustomer: (id: number, value: CustomerCrmWriteRequest) =>
     socialInvoke<CustomerDetailDto>('customers.update', { id, value }, true),
   customerTags: () => socialInvoke<string[]>('customers.tags'),
+  coupons: () => socialInvoke<CouponDto[]>('coupons.list'),
+  createCoupon: (value: CouponWriteRequest) => socialInvoke<CouponDto>('coupons.create', { value }, true),
+  updateCoupon: (id: number, value: CouponWriteRequest) => socialInvoke<CouponDto>('coupons.update', { id, value }, true),
+  deleteCoupon: (id: number) => socialInvoke<void>('coupons.delete', { id }, true),
   customerReport: (from: string, to: string) =>
     socialInvoke<CustomerReportDto>('reports.customers', { value: { from, to } }),
   serverLogs: (limit = 500) => request<LogEntry[]>(`/api/admin/logs?limit=${limit}`),

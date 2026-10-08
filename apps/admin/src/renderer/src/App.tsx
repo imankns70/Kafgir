@@ -39,6 +39,7 @@ import { CourierAccountingPage, CourierDaysPage, CouriersPage } from './CourierP
 import { MonthTrend } from './BusinessPages'
 import { LogsPage } from './LogsPage'
 import { AuditLogPage } from './AuditLogPage'
+import { CouponsPage } from './CouponsPage'
 import { KitchenPage } from './KitchenPage'
 import { useNewOrderAlerts } from './new-order-alerts'
 import { isAdminOperationAllowed } from '../../shared/admin-permissions'
@@ -253,6 +254,7 @@ function AdminOrderInvoice({ order }: { order: OrderDto }) {
     <section className="admin-invoice-summary">
       <div><span>جمع اقلام</span><strong>{money(order.subtotalAmount)}</strong></div>
       <div><span>هزینه ارسال</span><strong>{money(order.deliveryFee)}</strong></div>
+      {order.discountAmount > 0 && <div><span>تخفیف{order.couponCode ? ` (${order.couponCode})` : ''}</span><strong>−{money(order.discountAmount)}</strong></div>}
       <div className="admin-invoice-total"><span>مبلغ قابل پرداخت</span><strong>{money(order.totalAmount)}</strong></div>
     </section>
     {order.customerNote && <section className="admin-invoice-note"><strong>یادداشت مشتری</strong><p>{order.customerNote}</p></section>}
@@ -295,6 +297,7 @@ export function AdminThermalReceipt({ order }: { order: OrderDto }) {
     <section className="thermal-receipt-summary">
       <div><span>جمع اقلام</span><strong>{money(order.subtotalAmount)}</strong></div>
       <div><span>هزینه ارسال</span><strong>{money(order.deliveryFee)}</strong></div>
+      {order.discountAmount > 0 && <div><span>تخفیف{order.couponCode ? ` (${order.couponCode})` : ''}</span><strong>−{money(order.discountAmount)}</strong></div>}
       <div className="thermal-receipt-total"><span>مبلغ قابل پرداخت</span><strong>{money(order.totalAmount)}</strong></div>
     </section>
     {order.customerNote && <section className="thermal-receipt-note"><strong>یادداشت مشتری</strong><p>{order.customerNote}</p></section>}
@@ -578,6 +581,7 @@ function OrderDetails({ order }: { order: AdminOrderDetailDto }) {
           <div><dt>روش فروش</dt><dd>{paymentMethodLabel[order.paymentMethod]}</dd></div>
           <div><dt>جمع اقلام</dt><dd>{money(order.subtotalAmount)}</dd></div>
           <div><dt>هزینه ارسال (از مشتری)</dt><dd>{money(order.deliveryFee)}</dd></div>
+          {order.discountAmount > 0 && <div><dt>کد تخفیف</dt><dd><bdi dir="ltr">{order.couponCode ?? '—'}</bdi> · −{money(order.discountAmount)}</dd></div>}
           <div className="detail-total"><dt>مبلغ کل</dt><dd>{money(order.totalAmount)}</dd></div>
         </dl>
       </section>
@@ -2113,6 +2117,7 @@ export function App() {
     months: <MonthsPage />,
     logs: <LogsPage />,
     'audit-log': <AuditLogPage />,
+    coupons: <CouponsPage />,
     kitchen: <KitchenPage />,
     'food-tag-groups': <FoodTagGroupsPage />,
     'support-subjects': <SupportSubjectsPage />,

@@ -2312,3 +2312,14 @@ select:disabled {
   .plan-live-dot::after, .plan-skeleton { animation: none; }
   .plan-day:hover, .plan-strip-day:hover, .plan-day:hover .plan-avatar, .plan-today-food:hover > img { transform: none; }
 }
+
+/* Discount code at checkout. */
+.checkout-coupon { display:grid;gap:6px }
+.checkout-coupon-row { display:flex;gap:8px }
+.checkout-coupon-row input { flex:1;min-width:0;text-align:left }
+.checkout-coupon-row .outline-button { flex:0 0 auto;min-width:84px }
+.checkout-coupon-applied { display:flex;align-items:center;gap:10px;border:1px solid #5a7d2e55;border-radius:var(--kafgir-radius-sm);padding:10px 12px;color:#3f5a1f;background:#eef3e4 }
+.checkout-coupon-applied span { flex:1;font-size:.92rem }
+.checkout-coupon-applied button { border:0;padding:4px 6px;color:var(--kafgir-color-primary);background:transparent;font:inherit;font-size:.86rem;cursor:pointer }
+.checkout-totals-discount strong { color:#3f6b1f }
+.checkout-totals-discount small { margin-inline-start:4px;font-size:.78rem }

@@ -16,6 +16,7 @@ export * from './delivery.js'
 export * from './menu-plan.js'
 export * from './courier.js'
 export * from './money.js'
+export * from './coupon.js'
 
 export const nullableText = z.string().trim().nullable().optional()
 
@@ -267,6 +268,8 @@ export const createOrderSchema = z.object({
    * keeps compiling and an absent flag means an ordinary delivery.
    */
   isExpress: z.boolean().optional(),
+  /** A discount code; the server decides whether it applies and how much it is worth. */
+  couponCode: z.string().trim().max(40).nullable().optional(),
   items: z.array(createOrderItemSchema).min(1),
 })
 
@@ -302,6 +305,9 @@ export const orderSchema = z.object({
   deliveryMethod: z.nativeEnum(DeliveryMethod),
   subtotalAmount: z.number(),
   deliveryFee: z.number(),
+  /** Taken off the food by a coupon; `total = subtotal + delivery − discount`. */
+  discountAmount: z.number().nonnegative().default(0),
+  couponCode: z.string().nullable().optional(),
   totalAmount: z.number(),
   customerNote: z.string().nullable().optional(),
   adminNote: z.string().nullable().optional(),

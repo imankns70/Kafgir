@@ -380,7 +380,7 @@ function ShareTable<T extends { orders: number; sales: number }>({ title, label,
 /** What sold, in which window and how it was paid, for the month's delivered orders. */
 export function SalesAnalysis({ analysis }: { analysis: SalesAnalysisDto }) {
   return <section className="sales-analysis">
-    <div className="table-panel-head"><h2>تحلیل فروش</h2><span>فقط سفارش‌های تحویل‌شده؛ مبالغ پیش از استرداد</span></div>
+    <div className="table-panel-head"><h2>تحلیل فروش</h2><span>فقط سفارش‌های تحویل‌شده؛ مبالغ پیش از تخفیف و استرداد</span></div>
     <div className="metric-grid">
       <article className="metric"><span>سفارش تحویل‌شده</span><strong>{formatNumber(analysis.deliveredOrders)}</strong></article>
       <article className="metric"><span>میانگین سبد (خالص)</span><strong>{analysis.averageBasket === null ? '—' : formatMoney(analysis.averageBasket)}</strong></article>

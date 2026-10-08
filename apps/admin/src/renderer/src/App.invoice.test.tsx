@@ -16,6 +16,7 @@ const order: OrderDto = {
   deliveryMethod: DeliveryMethod.Delivery,
   subtotalAmount: 774000,
   deliveryFee: 50000,
+  discountAmount: 0,
   totalAmount: 824000,
   customerNote: 'زنگ در خراب است.',
   adminNote: null,

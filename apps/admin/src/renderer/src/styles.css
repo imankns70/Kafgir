@@ -914,3 +914,14 @@ td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-ali
 .customer-crm-actions{display:flex;align-items:center;gap:10px}
 .customer-name-cell{white-space:normal}.customer-name-cell .badge,.customer-name-cell .customer-tag{margin-inline-start:6px}
 .customer-blocked-filter{align-self:center}
+
+/* Coupons. */
+.coupon-form{grid-template-columns:repeat(4,minmax(0,1fr));align-items:start}
+.coupon-form .switch{align-self:center;justify-content:flex-start}
+.coupon-form .switch input{width:auto;flex:0 0 auto}
+.coupon-form-toggles{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:22px}
+.coupon-form-actions{display:flex;gap:8px;align-items:center;margin-inline-start:auto}
+.coupon-table td{white-space:normal}.coupon-table td.text-cell{text-align:right;min-width:130px}
+.coupon-table .action-row{flex-wrap:wrap;justify-content:center;min-width:96px}
+.coupon-table .action-row button{padding:6px 10px;font-size:13px}
+.coupon-title{display:block;color:var(--muted);font-size:12px}

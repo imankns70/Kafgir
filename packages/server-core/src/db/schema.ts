@@ -446,6 +446,32 @@ export const courierSettlements = pgTable('courier_settlements', {
   check('courier_settlements_amount_check', sql`${table.amount} > 0`),
 ])
 
+/** Discount codes. `discount_type` 1 is a percentage of the food, 2 a fixed toman amount. */
+export const coupons = pgTable('coupons', {
+  id: serial('id').primaryKey(),
+  code: varchar('code', { length: 40 }).notNull(),
+  normalizedCode: varchar('normalized_code', { length: 40 }).notNull(),
+  title: varchar('title', { length: 150 }),
+  discountType: integer('discount_type').notNull(),
+  discountValue: money('discount_value').notNull(),
+  maxDiscountAmount: money('max_discount_amount'),
+  minOrderAmount: money('min_order_amount').notNull().default(0),
+  startsOn: date('starts_on', { mode: 'string' }),
+  endsOn: date('ends_on', { mode: 'string' }),
+  usageLimit: integer('usage_limit'),
+  perCustomerLimit: integer('per_customer_limit'),
+  firstOrderOnly: boolean('first_order_only').notNull().default(false),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: utcTimestamp('created_at').notNull(),
+  updatedAt: utcTimestamp('updated_at'),
+}, (table) => [
+  uniqueIndex('coupons_normalized_code_uidx').on(table.normalizedCode),
+  check('coupons_discount_type_check', sql`${table.discountType} IN (1, 2)`),
+  check('coupons_value_check', sql`${table.discountValue} > 0 AND (${table.discountType} <> 1 OR ${table.discountValue} <= 100)`),
+  check('coupons_limits_check', sql`(${table.usageLimit} IS NULL OR ${table.usageLimit} > 0) AND (${table.perCustomerLimit} IS NULL OR ${table.perCustomerLimit} > 0) AND ${table.minOrderAmount} >= 0 AND (${table.maxDiscountAmount} IS NULL OR ${table.maxDiscountAmount} > 0)`),
+  check('coupons_dates_check', sql`${table.startsOn} IS NULL OR ${table.endsOn} IS NULL OR ${table.startsOn} <= ${table.endsOn}`),
+])
+
 export const orders = pgTable('orders', {
   id: serial('id').primaryKey(),
   orderNumber: varchar('order_number', { length: 50 }).notNull(),
@@ -466,6 +492,10 @@ export const orders = pgTable('orders', {
    */
   deliveryFee: money('delivery_fee').notNull(),
   totalAmount: money('total_amount').notNull(),
+  /** Taken off the food by a coupon; `total = subtotal + delivery − discount`. */
+  discountAmount: money('discount_amount').notNull().default(0),
+  couponId: integer('coupon_id').references(() => coupons.id, { onDelete: 'restrict' }),
+  couponCode: varchar('coupon_code', { length: 40 }),
   customerNote: varchar('customer_note', { length: 1000 }),
   adminNote: varchar('admin_note', { length: 1000 }),
   // Delivery-window snapshot. Nullable because orders placed before this feature have no window and
@@ -519,7 +549,8 @@ export const orders = pgTable('orders', {
   check('orders_status_check', sql`${table.status} BETWEEN 1 AND 6`),
   check('orders_payment_method_check', sql`${table.paymentMethod} IN (1, 2, 3, 4)`),
   check('orders_delivery_method_check', sql`${table.deliveryMethod} BETWEEN 1 AND 2`),
-  check('orders_money_check', sql`${table.subtotalAmount} >= 0 AND ${table.deliveryFee} >= 0 AND ${table.totalAmount} = ${table.subtotalAmount} + ${table.deliveryFee}`),
+  check('orders_money_check', sql`${table.subtotalAmount} >= 0 AND ${table.deliveryFee} >= 0 AND ${table.discountAmount} >= 0 AND ${table.discountAmount} <= ${table.subtotalAmount} AND ${table.totalAmount} = ${table.subtotalAmount} + ${table.deliveryFee} - ${table.discountAmount}`),
+  index('orders_coupon_idx').on(table.couponId).where(sql`coupon_id IS NOT NULL`),
   // Serves the courier earnings aggregate, which scans by courier and current status.
   index('orders_courier_status_idx').on(table.courierId, table.status)
     .where(sql`courier_id IS NOT NULL`),

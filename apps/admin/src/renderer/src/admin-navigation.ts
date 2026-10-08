@@ -8,7 +8,7 @@ export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' |
   | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
   | 'food-tag-groups' | 'support-subjects'
   | 'payment-methods' | 'delivery-methods' | 'customer-report' | 'customers' | 'site-analytics'
-  | 'couriers' | 'courier-days' | 'courier-accounting'
+  | 'couriers' | 'courier-days' | 'courier-accounting' | 'coupons'
 
 export type NavigationGroupId =
   'sales' | 'catalog' | 'finance' | 'social' | 'reference' | 'settings'
@@ -76,6 +76,7 @@ export const navigationGroups: NavigationGroup[] = [
       { page: 'orders', label: 'سفارش‌ها', operation: 'orders.search' },
       { page: 'manual', label: 'سفارش دستی', operation: 'orders.create' },
       { page: 'customers', label: 'مشتریان', operation: 'customers.search' },
+      { page: 'coupons', label: 'کدهای تخفیف', operation: 'coupons.list' },
       { page: 'customer-communication', label: 'پشتیبانی و نظرها', operation: 'support.conversations.list' },
       { page: 'report', label: 'گزارش سفارش‌ها', operation: 'orders.search' },
       { page: 'customer-report', label: 'گزارش مشتریان', operation: 'reports.customers' },

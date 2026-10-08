@@ -34,6 +34,7 @@ import { logger } from '../logging/logger'
 import { formatTelegramOrderInvoice } from '../domain/order-invoice'
 import { generateOrderNumber, orderNumberSearchDigits } from '../domain/order-number'
 import { formatToman } from '../domain/money'
+import { applyCouponToOrder, recomputeOrderDiscount } from './coupon-service'
 
 const defaultCity = 'اندیمشک'
 const customerRole = 'Customer'
@@ -58,6 +59,8 @@ type OrderRecord = {
   deliveryMethod: number
   subtotalAmount: number
   deliveryFee: number
+  discountAmount: number
+  couponCode: string | null
   totalAmount: number
   customerNote: string | null
   adminNote: string | null
@@ -438,12 +441,18 @@ export async function createOrder(
     // charge which was the surcharge.
     const expressFee = isExpress ? deliverySettings[0].expressFee : 0
     const chargedDeliveryFee = deliveryFee + expressFee
-    const total = subtotal + chargedDeliveryFee
+    // A coupon comes off the food only, after the minimum-order rule has been met on the full food.
+    const coupon = optionalText(request.couponCode)
+      ? await applyCouponToOrder(tx, request.couponCode!, customer.profileId, subtotal)
+      : null
+    const discount = coupon?.discount ?? 0
+    const total = subtotal + chargedDeliveryFee - discount
     const orderRows = await tx<{ id: number }[]>`
       INSERT INTO orders
         (order_number, customer_profile_id, customer_address_id, delivery_full_name,
          delivery_phone_number, delivery_city, delivery_address_line,
          status, payment_method, delivery_method, subtotal_amount, delivery_fee,
+         discount_amount, coupon_id, coupon_code,
          total_amount, customer_note, delivery_date, delivery_time_slot_id,
          delivery_time_slot_title, delivery_start_time, delivery_end_time, is_express, express_fee,
          courier_id, courier_name_snapshot, courier_delivery_day_id, courier_payable_amount,
@@ -452,6 +461,7 @@ export async function createOrder(
         (${orderNumber}, ${customer.profileId}, ${customerAddressId}, ${fullName},
          ${phoneNumber}, ${city}, ${addressLine}, ${OrderStatus.PendingConfirmation},
          ${request.paymentMethod}, ${request.deliveryMethod}, ${subtotal}, ${chargedDeliveryFee},
+         ${discount}, ${coupon?.id ?? null}, ${coupon?.code ?? null},
          ${total}, ${optionalText(request.customerNote)},
          ${deliverySnapshot || isExpress ? deliveryDate : null}::date, ${deliverySnapshot?.slotId ?? null},
          ${deliverySnapshot?.title ?? null},
@@ -507,6 +517,8 @@ export async function createOrder(
           paymentMethod: request.paymentMethod,
           subtotalAmount: subtotal,
           deliveryFee: chargedDeliveryFee,
+          discountAmount: discount,
+          couponCode: coupon?.code ?? null,
           totalAmount: total,
           items: orderLines.map(({ menuItem, quantity }) => ({
             foodName: menuItem.name,
@@ -546,7 +558,7 @@ export async function getOrder(id: number): Promise<OrderDto> {
            delivery_phone_number AS "customerPhoneNumber",
            delivery_address_line AS "addressLine", delivery_city AS "deliveryCity",
            status, payment_method AS "paymentMethod", delivery_method AS "deliveryMethod",
-           subtotal_amount::float8 AS "subtotalAmount", delivery_fee::float8 AS "deliveryFee",
+           subtotal_amount::float8 AS "subtotalAmount", delivery_fee::float8 AS "deliveryFee", discount_amount::float8 AS "discountAmount", coupon_code AS "couponCode",
            total_amount::float8 AS "totalAmount", customer_note AS "customerNote",
            admin_note AS "adminNote", created_at AS "createdAt",
            confirmed_at AS "confirmedAt", delivered_at AS "deliveredAt",
@@ -832,8 +844,8 @@ const editableStatuses = [OrderStatus.PendingConfirmation, OrderStatus.Confirmed
  */
 export async function editOrder(id: number, request: OrderEditRequest, userId: number): Promise<void> {
   await sqlClient.begin(async (tx) => {
-    const orders = await tx<{ status: OrderStatus; deliveryFee: number; subtotal: number; orderNumber: string }[]>`
-      SELECT status, delivery_fee::float8 AS "deliveryFee", subtotal_amount::float8 AS subtotal,
+    const orders = await tx<{ status: OrderStatus; deliveryFee: number; subtotal: number; orderNumber: string; couponId: number | null }[]>`
+      SELECT status, delivery_fee::float8 AS "deliveryFee", subtotal_amount::float8 AS subtotal, coupon_id AS "couponId",
              order_number AS "orderNumber"
       FROM orders WHERE id = ${id} FOR UPDATE
     `
@@ -922,6 +934,8 @@ export async function editOrder(id: number, request: OrderEditRequest, userId: n
     `
     const subtotal = totals[0]!.subtotal
     if (subtotal !== order.subtotal) changes.push(`مبلغ غذا: ${formatToman(order.subtotal)} ← ${formatToman(subtotal)}`)
+    // The order's coupon is re-priced on the new food, under the rules it was given with.
+    const discount = await recomputeOrderDiscount(tx, order.couponId, subtotal)
     const city = optionalText(request.city)
     const addressLine = optionalText(request.addressLine)
     const contact = await tx<{ changed: boolean }[]>`
@@ -932,7 +946,8 @@ export async function editOrder(id: number, request: OrderEditRequest, userId: n
         delivery_address_line = COALESCE(${addressLine}, o.delivery_address_line),
         customer_note = ${optionalText(request.customerNote)},
         subtotal_amount = ${subtotal},
-        total_amount = ${subtotal} + o.delivery_fee
+        discount_amount = ${discount},
+        total_amount = ${subtotal} + o.delivery_fee - ${discount}
       FROM (SELECT delivery_full_name, delivery_phone_number, delivery_city, delivery_address_line FROM orders WHERE id = ${id}) old
       WHERE o.id = ${id}
       RETURNING (old.delivery_full_name, old.delivery_phone_number, old.delivery_city, old.delivery_address_line)

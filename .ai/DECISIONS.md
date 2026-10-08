@@ -950,3 +950,14 @@
 - The Electron development renderer binds to `127.0.0.1` so Windows localhost resolution cannot
   select an IPv6-only Vite listener. Electron retries the initial renderer navigation briefly because
   electron-vite starts the main process and renderer server concurrently.
+
+## 2026-10-08 — Coupons and customer blocking
+
+- A coupon discounts food only, never the delivery charge. Orders snapshot `coupon_code` and
+  `discount_amount`, and the money check is `total = subtotal + delivery_fee − discount`. Revenue
+  reporting counts food as `subtotal − discount`; per-dish, per-window and per-payment-method shares
+  stay pre-discount because a discount belongs to the order, not a dish.
+- Coupon usage (overall, per customer, first-order-only) counts non-cancelled orders, so cancelling
+  an order frees its use. The coupon row is locked while an order applies it. A used coupon cannot
+  be deleted, only deactivated. Correcting an order's basket re-prices its coupon under its own rules.
+- Blocking a customer stops orders from the customer app only; staff can still place a manual order.

@@ -1,4 +1,4 @@
-import { DeliveryMethod, OrderStatus, PaymentMethod, PaymentStatus } from '@kafgir/contracts'
+import { CouponDiscountType, DeliveryMethod, OrderStatus, PaymentMethod, PaymentStatus } from '@kafgir/contracts'
 import {
   changePaymentStatus,
   closeDatabase,
@@ -6,6 +6,9 @@ import {
   createOrder,
   createPayment,
   editOrder,
+  checkCoupon,
+  createCoupon,
+  deleteCoupon,
   getCustomerDetail,
   searchCustomers,
   updateCustomerCrm,
@@ -106,6 +109,7 @@ integration.sequential('order money integrity', () => {
       await sql`DELETE FROM order_items WHERE order_id = ${id}`
       await sql`DELETE FROM orders WHERE id = ${id}`
     }
+    await sql`DELETE FROM coupons WHERE title = ${suffix}`
     await sql`DELETE FROM daily_menu_items WHERE daily_menu_id = ${menuId}`
     await sql`DELETE FROM daily_menus WHERE id = ${menuId}`
     await sql`DELETE FROM foods WHERE category_id = ${categoryId}`
@@ -305,5 +309,39 @@ integration.sequential('order money integrity', () => {
     const log = await listAuditLogs({ page: 1, pageSize: 50, entityType: 'customer' } as never)
     expect(log.items.filter((entry) => entry.entityId === profileId).map((entry) => entry.action))
       .toEqual(expect.arrayContaining(['customer.block', 'customer.unblock']))
+  })
+
+  it('takes a coupon off the food only, once per customer, and frees it when the order is cancelled', async () => {
+    const code = `T${suffix.replace(/\W/gu, '').slice(0, 10)}`
+    const coupon = await createCoupon({
+      code, title: suffix, discountType: CouponDiscountType.Percent, discountValue: 10, maxDiscountAmount: 30_000,
+      minOrderAmount: 300_000, usageLimit: 5, perCustomerLimit: 1, firstOrderOnly: false, isActive: true,
+    }, adminUserId)
+    expect((await checkCoupon(code.toLowerCase(), 400_000)).discountAmount).toBe(30_000)
+    await expect(checkCoupon(code, 200_000)).rejects.toThrow(/به بالا/u)
+    await expect(checkCoupon('NO-SUCH-CODE', 400_000)).rejects.toThrow(/معتبر نیست/u)
+
+    const withCoupon = (quantity: number) => createOrder({
+      fullName: `مشتری ${suffix}`, phoneNumber: '09000000088', city: 'x', addressLine: 'x', saveAddress: false,
+      paymentMethod: PaymentMethod.Cash, deliveryMethod: DeliveryMethod.Pickup, customerNote: null,
+      deliveryTimeSlotId: null, couponCode: code,
+      items: [{ dailyMenuItemId: menuItemId, withPersianRice: false, quantity }],
+    } as never, anonymous, true)
+    const first = await withCoupon(1)
+    orderIds.push(first.id)
+    expect(first.discountAmount).toBe(30_000)
+    expect(first.couponCode).toBe(code.toUpperCase())
+    expect(first.totalAmount).toBe(first.subtotalAmount + first.deliveryFee - 30_000)
+    await expect(withCoupon(1)).rejects.toThrow(/پیش‌تر/u)
+    await expect(deleteCoupon(coupon.id, adminUserId)).rejects.toThrow(/غیرفعال/u)
+
+    // Correcting the basket re-prices the coupon under its own rules: below the minimum it gives nothing.
+    await editOrder(first.id, { fullName: 'x', phoneNumber: '09000000088', items: [{ dailyMenuItemId: menuItemId, quantity: 2 }] }, adminUserId)
+    expect((await getAdminOrderDetail(first.id)).discountAmount).toBe(30_000)
+
+    await updateOrderStatus(first.id, { newStatus: OrderStatus.Cancelled })
+    const second = await withCoupon(1)
+    orderIds.push(second.id)
+    expect(second.discountAmount).toBe(30_000)
   })
 })

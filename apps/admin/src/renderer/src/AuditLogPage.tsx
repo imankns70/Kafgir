@@ -15,6 +15,9 @@ const actionLabel: Record<string, string> = {
   'customer.update': 'ویرایش یادداشت/برچسب مشتری',
   'customer.block': 'مسدود کردن مشتری',
   'customer.unblock': 'رفع مسدودی مشتری',
+  'coupon.create': 'ساخت کد تخفیف',
+  'coupon.update': 'ویرایش کد تخفیف',
+  'coupon.delete': 'حذف کد تخفیف',
   'payment.create': 'ثبت پرداخت',
   'payment.status': 'تغییر وضعیت پرداخت',
   'payment.refund': 'استرداد',
@@ -23,7 +26,7 @@ const actionLabel: Record<string, string> = {
   'purchase.delete': 'حذف خرید',
 }
 
-const entityLabel: Record<string, string> = { order: 'سفارش', payment: 'پرداخت', purchase: 'خرید', customer: 'مشتری' }
+const entityLabel: Record<string, string> = { order: 'سفارش', payment: 'پرداخت', purchase: 'خرید', customer: 'مشتری', coupon: 'کد تخفیف' }
 
 const orderStatusLabel: Record<number, string> = {
   [OrderStatus.PendingConfirmation]: 'در انتظار تأیید',

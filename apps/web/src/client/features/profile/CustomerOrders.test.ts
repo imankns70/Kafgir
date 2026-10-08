@@ -48,6 +48,7 @@ const detail: CustomerOrderDetailDto = {
   deliveryMethod: DeliveryMethod.Delivery,
   subtotalAmount: 475000,
   deliveryFee: 10000,
+  discountAmount: 0,
   totalAmount: 485000,
   customerNote: null,
   createdAt: '2026-08-09T08:00:00.000Z',

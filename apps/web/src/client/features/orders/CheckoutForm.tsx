@@ -5,7 +5,7 @@ import {
   requestCustomerOtp,
   verifyCustomerOtp,
 } from '../../services/customerApi'
-import { createOrder, getOrderOptions } from '../../services/ordersApi'
+import { checkCoupon, createOrder, getOrderOptions } from '../../services/ordersApi'
 import { getDeliveryPricing } from '../../services/deliveryApi'
 import { getTelegramInitData, getTelegramUser } from '../../services/telegram'
 import { cartItemIssue } from '../../services/cartReconciliation'
@@ -102,7 +102,12 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
   const selectedPricing = pricing?.methods.find((item) => item.method === form.deliveryMethod) ?? null
   const deliveryFee = selectedPricing?.customerDeliveryFee ?? null
   const isDeliveryUnpriced = Boolean(selectedPricing && deliveryFee === null)
-  const finalTotal = cartSubtotal + (deliveryFee ?? 0) + expressFee
+  const [couponText, setCouponText] = useState('')
+  const [coupon, setCoupon] = useState<{ code: string; discountAmount: number; message: string } | null>(null)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [isCheckingCoupon, setIsCheckingCoupon] = useState(false)
+  const couponDiscount = coupon ? Math.min(coupon.discountAmount, cartSubtotal) : 0
+  const finalTotal = cartSubtotal + (deliveryFee ?? 0) + expressFee - couponDiscount
 
   const applyProfile = useCallback((profile: CustomerProfileDto, requireConfirmedPhone: boolean) => {
     setCustomerProfile(profile)
@@ -272,6 +277,26 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     if (!stepError) onWizardStepChange?.(next)
   }
 
+  const applyCoupon = async (code = couponText) => {
+    const trimmed = code.trim()
+    if (!trimmed) return
+    setIsCheckingCoupon(true)
+    setCouponError(null)
+    try {
+      const result = await checkCoupon(trimmed, cartSubtotal)
+      setCoupon({ code: result.code, discountAmount: result.discountAmount, message: result.message })
+    } catch (couponFailure) {
+      setCoupon(null)
+      setCouponError(couponFailure instanceof Error ? couponFailure.message : 'کد تخفیف بررسی نشد.')
+    } finally { setIsCheckingCoupon(false) }
+  }
+  const removeCoupon = () => { setCoupon(null); setCouponText(''); setCouponError(null) }
+  // A changed basket changes what a percentage coupon is worth, or whether it applies at all.
+  const appliedCode = coupon?.code
+  useEffect(() => {
+    if (appliedCode) void applyCoupon(appliedCode)
+  }, [cartSubtotal])
+
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
@@ -326,6 +351,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       deliveryMethod: form.deliveryMethod, paymentMethod: form.paymentMethod,
       deliveryTimeSlotId: expressChosen ? null : deliveryTimeSlotId,
       isExpress: expressChosen,
+      couponCode: coupon?.code ?? null,
       items: items.map((item) => ({ dailyMenuItemId: item.dailyMenuItemId, withPersianRice: Boolean(item.withPersianRice), quantity: item.quantity })),
     }
     setIsSubmitting(true)
@@ -507,6 +533,26 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     <div className="checkout-step-block" data-step="payment">
       <label className="field checkout-note-field"><span>توضیح سفارش <small>(اختیاری)</small></span><textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
 
+      <div className="checkout-coupon">
+        {coupon
+          ? <div className="checkout-coupon-applied" role="status">
+              <Icon name="discount" size="sm" />
+              <span><strong dir="ltr">{coupon.code}</strong> {coupon.message}</span>
+              <button type="button" className="text-button" onClick={removeCoupon}>حذف کد</button>
+            </div>
+          : <label className="field checkout-coupon-field">
+              <span>کد تخفیف <small>(اختیاری)</small></span>
+              <div className="checkout-coupon-row">
+                <input dir="ltr" value={couponText} maxLength={40} autoComplete="off" placeholder="KAFGIR10"
+                  onChange={(event) => { setCouponText(event.target.value); setCouponError(null) }}
+                  onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void applyCoupon() } }} />
+                <button type="button" className="outline-button" disabled={!couponText.trim() || isCheckingCoupon}
+                  onClick={() => void applyCoupon()}>{isCheckingCoupon ? <ButtonLoading label="بررسی…" /> : 'اعمال'}</button>
+              </div>
+            </label>}
+        {couponError && <div className="form-error" role="alert">{couponError}</div>}
+      </div>
+
       {/* The delivery charge is shown as its own line, never folded into the total: the customer should
           be able to read غذا + ارسال = پرداختی without doing arithmetic to find the difference. */}
       <section className="checkout-totals" aria-label="خلاصه مبلغ سفارش">
@@ -520,6 +566,10 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
         {expressChosen && <div>
           <span>ارسال فوری</span>
           <strong>{formatMoney(expressFee)}</strong>
+        </div>}
+        {couponDiscount > 0 && <div className="checkout-totals-discount">
+          <span>تخفیف <small dir="ltr">{coupon?.code}</small></span>
+          <strong>−{formatMoney(couponDiscount)}</strong>
         </div>}
         <div className="checkout-totals-final">
           <span>مبلغ نهایی</span>
