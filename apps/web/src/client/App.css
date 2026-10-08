@@ -1269,89 +1269,13 @@ select:disabled {
 
 .mobile-bottom-nav { display: none; }
 
-.food-detail-header-actions,
-.food-detail-facts,
-.food-tag-list,
-.food-detail-thumbnails { display:flex;align-items:center;gap:8px }
+.food-detail-header-actions { display:flex;align-items:center;gap:8px }
 .icon-action { display:inline-grid;width:42px;height:42px;place-items:center;border:1px solid var(--kafgir-color-border);border-radius:50%;color:var(--kafgir-color-secondary);background:var(--kafgir-color-surface);text-decoration:none }
-.icon-action.active,.food-like.active { color:var(--kafgir-color-primary);background:var(--kafgir-color-primary-soft);border-color:var(--kafgir-color-primary) }
+.icon-action.active { color:var(--kafgir-color-primary);background:var(--kafgir-color-primary-soft);border-color:var(--kafgir-color-primary) }
 .nav-icon-wrap { position: relative; display: inline-grid; place-items: center; line-height: 1; }
 .nav-count { position: absolute; inset-inline-start: -10px; inset-block-start: -7px; display: grid; min-width: 17px; height: 17px; place-items: center; border-radius: var(--kafgir-radius-pill); color: var(--kafgir-color-text-on-primary); background: var(--kafgir-color-primary); font-size: .62rem; font-weight: 700; line-height: 1; }
 .food-detail-cart-action { position:relative }
 .food-detail-cart-action .nav-count { inset-inline-start:-8px;inset-block-start:-9px }
-.food-detail-page { display:grid;grid-template-columns:minmax(300px,.9fr) minmax(0,1.1fr);gap:var(--kafgir-space-5);align-items:start;padding-block-end:24px }
-.food-detail-gallery { position:sticky;inset-block-start:112px;padding:0;overflow:hidden }
-.food-detail-main-image { position:relative }
-.food-detail-main-image .food-image,.food-detail-main-image .food-placeholder { aspect-ratio:4/3 }
-.food-gallery-arrow {
-  position:absolute;
-  z-index:2;
-  inset-block-start:50%;
-  display:grid;
-  width:42px;
-  height:42px;
-  place-items:center;
-  border:1px solid rgba(255,255,255,.72);
-  border-radius:50%;
-  color:var(--kafgir-color-text-on-primary);
-  background:rgba(43,43,43,.46);
-  box-shadow:var(--kafgir-shadow-card);
-  transform:translateY(-50%);
-  backdrop-filter:blur(10px);
-}
-.food-gallery-arrow:hover { background:rgba(196,77,49,.9) }
-.food-gallery-arrow.previous { inset-inline-start:12px }
-.food-gallery-arrow.next { inset-inline-end:12px }
-.food-gallery-counter {
-  position:absolute;
-  z-index:2;
-  inset-inline-start:12px;
-  inset-block-end:12px;
-  padding:4px 9px;
-  border:1px solid rgba(255,255,255,.72);
-  border-radius:var(--kafgir-radius-pill);
-  color:var(--kafgir-color-text-on-primary);
-  background:rgba(43,43,43,.5);
-  font-size:var(--kafgir-type-caption);
-  font-weight:700;
-  backdrop-filter:blur(10px);
-}
-.food-detail-thumbnails { padding:10px;overflow-x:auto }
-.food-detail-thumbnails button { width:68px;height:54px;flex:0 0 auto;overflow:hidden;border:2px solid transparent;border-radius:var(--kafgir-radius-sm);padding:0;background:var(--kafgir-color-background-secondary) }
-.food-detail-thumbnails button.active { border-color:var(--kafgir-color-primary);box-shadow:0 0 0 2px var(--kafgir-color-primary-soft) }
-.food-detail-thumbnails img { width:100%;height:100%;object-fit:cover }
-.food-detail-content { display:grid;gap:var(--kafgir-space-3) }
-.food-detail-content .panel { margin:0 }
-.food-detail-summary h1 { margin:4px 0;color:var(--kafgir-color-text-primary);font-size:var(--kafgir-type-page) }
-.food-detail-info-grid { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--kafgir-space-3) }
-.food-copy-section { display:grid;align-content:start;gap:7px }
-.food-copy-section p { margin:0;color:var(--kafgir-color-text-secondary);line-height:1.9;white-space:pre-line }
-.food-copy-section p.muted { color:var(--kafgir-color-text-muted) }
-.food-category-label { color:var(--kafgir-color-secondary);font-weight:700 }
-.food-detail-facts { flex-wrap:wrap;margin-block-start:12px;color:var(--kafgir-color-text-secondary);font-size:var(--kafgir-type-body-sm) }
-.food-detail-facts>span,.food-like { display:inline-flex;align-items:center;gap:5px;min-height:34px;border:1px solid var(--kafgir-color-border);border-radius:var(--kafgir-radius-pill);padding:5px 10px;background:var(--kafgir-color-surface) }
-.food-like { color:var(--kafgir-color-secondary);font:inherit;cursor:pointer }
-.food-tag-list { flex-wrap:wrap;margin-block-start:12px }
-.food-tag-list span { padding:5px 10px;border-radius:var(--kafgir-radius-pill);color:var(--kafgir-color-secondary);background:var(--kafgir-color-secondary-soft);font-size:var(--kafgir-type-caption) }
-.food-copy-section h2,.related-foods h2 { margin:0;color:var(--kafgir-color-text-primary);font-size:var(--kafgir-type-card) }
-.food-copy-section.allergy { border-color:var(--kafgir-color-warning);background:var(--kafgir-color-warning-soft) }
-.current-menu-box { display:flex;justify-content:space-between;gap:16px }
-.current-menu-box>div { display:grid;gap:4px }
-.current-menu-box strong { color:var(--kafgir-color-primary);font-size:var(--kafgir-type-price) }
-.current-menu-box span,.current-menu-box small { color:var(--kafgir-color-text-secondary) }
-.related-foods { display:grid;gap:10px }
-.related-foods>div { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px }
-.related-foods a { display:grid;grid-template-columns:72px 1fr;grid-template-rows:auto auto;gap:2px 10px;align-items:center;overflow:hidden;border:1px solid var(--kafgir-color-border);border-radius:var(--kafgir-radius-md);padding:8px;color:var(--kafgir-color-text-primary);background:var(--kafgir-color-surface);text-decoration:none }
-.related-foods .food-image,.related-foods .food-placeholder { grid-row:1/3;width:72px;height:58px;aspect-ratio:auto;border-radius:var(--kafgir-radius-sm) }
-.related-foods .food-placeholder-copy { display:none }
-.related-foods .food-placeholder-art { width:56px;height:44px }
-.related-foods a span { color:var(--kafgir-color-primary);font-size:var(--kafgir-type-caption) }
-.related-foods .discount-pill { color:var(--kafgir-color-error);background:var(--kafgir-color-error-soft) }
-.food-purchase-bar { display:grid;grid-template-columns:1fr;gap:10px;margin:10px;padding:10px 12px;border:1px solid var(--kafgir-color-border);border-radius:var(--kafgir-radius-lg);background:var(--kafgir-color-surface-elevated);box-shadow:none }
-.food-purchase-bar-mobile { display:none }
-.food-purchase-action { display:grid;grid-template-columns:max-content minmax(190px,1fr);align-items:end;direction:rtl;gap:10px;min-width:0 }
-.food-purchase-bar .add-button { width:100%;min-width:0 }
-.food-purchase-bar .quantity-add-control { width:100% }
 
 .profile-login-page { max-width:560px;margin-inline:auto }
 .profile-login-card { margin-block-start:28px }
@@ -1791,29 +1715,9 @@ select:disabled {
   .mobile-bottom-nav button > span:last-child { line-height: 1.15; white-space: nowrap; }
 
   .mobile-bottom-nav button.active { color: var(--kafgir-color-primary); background: var(--kafgir-color-primary-soft); }
-  .food-detail-page { display:block;padding-block-end:118px }
-  .food-detail-shell:has(.food-purchase-bar-mobile .rice-upgrade-option-card) .food-detail-page { padding-block-end:172px }
-  .food-detail-gallery { position:static;margin-block-end:12px }
-  .food-gallery-arrow { width:36px;height:36px }
-  .food-gallery-arrow.previous { inset-inline-start:8px }
-  .food-gallery-arrow.next { inset-inline-end:8px }
-  .food-gallery-counter { inset-inline-start:8px;inset-block-end:8px }
-  .food-detail-content { gap:10px }
-  .food-detail-info-grid { grid-template-columns:1fr;gap:10px }
   .food-detail-header .brand-logo { width:76px;height:54px }
   .food-detail-header-actions { gap:5px }
   .icon-action { width:38px;height:38px }
-  .related-foods>div { grid-template-columns:1fr }
-  .food-purchase-bar-desktop { display:none }
-  .food-purchase-bar-mobile { position:fixed;z-index:var(--kafgir-z-navigation);inset-inline:50%;inset-block-end:max(10px,env(safe-area-inset-bottom));transform:translateX(50%);display:grid;grid-template-columns:1fr;gap:8px;width:min(calc(100% - 24px),760px);margin:0;padding:9px 10px;border-radius:var(--kafgir-radius-xl);background:var(--kafgir-color-surface-glass);box-shadow:var(--kafgir-shadow-navigation);backdrop-filter:blur(14px) }
-  .food-purchase-bar .menu-card-price>span { display:none }
-  .food-purchase-bar .price { font-size:.9rem }
-  .food-purchase-bar .primary-button { min-height:42px;padding:8px 10px;font-size:.76rem }
-  .food-purchase-action { grid-template-columns:max-content minmax(156px,1fr) }
-  .food-purchase-bar .add-button { min-width:0 }
-  .food-purchase-bar .quantity-add-control { width:100%;grid-template-columns:32px minmax(54px,1fr) 32px }
-  .food-purchase-bar .quantity-controls { gap:4px }
-  .food-purchase-bar .quantity-button { min-width:34px;min-height:34px }
   .profile-layout { display:block }
   .contact-link { display:grid;gap:6px;justify-items:start }
   .customer-orders-panel { position:static }
@@ -1895,8 +1799,8 @@ select:disabled {
 }
 .rice-upgrade-option-card input { flex: 0 0 auto; width: 1rem; height: 1rem; }
 /* On the menu card the upgrade is a small switch: it reads as an option of the dish, not a form. */
-.menu-card .rice-upgrade-option-card { min-height: 42px; padding: .4rem .7rem; border-style: dashed; background: color-mix(in srgb, var(--kafgir-color-secondary-soft) 55%, var(--kafgir-color-surface-elevated)); }
-.menu-card .rice-upgrade-option-card input {
+:is(.menu-card, .food-purchase-bar) .rice-upgrade-option-card { min-height: 42px; padding: .4rem .7rem; border-style: dashed; background: color-mix(in srgb, var(--kafgir-color-secondary-soft) 55%, var(--kafgir-color-surface-elevated)); }
+:is(.menu-card, .food-purchase-bar) .rice-upgrade-option-card input {
   position: relative;
   width: 34px;
   height: 20px;
@@ -1906,7 +1810,7 @@ select:disabled {
   transition: background var(--kafgir-motion-fast) var(--kafgir-ease);
   appearance: none;
 }
-.menu-card .rice-upgrade-option-card input::before {
+:is(.menu-card, .food-purchase-bar) .rice-upgrade-option-card input::before {
   content: "";
   position: absolute;
   inset-block-start: 2px;
@@ -1918,18 +1822,14 @@ select:disabled {
   box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
   transition: transform var(--kafgir-motion-fast) var(--kafgir-ease);
 }
-.menu-card .rice-upgrade-option-card input:checked { background: var(--kafgir-color-secondary); }
-.menu-card .rice-upgrade-option-card input:checked::before { transform: translateX(-14px); }
-.menu-card .rice-upgrade-option-card:has(input:checked) { border-style: solid; background: var(--kafgir-color-secondary-soft); }
+:is(.menu-card, .food-purchase-bar) .rice-upgrade-option-card input:checked { background: var(--kafgir-color-secondary); }
+:is(.menu-card, .food-purchase-bar) .rice-upgrade-option-card input:checked::before { transform: translateX(-14px); }
+:is(.menu-card, .food-purchase-bar) .rice-upgrade-option-card:has(input:checked) { border-style: solid; background: var(--kafgir-color-secondary-soft); }
 .rice-upgrade-label { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .rice-upgrade-price { flex:0 0 auto;margin-inline-start:auto;padding-inline-start:.6rem;border-inline-start:1px solid color-mix(in srgb,var(--kafgir-color-secondary) 26%,transparent);direction:rtl;white-space:nowrap; }
 @media (max-width:340px) {
   .menu-card-action { flex-wrap:wrap; }
   .menu-card .add-button { flex:1 1 100%; }
-  .food-purchase-action { grid-template-columns:1fr;align-items:stretch; }
-  .food-purchase-action .price-display { justify-self:end; }
-  .food-detail-page { padding-block-end:166px; }
-  .food-detail-shell:has(.food-purchase-bar-mobile .rice-upgrade-option-card) .food-detail-page { padding-block-end:220px; }
 }
 .rice-upgrade-hint { display: inline-flex; align-items: center; gap: .3rem; color: var(--kafgir-color-secondary); font-size: .75rem; font-weight: 700; text-decoration: none; }
 .cart-variant-hint { display: block; color: var(--kafgir-color-text-muted); font-size: .72rem; line-height: 1.7; }

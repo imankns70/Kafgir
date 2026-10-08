@@ -40,11 +40,12 @@ type Props = {
   initialCatalog: FoodCatalogDetail
 }
 
-function FoodInfoSection({ title, value }: { title: string; value: string | null }) {
-  return <section className="panel food-copy-section">
-    <h2>{title}</h2>
-    <p className={value ? undefined : 'muted'}>{value || 'ثبت نشده'}</p>
-  </section>
+const lowStockThreshold = 5
+
+// Ingredients are typed as one comma-separated sentence in the admin; shown as chips they scan faster.
+export function splitIngredients(value: string | null): string[] {
+  if (!value) return []
+  return value.split(/[،,]/u).map((part) => part.trim().replace(/[.。]$/u, '').trim()).filter(Boolean)
 }
 
 export function FoodDetailPage({ slug, initialCatalog }: Props) {
@@ -124,7 +125,9 @@ export function FoodDetailPage({ slug, initialCatalog }: Props) {
     const tomorrowText = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Tehran', year: 'numeric', month: '2-digit', day: '2-digit',
     }).format(tomorrow)
-    return food.menuDate === today ? 'منوی امروز' : food.menuDate === tomorrowText ? 'منوی فردا' : 'منوی روز'
+    // The API sends the date as an ISO timestamp; only its calendar day matters here.
+    const menuDay = food.menuDate.slice(0, 10)
+    return menuDay === today ? 'منوی امروز' : menuDay === tomorrowText ? 'منوی فردا' : 'منوی روز'
   }, [food?.menuDate])
 
   const changeInteraction = async (kind: 'like' | 'favorite') => {
@@ -210,7 +213,7 @@ export function FoodDetailPage({ slug, initialCatalog }: Props) {
 
     return <div className={className}>
       {offersRice && rice && <label className="rice-upgrade-option rice-upgrade-option-card">
-        <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
+        <input type="checkbox" role="switch" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
           onChange={(event) => event.target.checked ? setConfirmingRice(true) : setWithPersianRice(false)} />
         <span className="rice-upgrade-label">{riceAvailable || upgradedInCart
           ? 'با برنج ایرانی'
@@ -225,6 +228,7 @@ export function FoodDetailPage({ slug, initialCatalog }: Props) {
           price={(food.price ?? 0) + (withPersianRice && rice ? rice.price : 0)}
           originalPrice={food.originalPrice}
           discountPercentage={food.discountPercentage}
+          showDiscountPill={false}
         />
         {upgradedQuantity > 0
           ? <div className="add-button quantity-add-control" aria-label={`${initialCatalog.title} در سبد خرید`}>
@@ -232,13 +236,13 @@ export function FoodDetailPage({ slug, initialCatalog }: Props) {
                 type="button"
                 className="quantity-add-button"
                 onClick={() => changeCartQuantity(upgradedQuantity - 1, withPersianRice)}
-                aria-label={`کم کردن ${initialCatalog.title}`}
+                aria-label={upgradedQuantity === 1 ? `حذف ${initialCatalog.title} از سبد` : `کم کردن ${initialCatalog.title}`}
               >
-                <Icon name="minus" size="sm" />
+                <Icon name={upgradedQuantity === 1 ? 'delete' : 'minus'} size="sm" />
               </button>
               <span className="quantity-add-status">
                 <span>{formatNumber(upgradedQuantity)}</span>
-                <small>در سبد خرید</small>
+                <small>در سبد</small>
               </span>
               <button
                 type="button"
@@ -250,12 +254,22 @@ export function FoodDetailPage({ slug, initialCatalog }: Props) {
                 <Icon name="add" size="sm" />
               </button>
             </div>
-          : <button className="primary-button add-button" disabled={!food.isOrderable} onClick={() => addToCart()}>
-              <Icon name="cart" size="sm" /><span>افزودن به سبد خرید</span>
+          : <button type="button" className="primary-button add-button" disabled={!food.isOrderable} onClick={() => addToCart()}
+              aria-label={food.isOrderable ? `افزودن ${initialCatalog.title} به سبد خرید` : food.availabilityReason}>
+              {food.isOrderable
+                ? <><Icon name="add" size="sm" /><span>{withPersianRice ? 'افزودن با برنج' : 'افزودن به سبد'}</span></>
+                : <span>فعلاً قابل سفارش نیست</span>}
             </button>}
       </div>
     </div>
   }
+
+  const ingredients = splitIngredients(initialCatalog.ingredients)
+  const hasStory = Boolean(initialCatalog.fullDescription)
+  const lowStock = Boolean(food?.isOrderable && food.remainingCapacity > 0 && food.remainingCapacity <= lowStockThreshold)
+  const orderDeadline = food?.orderDeadline
+    ? new Intl.DateTimeFormat('fa-IR-u-nu-latn', { timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(new Date(food.orderDeadline))
+    : null
 
   return <div className="app-shell food-detail-shell">
     <header className="app-header food-detail-header">
@@ -275,25 +289,35 @@ export function FoodDetailPage({ slug, initialCatalog }: Props) {
     </header>
 
     <main className="food-detail-page">
-      <section className="food-detail-gallery panel">
+      <section className="food-detail-gallery">
         <div className="food-detail-main-image" aria-roledescription="carousel" aria-label={`تصاویر ${initialCatalog.title}`}>
           <FoodImage src={primaryImage} alt={initialCatalog.images[activeImage]?.altText || initialCatalog.title} />
-          {initialCatalog.primaryBadge && <span className="food-card-badge">{initialCatalog.primaryBadge.icon} {initialCatalog.primaryBadge.title}</span>}
-          {food?.discountPercentage && <span className="discount-card-badge"><Icon name="discount" size="xs" /> {formatNumber(food.discountPercentage)}٪ تخفیف</span>}
+          {(initialCatalog.primaryBadge || food?.discountPercentage) && <div className="menu-card-badges">
+            {initialCatalog.primaryBadge && <span className="menu-card-badge">
+              {initialCatalog.primaryBadge.icon && <span aria-hidden="true">{initialCatalog.primaryBadge.icon}</span>}
+              {initialCatalog.primaryBadge.title}
+            </span>}
+            {food?.discountPercentage && <span className="menu-card-badge is-discount">
+              <Icon name="discount" size="xs" /> {formatNumber(food.discountPercentage)}٪ تخفیف
+            </span>}
+          </div>}
           {showCarouselControls && <>
-            <button className="food-gallery-arrow previous" onClick={showPreviousImage} aria-label="تصویر قبلی">
-              <Icon name="forward" size="md" />
+            <button type="button" className="food-gallery-arrow previous" onClick={showPreviousImage} aria-label="تصویر قبلی">
+              <Icon name="forward" size="sm" />
             </button>
-            <button className="food-gallery-arrow next" onClick={showNextImage} aria-label="تصویر بعدی">
-              <Icon name="back" size="md" />
+            <button type="button" className="food-gallery-arrow next" onClick={showNextImage} aria-label="تصویر بعدی">
+              <Icon name="back" size="sm" />
             </button>
-            <span className="food-gallery-counter">
-              {formatNumber(activeImage + 1)} / {formatNumber(imageCount)}
-            </span>
+            <div className="food-gallery-dots">
+              {initialCatalog.images.map((image, index) => <button key={image.id} type="button"
+                className={activeImage === index ? 'active' : ''}
+                aria-current={activeImage === index ? 'true' : undefined}
+                onClick={() => setActiveImage(index)} aria-label={`نمایش تصویر ${formatNumber(index + 1)}`} />)}
+            </div>
           </>}
         </div>
-        {initialCatalog.images.length > 1 && <div className="food-detail-thumbnails">
-          {initialCatalog.images.map((image, index) => <button key={image.id} className={activeImage === index ? 'active' : ''}
+        {showCarouselControls && <div className="food-detail-thumbnails">
+          {initialCatalog.images.map((image, index) => <button key={image.id} type="button" className={activeImage === index ? 'active' : ''}
             aria-current={activeImage === index ? 'true' : undefined}
             onClick={() => setActiveImage(index)} aria-label={`نمایش تصویر ${formatNumber(index + 1)}`}>
             <img src={image.imageUrl} alt={image.altText} />
@@ -303,56 +327,79 @@ export function FoodDetailPage({ slug, initialCatalog }: Props) {
       </section>
 
       <section className="food-detail-content">
-        <div className="panel food-detail-summary">
-          <span className="food-category-label">{initialCatalog.category.icon} {initialCatalog.category.title}</span>
+        <header className="food-detail-summary">
+          <div className="food-detail-kicker">
+            <span>{initialCatalog.category.icon} {initialCatalog.category.title}</span>
+            {menuContext && <span><Icon name="freshIngredients" size="xs" /> {menuContext === 'منوی امروز' ? 'پخت تازه امروز' : menuContext}</span>}
+          </div>
           <h1>{initialCatalog.title}</h1>
+          {initialCatalog.shortDescription && <p className="food-detail-lead">{initialCatalog.shortDescription}</p>}
           <div className="food-detail-facts">
-            {food && <button className={food.isLikedByCurrentUser ? 'food-like active' : 'food-like'} disabled={interactionBusy}
-              onClick={() => void changeInteraction('like')}><Icon name="favorite" size="sm" /> {formatNumber(food.likeCount)} پسند</button>}
-            {initialCatalog.preparationTimeMinutes && <span><Icon name="clock" size="sm" /> {formatNumber(initialCatalog.preparationTimeMinutes)} دقیقه</span>}
-            {menuContext && <span><Icon name="calendar" size="sm" /> {menuContext}</span>}
+            {initialCatalog.preparationTimeMinutes && <div className="food-fact">
+              <Icon name="clock" size="md" />
+              <strong>{formatNumber(initialCatalog.preparationTimeMinutes)} دقیقه</strong>
+              <small>زمان پخت</small>
+            </div>}
+            {food && <div className="food-fact">
+              <Icon name="calendar" size="md" />
+              <strong>{menuContext ?? 'خارج از منو'}</strong>
+              <small>زمان سرو</small>
+            </div>}
+            {food && <button type="button" className={food.isLikedByCurrentUser ? 'food-fact food-like active' : 'food-fact food-like'} disabled={interactionBusy}
+              aria-pressed={food.isLikedByCurrentUser}
+              onClick={() => void changeInteraction('like')}>
+              <Icon name="favorite" size="md" />
+              <strong>{formatNumber(food.likeCount)}</strong>
+              <small>{food.isLikedByCurrentUser ? 'پسندیدید' : 'پسند'}</small>
+            </button>}
           </div>
           {initialCatalog.tags.length > 0 && <div className="food-tag-list">{initialCatalog.tags.map((tag) =>
             <span key={tag.id}>{tag.icon} {tag.title}</span>)}</div>}
-        </div>
-
-        <div className="food-detail-info-grid">
-          {/* The two descriptions are one piece of writing to a reader — a lead line and the text
-              that follows it — so they share a box instead of repeating the same heading twice. */}
-          <section className="panel food-copy-section food-description-section">
-            <h2>معرفی غذا</h2>
-            {initialCatalog.shortDescription && <p className="food-description-lead">{initialCatalog.shortDescription}</p>}
-            {initialCatalog.fullDescription && <p>{initialCatalog.fullDescription}</p>}
-            {!initialCatalog.shortDescription && !initialCatalog.fullDescription && <p className="muted">ثبت نشده</p>}
-          </section>
-          <FoodInfoSection title="مقدار و محتویات هر پرس" value={initialCatalog.portionDescription} />
-          <FoodInfoSection title="مواد حساسیت زا" value={initialCatalog.allergyInformation} />
-        </div>
-        {initialCatalog.ingredients && <section className="panel food-copy-section"><h2>مواد اولیه</h2><p>{initialCatalog.ingredients}</p></section>}
+        </header>
 
         {food
-          ? <section className="panel current-menu-box">
-              <div><PriceDisplay price={food.price} originalPrice={food.originalPrice} discountPercentage={food.discountPercentage} label="قیمت امروز" /><span>{food.availabilityReason}</span></div>
-              {food.orderDeadline && <div>
-                <small>مهلت سفارش: {new Intl.DateTimeFormat('fa-IR-u-nu-latn', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Tehran' }).format(new Date(food.orderDeadline))}</small>
-              </div>}
-            </section>
-          : <section className="panel current-menu-box" aria-live="polite">
-              <div><strong>{loading ? 'در حال بررسی منوی روز…' : 'اطلاعات منوی روز دریافت نشد.'}</strong></div>
-            </section>}
+          ? <div className={`food-detail-availability${food.isOrderable ? '' : ' is-closed'}${lowStock ? ' is-low' : ''}`} role="status">
+              <span className="food-availability-dot" aria-hidden="true" />
+              <strong>{lowStock ? `فقط ${formatNumber(food.remainingCapacity)} پرس باقی مانده` : food.availabilityReason}</strong>
+              {orderDeadline && food.isOrderable && <small><Icon name="clock" size="xs" /> مهلت سفارش {orderDeadline}</small>}
+            </div>
+          : <div className="food-detail-availability is-loading" aria-live="polite">
+              <span className="food-availability-dot" aria-hidden="true" />
+              <strong>{loading ? 'در حال بررسی منوی روز…' : 'اطلاعات منوی روز دریافت نشد.'}</strong>
+            </div>}
         {error && <div className="form-error" role="alert">{error}</div>}
 
+        {hasStory && <section className="food-detail-section">
+          <h2><Icon name="homeCook" size="sm" /> معرفی غذا</h2>
+          <p>{initialCatalog.fullDescription}</p>
+        </section>}
+        {initialCatalog.portionDescription && <section className="food-detail-section">
+          <h2><Icon name="packaging" size="sm" /> در هر پرس</h2>
+          <p>{initialCatalog.portionDescription}</p>
+        </section>}
+        {ingredients.length > 0 && <section className="food-detail-section">
+          <h2><Icon name="freshIngredients" size="sm" /> مواد اولیه</h2>
+          <ul className="food-ingredient-list">{ingredients.map((ingredient) => <li key={ingredient}>{ingredient}</li>)}</ul>
+        </section>}
+        {initialCatalog.allergyInformation && <section className="food-detail-section is-allergy">
+          <h2><Icon name="info" size="sm" /> حساسیت‌زا</h2>
+          <p>{initialCatalog.allergyInformation}</p>
+        </section>}
+
         {food && food.relatedFoods.length > 0 && <section className="related-foods">
-          <h2>غذاهای پیشنهادی</h2>
-          <div>{food.relatedFoods.map((related) => <Link key={related.menuItemId} href={`/foods/${related.slug}?menuItemId=${related.menuItemId}`}>
-            <FoodImage src={related.imageUrl} alt={related.title} />
+          <h2>شاید این‌ها را هم دوست داشته باشید</h2>
+          <div className="related-foods-track">{food.relatedFoods.map((related) => <Link key={related.menuItemId} className="related-food-card"
+            href={`/foods/${related.slug}?menuItemId=${related.menuItemId}`}>
+            <span className="related-food-media">
+              <FoodImage src={related.imageUrl} alt={related.title} />
+              {related.discountPercentage && <span className="menu-card-badge is-discount">{formatNumber(related.discountPercentage)}٪</span>}
+            </span>
             <strong>{related.title}</strong>
             {related.allowsPersianRice && <span className="rice-upgrade-hint">با امکان برنج ایرانی</span>}
-            <div>
-              <PriceDisplay compact label="" price={related.price}
-                originalPrice={related.originalPrice}
-                discountPercentage={related.discountPercentage} />
-            </div>
+            <PriceDisplay compact label="" price={related.price}
+              originalPrice={related.originalPrice}
+              discountPercentage={related.discountPercentage}
+              showDiscountPill={false} />
           </Link>)}</div>
         </section>}
       </section>
