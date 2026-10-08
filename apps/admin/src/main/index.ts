@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { join, resolve } from 'node:path'
 import {
   authenticateAdmin,
+  currentAdminRoles,
   assertReferenceDataSchemaReady,
   closeDatabase,
   configureDatabase,
@@ -32,6 +33,21 @@ import {
 
 let mainWindow: BrowserWindow | null = null
 let principal: AdminPrincipal | null = null
+/** When the signed-in account was last re-read, so deactivation or a role change ends the session. */
+let principalCheckedAt = 0
+const principalRecheckMs = 60_000
+
+async function refreshPrincipal() {
+  if (!principal || Date.now() - principalCheckedAt < principalRecheckMs) return
+  const roles = await currentAdminRoles(principal.userId)
+  principalCheckedAt = Date.now()
+  if (!roles) {
+    desktopLogger().warn({ event: 'auth.session.revoked', userId: principal.userId }, 'حساب مدیریت غیرفعال شد')
+    principal = null
+    throw new Error('حساب شما غیرفعال شده یا دسترسی آن تغییر کرده است. دوباره وارد شوید.')
+  }
+  principal = { ...principal, roles }
+}
 let configuredFingerprint: string | null = null
 let runtimeConfigurationPromise: Promise<void> | null = null
 let databaseClosedForQuit = false
@@ -140,6 +156,7 @@ function registerIpc() {
     assertTrustedSender(event)
     await ensureConfigured()
     principal = await authenticateAdmin(request)
+    principalCheckedAt = Date.now()
     startSocialAutomationTimer()
     return {
       fullName: principal.fullName,
@@ -159,6 +176,7 @@ function registerIpc() {
     await ensureConfigured()
     const startedAt = Date.now()
     try {
+      await refreshPrincipal()
       const result = await dispatchAdminOperation(request.operation, request.payload, principal)
       desktopLogger().info({
         event: 'database.operation.succeeded',

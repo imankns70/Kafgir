@@ -59,6 +59,7 @@ export async function authenticateAdmin(request: AdminLoginRequest): Promise<Adm
       WHERE id = ${user.id}
     `
   }
+  await sqlClient`UPDATE users SET last_seen_at = NOW(), access_failed_count = 0 WHERE id = ${user.id}`
   const principal = {
     userId: user.id,
     username: user.username,

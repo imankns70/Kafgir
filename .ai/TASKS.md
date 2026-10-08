@@ -29,7 +29,7 @@ Operations features
 - [x] C6 Customer notes, tags and blocking.
 - [x] C7 Discount codes (coupons).
 - [x] C8 SMS order-status notifications for customers without Telegram.
-- [ ] C9 Staff user and role management.
+- [x] C9 Staff user and role management.
 - [ ] C10 More than one courier per day, and cash a courier collects from customers.
 
 Smaller improvements

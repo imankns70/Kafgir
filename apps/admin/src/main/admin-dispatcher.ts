@@ -34,6 +34,9 @@ import {
   customerCrmWriteSchema,
   couponWriteSchema,
   customerNotificationSettingsSchema,
+  staffCreateSchema,
+  staffUpdateSchema,
+  staffPasswordSchema,
   paymentMethodSettingWriteSchema,
   deliveryMethodSettingWriteSchema,
   PaymentMethod,
@@ -81,6 +84,10 @@ import {
   getCustomerNotificationSettings,
   saveCustomerNotificationSettings,
   listRecentNotifications,
+  listStaff,
+  createStaff,
+  updateStaff,
+  resetStaffPassword,
   refundPayment,
   listUnpaidOrders,
   paymentReconciliation,
@@ -378,6 +385,11 @@ export async function dispatchAdminOperation(
     case 'notifications.settings.save':
       return saveCustomerNotificationSettings(customerNotificationSettingsSchema.parse(body.value), principal.userId)
     case 'notifications.list': return listRecentNotifications()
+    case 'staff.list': return listStaff()
+    case 'staff.create': return createStaff(staffCreateSchema.parse(body.value), principal.userId)
+    case 'staff.update': return updateStaff(numberField(body, 'id'), staffUpdateSchema.parse(body.value), principal.userId)
+    case 'staff.resetPassword':
+      return resetStaffPassword(numberField(body, 'id'), staffPasswordSchema.parse(body.value), principal.userId)
     case 'reports.customers': {
       const query = customerReportQuerySchema.parse(body.value)
       return getCustomerReport(query.from, query.to)

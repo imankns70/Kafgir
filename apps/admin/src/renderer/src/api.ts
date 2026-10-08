@@ -37,6 +37,10 @@ import type {
   CouponWriteRequest,
   CustomerNotificationSettings,
   NotificationLogItemDto,
+  StaffUserDto,
+  StaffCreateRequest,
+  StaffUpdateRequest,
+  StaffPasswordRequest,
   PageRequest,
   PagedResult,
   CustomerPaymentDto,
@@ -433,6 +437,11 @@ export const adminApi = {
   saveNotificationSettings: (value: CustomerNotificationSettings) =>
     socialInvoke<CustomerNotificationSettings>('notifications.settings.save', { value }, true),
   notifications: () => socialInvoke<NotificationLogItemDto[]>('notifications.list'),
+  staff: () => socialInvoke<StaffUserDto[]>('staff.list'),
+  createStaff: (value: StaffCreateRequest) => socialInvoke<StaffUserDto>('staff.create', { value }, true),
+  updateStaff: (id: number, value: StaffUpdateRequest) => socialInvoke<StaffUserDto>('staff.update', { id, value }, true),
+  resetStaffPassword: (id: number, value: StaffPasswordRequest) =>
+    socialInvoke<void>('staff.resetPassword', { id, value }, true),
   customerReport: (from: string, to: string) =>
     socialInvoke<CustomerReportDto>('reports.customers', { value: { from, to } }),
   serverLogs: (limit = 500) => request<LogEntry[]>(`/api/admin/logs?limit=${limit}`),
