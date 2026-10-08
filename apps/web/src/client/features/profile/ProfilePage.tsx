@@ -243,7 +243,7 @@ export function ProfilePage({ onBack, onAuthenticationChange }: {
           ? <label className="field">شماره موبایل<input className="ltr-value" dir="ltr" inputMode="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="09121234567" /></label>
           : <label className="field">کد تایید<input className="otp-input ltr-value" dir="ltr" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(asciiDigits(event.target.value))} /></label>}
         {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="primary-button full-width" disabled={isSubmitting}>{isSubmitting ? 'لطفاً صبر کنید…' : loginStep === 'phone' ? 'ارسال کد تایید' : 'مشاهده پروفایل'}</button>
+        <button className="primary-button full-width" disabled={isSubmitting}>{isSubmitting ? 'لطفاً صبر کنید…' : loginStep === 'phone' ? 'ارسال کد تایید' : 'ورود'}</button>
         {loginStep === 'code' && <div className="otp-actions">
           <button type="button" className="outline-button" onClick={() => setLoginStep('phone')}>تغییر شماره</button>
           <button type="button" className="outline-button" disabled={resendSeconds > 0 || isSubmitting} onClick={() => void sendOtp()}>
