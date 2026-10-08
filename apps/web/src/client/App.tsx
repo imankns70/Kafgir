@@ -266,7 +266,7 @@ function App() {
           onAuthenticationChange={setIsCustomerAuthenticated} />
       )}
       {page === 'success' && order && (
-        <OrderSuccess order={order} onBack={() => { setOrder(null); setPage('menu') }} />
+        <OrderSuccess order={order} onBack={() => { setOrder(null); setPage('menu') }} onTrack={() => { setOrder(null); setPage('profile') }} />
       )}
       {page === 'plan' && <MenuPlanPage onBack={() => setPage('menu')} onOpenToday={() => setPage('menu')} />}
       {page === 'profile' && <ProfilePage onBack={() => setPage('menu')} onAuthenticationChange={setIsCustomerAuthenticated} />}

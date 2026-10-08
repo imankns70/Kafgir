@@ -1,5 +1,14 @@
 # Project state
 
+## 2026-10-08 — Order success page and active-order pill spacing
+
+- The success page leads with the order number, delivery time (window or «ارسال فوری»), total and
+  status as one column of rows, with «پیگیری سفارش» (opens «حساب من») as the primary action. On
+  phones the invoice, which repeated those facts, opens from «مشاهده فاکتور»; desktop keeps it open.
+- While the floating active-order pill is shown on phones, the page shell reserves room for it, so
+  the end of a page (totals, «چاپ یا ذخیره فاکتور») is no longer stuck underneath it.
+- Web unit tests now include `*.test.tsx`; `OrderSuccess.test.tsx` had never been run.
+
 ## 2026-10-08 — Mobile checkout wizard redesign
 
 - On phones each checkout step is a single card opening with «مرحله N از ۴» and the step title. The

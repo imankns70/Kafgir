@@ -1386,6 +1386,8 @@ select:disabled {
 .order-success-actions { display:flex;justify-content:flex-start;gap:10px }
 .order-success-actions button { min-width:148px }
 .order-success-invoice { scroll-margin-block-start:100px }
+/* Desktop shows the invoice under the summary; the toggle exists for phones only. */
+.order-success-invoice-toggle { display:none }
 .customer-invoice { display:grid;gap:18px;border:1px solid var(--kafgir-color-border-strong);border-radius:var(--kafgir-radius-lg);padding:22px;background:var(--kafgir-color-surface-elevated);box-shadow:var(--kafgir-shadow-card);text-align:start }
 .invoice-heading { display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;border-block-end:1px solid var(--kafgir-color-border);padding-block-end:15px }
 .invoice-heading .invoice-brand-symbol { width:58px;height:58px }
@@ -1718,17 +1720,23 @@ select:disabled {
   .section-heading-row { align-items:center }
   .section-heading-row .outline-button { min-height:38px;padding:6px 9px;font-size:var(--kafgir-type-caption) }
   .order-success-page { gap:14px }
-  .order-success-summary { gap:16px;margin-block-start:0;padding:18px }
+  /* One column of label/value rows reads better than boxed tiles on a narrow screen. */
+  .order-success-summary { gap:16px;margin-block-start:0;padding:18px 16px }
   .order-success-hero { align-items:flex-start;gap:12px }
-  .order-success-summary .success-mark { width:58px;height:58px }
+  .order-success-summary .success-mark { width:52px;height:52px }
   .order-success-copy .section-title { font-size:1.28rem }
   .order-success-copy>p:last-child { font-size:var(--kafgir-type-caption) }
-  .order-success-facts { grid-template-columns:1fr 1fr }
-  .order-success-facts>div { min-height:76px;padding:11px 14px }
-  .order-success-facts .order-success-number { grid-column:1/-1;min-height:88px;border-inline-end:0;border-block-end:1px solid var(--kafgir-color-border) }
-  .order-success-number strong { font-size:1.55rem }
+  .order-success-facts { grid-template-columns:1fr }
+  .order-success-facts>div { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:0;padding:11px 14px;border-inline-end:0;border-block-end:1px solid var(--kafgir-color-border) }
+  .order-success-facts>div:last-child { border-block-end:0 }
+  .order-success-facts span:first-child { flex:none;white-space:nowrap }
+  .order-success-facts strong { text-align:end }
+  .order-success-facts .status-badge { flex:none;white-space:nowrap }
+  .order-success-number strong { font-size:1.3rem }
   .order-success-actions { display:grid;grid-template-columns:1fr }
-  .order-success-actions button { width:100% }
+  .order-success-actions button { width:100%;min-width:0 }
+  .order-success-invoice-toggle { display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;border:0;color:var(--kafgir-color-secondary);background:transparent;font-weight:700;text-decoration:underline;text-underline-offset:4px }
+  .order-success-invoice:not(.is-open) { display:none }
   .order-detail-summary { grid-template-columns:repeat(2,minmax(0,1fr)) }
   .customer-order-line { grid-template-columns:minmax(0,1fr) auto }
   .customer-order-line span:last-child { grid-column:1/-1;color:var(--kafgir-color-primary);font-weight:700 }

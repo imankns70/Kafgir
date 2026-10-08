@@ -29,13 +29,30 @@ const order: OrderDto = {
 
 describe('OrderSuccess', () => {
   it('shows the primary order facts and both next actions', () => {
-    const html = renderToStaticMarkup(createElement(OrderSuccess, { order, onBack: () => undefined }))
+    const html = renderToStaticMarkup(createElement(OrderSuccess, { order, onBack: () => undefined, onTrack: () => undefined }))
 
     expect(html).toContain('سفارشت ثبت شد!')
     expect(html).toContain('14051')
     expect(html).toContain('381,000 تومان')
     expect(html).toContain('در انتظار تأیید')
-    expect(html).toContain('جزئیات سفارش')
+    expect(html).toContain('پیگیری سفارش')
+    expect(html).toContain('مشاهده فاکتور')
     expect(html).toContain('بازگشت به منو')
+  })
+
+  it('says when the food arrives: the booked window, or express when no window was booked', () => {
+    const windowed = renderToStaticMarkup(createElement(OrderSuccess, { order: {
+      ...order, deliveryDate: '2026-10-08', deliveryStartTime: '14:00', deliveryEndTime: '16:00',
+    }, onBack: () => undefined }))
+    expect(windowed).toContain('زمان تحویل')
+    expect(windowed).toContain('14:00')
+
+    const express = renderToStaticMarkup(createElement(OrderSuccess, { order: { ...order, deliveryDate: '2026-10-08' }, onBack: () => undefined }))
+    expect(express).toContain('ارسال فوری')
+
+    // Only the summary facts: the invoice below has its own «زمان تحویل» row for every order.
+    const legacy = renderToStaticMarkup(createElement(OrderSuccess, { order, onBack: () => undefined }))
+    const facts = legacy.slice(legacy.indexOf('order-success-facts'), legacy.indexOf('order-success-actions'))
+    expect(facts).not.toContain('زمان تحویل')
   })
 })
