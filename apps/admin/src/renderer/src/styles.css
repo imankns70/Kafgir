@@ -925,3 +925,13 @@ td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-ali
 .coupon-table .action-row{flex-wrap:wrap;justify-content:center;min-width:96px}
 .coupon-table .action-row button{padding:6px 10px;font-size:13px}
 .coupon-title{display:block;color:var(--muted);font-size:12px}
+
+/* Customer notifications. */
+.notification-settings{display:grid;gap:14px}
+.notification-master{font-weight:700}
+.notification-statuses{display:flex;flex-wrap:wrap;gap:10px 22px;margin:0;border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.notification-statuses legend{padding:0 6px;color:var(--muted);font-size:13px}
+.notification-statuses:disabled{opacity:.55}
+.notification-hint{margin:0;font-size:13px;line-height:1.9;color:var(--muted)}
+.notification-failed{color:var(--error)}
+.notification-text{max-width:360px;overflow:hidden;text-overflow:ellipsis}

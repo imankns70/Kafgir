@@ -17,6 +17,7 @@ export * from './menu-plan.js'
 export * from './courier.js'
 export * from './money.js'
 export * from './coupon.js'
+export * from './notification.js'
 
 export const nullableText = z.string().trim().nullable().optional()
 

@@ -50,7 +50,9 @@ The processor:
 
 1. Selects pending work with `FOR UPDATE SKIP LOCKED`.
 2. Applies a five-minute claim lease before releasing row locks.
-3. Sends through Telegram Bot API.
+3. Sends Telegram messages through the Bot API and status SMS through SMS.ir (`SMSIR_LINE_NUMBER`;
+   the `console` provider in development). Status SMS are queued only for customers without a Telegram
+   chat, and only when the Owner enables them under Admin › تنظیمات › اطلاع‌رسانی به مشتری.
 4. Marks success as sent.
 5. Applies exponential retry delay or a terminal failed state.
 

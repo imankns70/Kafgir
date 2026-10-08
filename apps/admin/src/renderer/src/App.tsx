@@ -40,6 +40,7 @@ import { MonthTrend } from './BusinessPages'
 import { LogsPage } from './LogsPage'
 import { AuditLogPage } from './AuditLogPage'
 import { CouponsPage } from './CouponsPage'
+import { NotificationsPage } from './NotificationsPage'
 import { KitchenPage } from './KitchenPage'
 import { useNewOrderAlerts } from './new-order-alerts'
 import { isAdminOperationAllowed } from '../../shared/admin-permissions'
@@ -2118,6 +2119,7 @@ export function App() {
     logs: <LogsPage />,
     'audit-log': <AuditLogPage />,
     coupons: <CouponsPage />,
+    notifications: <NotificationsPage />,
     kitchen: <KitchenPage />,
     'food-tag-groups': <FoodTagGroupsPage />,
     'support-subjects': <SupportSubjectsPage />,

@@ -35,6 +35,8 @@ import type {
   CustomerCrmWriteRequest,
   CouponDto,
   CouponWriteRequest,
+  CustomerNotificationSettings,
+  NotificationLogItemDto,
   PageRequest,
   PagedResult,
   CustomerPaymentDto,
@@ -427,6 +429,10 @@ export const adminApi = {
   createCoupon: (value: CouponWriteRequest) => socialInvoke<CouponDto>('coupons.create', { value }, true),
   updateCoupon: (id: number, value: CouponWriteRequest) => socialInvoke<CouponDto>('coupons.update', { id, value }, true),
   deleteCoupon: (id: number) => socialInvoke<void>('coupons.delete', { id }, true),
+  notificationSettings: () => socialInvoke<CustomerNotificationSettings>('notifications.settings.get'),
+  saveNotificationSettings: (value: CustomerNotificationSettings) =>
+    socialInvoke<CustomerNotificationSettings>('notifications.settings.save', { value }, true),
+  notifications: () => socialInvoke<NotificationLogItemDto[]>('notifications.list'),
   customerReport: (from: string, to: string) =>
     socialInvoke<CustomerReportDto>('reports.customers', { value: { from, to } }),
   serverLogs: (limit = 500) => request<LogEntry[]>(`/api/admin/logs?limit=${limit}`),

@@ -682,7 +682,7 @@ export const notificationMessages = pgTable('notification_messages', {
 }, (table) => [
   index('notification_messages_pending_idx').on(table.status, table.nextAttemptAt, table.createdAt),
   index('notification_messages_order_idx').on(table.orderId),
-  check('notification_messages_channel_check', sql`${table.channel} = 1`),
+  check('notification_messages_channel_check', sql`${table.channel} IN (1, 2)`),
   check('notification_messages_type_check', sql`${table.type} BETWEEN 1 AND 3`),
   check('notification_messages_status_check', sql`${table.status} BETWEEN 1 AND 3`),
   check('notification_messages_retry_check', sql`${table.retryCount} >= 0`),

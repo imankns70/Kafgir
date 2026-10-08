@@ -35,6 +35,7 @@ import { formatTelegramOrderInvoice } from '../domain/order-invoice'
 import { generateOrderNumber, orderNumberSearchDigits } from '../domain/order-number'
 import { formatToman } from '../domain/money'
 import { applyCouponToOrder, recomputeOrderDiscount } from './coupon-service'
+import { getCustomerNotificationSettings } from './customer-notification-service'
 
 const defaultCity = 'اندیمشک'
 const customerRole = 'Customer'
@@ -740,8 +741,9 @@ export async function searchOrdersPaged(query: OrderReportQuery): Promise<PagedR
 
 export async function updateOrderStatus(id: number, request: UpdateOrderStatusRequest, userId: number | null = null): Promise<void> {
   await sqlClient.begin(async (tx) => {
-    const orderRows = await tx<{ status: OrderStatus; orderNumber: string; customerProfileId: number }[]>`
-      SELECT status, order_number AS "orderNumber", customer_profile_id AS "customerProfileId"
+    const orderRows = await tx<{ status: OrderStatus; orderNumber: string; customerProfileId: number; phone: string; deliveryMethod: DeliveryMethod }[]>`
+      SELECT status, order_number AS "orderNumber", customer_profile_id AS "customerProfileId",
+             delivery_phone_number AS phone, delivery_method AS "deliveryMethod"
       FROM orders WHERE id = ${id} FOR UPDATE
     `
     const order = orderRows[0]
@@ -826,9 +828,35 @@ export async function updateOrderStatus(id: number, request: UpdateOrderStatusRe
            ${`وضعیت سفارش شما در کفگیر تغییر کرد\nشماره سفارش: ${order.orderNumber}\nوضعیت: ${statusText[request.newStatus] ?? 'به‌روزرسانی شد'}`},
            ${id}, ${order.orderNumber}, 0, ${nowSql})
       `
+    } else {
+      // No Telegram chat: an SMS, but only when the Owner switched it on and chose this status.
+      const settings = await getCustomerNotificationSettings(tx)
+      const text = smsStatusText(request.newStatus, order.orderNumber, order.deliveryMethod)
+      const mobile = order.phone.replace(/^(\+?98|0098)/u, '0')
+      if (settings.smsEnabled && settings.smsStatuses.includes(request.newStatus) && text && /^09\d{9}$/u.test(mobile)) {
+        await tx`
+          INSERT INTO notification_messages
+            (channel, type, status, target, text, order_id, order_number, retry_count, created_at)
+          VALUES
+            (${NotificationChannel.Sms}, ${NotificationType.OrderStatusForCustomer},
+             ${NotificationStatus.Pending}, ${mobile}, ${text}, ${id}, ${order.orderNumber}, 0, ${nowSql})
+        `
+      }
     }
   })
   logger.info({ event: 'order.status.changed', orderId: id, userId, newStatus: request.newStatus }, 'وضعیت سفارش تغییر کرد')
+}
+
+/** One short SMS per status: a message costs per 70-character part, so every word is earned. */
+export function smsStatusText(status: OrderStatus, orderNumber: string, deliveryMethod: DeliveryMethod): string | null {
+  const text: Partial<Record<OrderStatus, string>> = {
+    [OrderStatus.Confirmed]: 'تأیید شد',
+    [OrderStatus.Preparing]: 'در حال آماده‌سازی است',
+    [OrderStatus.Ready]: deliveryMethod === DeliveryMethod.Pickup ? 'آماده تحویل حضوری است' : 'آماده ارسال است',
+    [OrderStatus.Delivered]: 'تحویل شد. نوش جان',
+    [OrderStatus.Cancelled]: 'لغو شد',
+  }
+  return text[status] ? `کفگیر: سفارش ${orderNumber} ${text[status]}.` : null
 }
 
 /** Statuses in which the kitchen has not started, so the basket and address can still change. */

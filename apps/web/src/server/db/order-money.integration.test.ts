@@ -1,4 +1,4 @@
-import { CouponDiscountType, DeliveryMethod, OrderStatus, PaymentMethod, PaymentStatus } from '@kafgir/contracts'
+import { CouponDiscountType, NotificationChannel, DeliveryMethod, OrderStatus, PaymentMethod, PaymentStatus } from '@kafgir/contracts'
 import {
   changePaymentStatus,
   closeDatabase,
@@ -6,6 +6,9 @@ import {
   createOrder,
   createPayment,
   editOrder,
+  getCustomerNotificationSettings,
+  listRecentNotifications,
+  saveCustomerNotificationSettings,
   checkCoupon,
   createCoupon,
   deleteCoupon,
@@ -343,5 +346,33 @@ integration.sequential('order money integrity', () => {
     const second = await withCoupon(1)
     orderIds.push(second.id)
     expect(second.discountAmount).toBe(30_000)
+  })
+
+  it('texts a customer without Telegram only when SMS is on and the status was chosen', async () => {
+    const before = await getCustomerNotificationSettings()
+    const smsFor = async (orderId: number) => sql<{ target: string; text: string }[]>`
+      SELECT target, text FROM notification_messages WHERE order_id = ${orderId} AND channel = ${NotificationChannel.Sms}`
+    try {
+      await saveCustomerNotificationSettings({ smsEnabled: false, smsStatuses: [OrderStatus.Confirmed] }, adminUserId)
+      const quiet = await placeOrder(1)
+      await updateOrderStatus(quiet.id, { newStatus: OrderStatus.Confirmed })
+      expect(await smsFor(quiet.id)).toHaveLength(0)
+
+      await saveCustomerNotificationSettings({ smsEnabled: true, smsStatuses: [OrderStatus.Confirmed, OrderStatus.Ready] }, adminUserId)
+      const order = await placeOrder(1)
+      await updateOrderStatus(order.id, { newStatus: OrderStatus.Confirmed })
+      await updateOrderStatus(order.id, { newStatus: OrderStatus.Preparing })
+      await updateOrderStatus(order.id, { newStatus: OrderStatus.Ready })
+      const sent = await smsFor(order.id)
+      expect(sent.map((row) => row.text)).toEqual([
+        `کفگیر: سفارش ${order.orderNumber} تأیید شد.`,
+        `کفگیر: سفارش ${order.orderNumber} آماده تحویل حضوری است.`,
+      ])
+      expect(sent[0]!.target).toBe('09000000088')
+      const log = await listRecentNotifications(50)
+      expect(log.find((item) => item.orderNumber === order.orderNumber)?.target).toBe('0900***0088')
+    } finally {
+      await saveCustomerNotificationSettings(before, adminUserId)
+    }
   })
 })

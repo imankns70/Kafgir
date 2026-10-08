@@ -21,6 +21,8 @@ export enum OrderStatus {
 
 export enum NotificationChannel {
   Telegram = 1,
+  /** A text message to the order's phone, for customers without a Telegram chat. */
+  Sms = 2,
 }
 
 export enum NotificationType {

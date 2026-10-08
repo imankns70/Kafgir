@@ -33,6 +33,7 @@ import {
   customerDirectoryQuerySchema,
   customerCrmWriteSchema,
   couponWriteSchema,
+  customerNotificationSettingsSchema,
   paymentMethodSettingWriteSchema,
   deliveryMethodSettingWriteSchema,
   PaymentMethod,
@@ -77,6 +78,9 @@ import {
   createCoupon,
   updateCoupon,
   deleteCoupon,
+  getCustomerNotificationSettings,
+  saveCustomerNotificationSettings,
+  listRecentNotifications,
   refundPayment,
   listUnpaidOrders,
   paymentReconciliation,
@@ -370,6 +374,10 @@ export async function dispatchAdminOperation(
     case 'coupons.update':
       return updateCoupon(numberField(body, 'id'), couponWriteSchema.parse(body.value), principal.userId)
     case 'coupons.delete': return deleteCoupon(numberField(body, 'id'), principal.userId)
+    case 'notifications.settings.get': return getCustomerNotificationSettings()
+    case 'notifications.settings.save':
+      return saveCustomerNotificationSettings(customerNotificationSettingsSchema.parse(body.value), principal.userId)
+    case 'notifications.list': return listRecentNotifications()
     case 'reports.customers': {
       const query = customerReportQuerySchema.parse(body.value)
       return getCustomerReport(query.from, query.to)

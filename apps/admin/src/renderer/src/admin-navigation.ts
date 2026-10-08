@@ -8,7 +8,7 @@ export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' |
   | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
   | 'food-tag-groups' | 'support-subjects'
   | 'payment-methods' | 'delivery-methods' | 'customer-report' | 'customers' | 'site-analytics'
-  | 'couriers' | 'courier-days' | 'courier-accounting' | 'coupons'
+  | 'couriers' | 'courier-days' | 'courier-accounting' | 'coupons' | 'notifications'
 
 export type NavigationGroupId =
   'sales' | 'catalog' | 'finance' | 'social' | 'reference' | 'settings'
@@ -141,6 +141,7 @@ export const navigationGroups: NavigationGroup[] = [
     items: [
       { page: 'payment-methods', label: 'روش‌های پرداخت', operation: 'paymentMethods.list' },
       { page: 'delivery-methods', label: 'روش‌های دریافت', operation: 'deliveryMethods.list' },
+      { page: 'notifications', label: 'اطلاع‌رسانی به مشتری', operation: 'notifications.settings.get' },
       { page: 'audit-log', label: 'گزارش تغییرات', operation: 'audit.list' },
       { page: 'logs', label: 'گزارش رویدادها', operation: 'logs.server' },
     ],

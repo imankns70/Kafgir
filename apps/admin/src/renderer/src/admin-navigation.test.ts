@@ -63,7 +63,7 @@ describe('reference data versus configuration', () => {
     // Payment and delivery methods are enum-bounded and carry commercial terms, so they are settings.
     expect(groupItems('reference')).not.toContain('payment-methods')
     expect(groupItems('reference')).not.toContain('delivery-methods')
-    expect(groupItems('settings')).toEqual(['payment-methods', 'delivery-methods', 'audit-log', 'logs'])
+    expect(groupItems('settings')).toEqual(['payment-methods', 'delivery-methods', 'notifications', 'audit-log', 'logs'])
   })
 
   it('separates the reusable delivery windows from the per-date capacity screen', () => {
