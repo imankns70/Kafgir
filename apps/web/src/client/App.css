@@ -662,13 +662,19 @@ select:disabled {
   box-shadow: var(--kafgir-shadow-card);
 }
 
+/* The menu card is the shop window: the photo is framed inside the card like a plated dish, the
+   badges float on it, and the footer reads «price → add» at a glance. */
 .menu-card {
-  display: grid;
-  grid-template-rows: auto 1fr;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: var(--kafgir-food-card-max-width);
   justify-self: start;
-  overflow: hidden;
+  padding: 8px;
+  border-color: color-mix(in srgb, var(--kafgir-color-border) 72%, transparent);
+  border-radius: 22px;
+  background: var(--kafgir-color-surface-elevated);
+  box-shadow: 0 1px 2px rgba(92, 58, 30, .06), 0 12px 28px -16px rgba(92, 58, 30, .32);
   transition: border-color var(--kafgir-motion-normal) var(--kafgir-ease), box-shadow var(--kafgir-motion-normal) var(--kafgir-ease), transform var(--kafgir-motion-normal) var(--kafgir-ease);
   animation: rise-in var(--kafgir-motion-normal) var(--kafgir-ease) both;
 }
@@ -676,9 +682,68 @@ select:disabled {
 .menu-card:nth-child(2) { animation-delay: 35ms; }
 .menu-card:nth-child(3) { animation-delay: 70ms; }
 .menu-card:nth-child(4) { animation-delay: 105ms; }
-.menu-card:hover { border-color: var(--kafgir-color-border-strong); box-shadow: var(--kafgir-shadow-floating); transform: translateY(-2px); }
+.menu-card:hover { border-color: var(--kafgir-color-border); box-shadow: 0 2px 4px rgba(92, 58, 30, .07), 0 20px 38px -18px rgba(92, 58, 30, .42); transform: translateY(-3px); }
+.menu-card.is-in-cart { border-color: color-mix(in srgb, var(--kafgir-color-secondary) 48%, var(--kafgir-color-border)); }
 .card-media { position: relative; overflow: hidden; border-block-end: 1px solid var(--kafgir-color-border); background: var(--kafgir-color-background-secondary); }
 .card-media > a { display: block; color: inherit; }
+.menu-card .card-media { isolation: isolate; border: 0; border-radius: 16px; }
+.menu-card .card-media > a { text-decoration: none; }
+.menu-card .card-media .food-image,
+.menu-card .card-media .food-placeholder { aspect-ratio: 4 / 3; transition: transform 600ms var(--kafgir-ease), filter var(--kafgir-motion-normal) var(--kafgir-ease); }
+.menu-card:hover .card-media .food-image { transform: scale(1.045); }
+.menu-card .card-media:has(.menu-card-stock)::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 42%;
+  background: linear-gradient(to top, rgba(43, 28, 18, .5), transparent);
+  pointer-events: none;
+}
+.menu-card-badges {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline: 10px;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  pointer-events: none;
+}
+.menu-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--kafgir-radius-pill);
+  color: var(--kafgir-color-primary);
+  background: rgba(255, 250, 243, .93);
+  box-shadow: 0 6px 14px -8px rgba(43, 28, 18, .55);
+  backdrop-filter: blur(6px);
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+.menu-card-badge.is-discount { margin-inline-start: auto; color: var(--kafgir-color-text-on-primary); background: var(--kafgir-color-primary); }
+.menu-card-stock {
+  position: absolute;
+  inset-block-end: 10px;
+  inset-inline-start: 10px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--kafgir-radius-pill);
+  color: #3d2a06;
+  background: var(--kafgir-color-accent);
+  box-shadow: 0 6px 14px -8px rgba(43, 28, 18, .6);
+  font-size: .72rem;
+  font-weight: 800;
+  line-height: 1.5;
+}
+.menu-card-stock.is-sold-out { color: #fff; background: rgba(43, 43, 43, .82); }
+.menu-card.is-sold-out:hover { transform: none; }
+.menu-card.is-sold-out .card-media .food-image { filter: grayscale(.75) brightness(.95); transform: none; }
 .food-card-badge { position:absolute;inset-block-start:10px;inset-inline-start:10px;display:inline-flex;align-items:center;gap:4px;padding:5px 9px;border-radius:var(--kafgir-radius-pill);color:var(--kafgir-color-text-on-primary);background:var(--kafgir-color-primary);box-shadow:var(--kafgir-shadow-card);font-size:var(--kafgir-type-caption);font-weight:700 }
 
 .food-image,
@@ -728,50 +793,62 @@ select:disabled {
 .food-placeholder-copy strong { color: var(--kafgir-color-text-primary); font-size: var(--kafgir-type-body-sm); }
 .food-placeholder-copy > span { display: flex; align-items: center; justify-content: center; gap: 5px; color: var(--kafgir-color-text-muted); font-size: var(--kafgir-type-caption); line-height: 1.5; }
 
-.menu-card-body { display: grid;grid-template-rows:auto auto auto 1fr;gap: 7px; padding: 12px; }
+.menu-card-body { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; padding: 12px 6px 4px; }
+.menu-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--kafgir-color-secondary);
+  font-size: .72rem;
+  font-weight: 700;
+}
+.menu-card-meta span { display: inline-flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
+.menu-card-meta span + span::before { content: ""; width: 3px; height: 3px; margin-inline-end: 3px; border-radius: 50%; background: currentColor; opacity: .55; }
 .menu-card h3 {
-  grid-row: 1;
   overflow: hidden;
   margin: 0;
   color: var(--kafgir-color-text-primary);
-  font-size: var(--kafgir-type-card);
-  font-weight: 700;
-  line-height: 1.5;
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1.55;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.menu-card h3 a { color:inherit;text-decoration:none }
-.menu-card h3 a:hover { color:var(--kafgir-color-primary) }
+.menu-card h3 a { color: inherit; text-decoration: none; }
+.menu-card h3 a:hover { color: var(--kafgir-color-primary); }
+/* Two lines, reserved even when shorter, so neighbouring cards keep their prices on one line. */
 .menu-card-description {
-  grid-row: 2;
+  display: -webkit-box;
   overflow: hidden;
-  margin: -2px 0 0;
+  min-height: calc(2 * 1.7em);
+  margin: 0;
   color: var(--kafgir-color-text-muted);
   font-size: var(--kafgir-type-body-sm);
-  line-height: 1.6;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.7;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
-.menu-card-meta {
-  grid-row: 3;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-  padding-block: 7px;
-  border-block: 1px solid var(--kafgir-color-border);
-  color: var(--kafgir-color-text-secondary);
-  font-size: var(--kafgir-type-caption);
-}
-.menu-card-meta span { display: inline-flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
-.menu-card-meta span + span { margin-inline-start: 10px; padding-inline-start: 10px; border-inline-start: 1px solid var(--kafgir-color-border); }
 .menu-card-action,
 .cart-row,
 .cart-total { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.menu-card-purchase { grid-row:4;display:grid;align-self:end;gap:10px;min-width:0; }
-.menu-card-action { display:grid;grid-template-columns:max-content minmax(150px,1fr);align-items:end;direction:rtl;gap:10px;min-width:0; }
-.menu-card-action .add-button { width:100%; }
+.menu-card-purchase { display: grid; gap: 10px; min-width: 0; margin-block-start: auto; padding-block-start: 8px; }
+.menu-card-action { display: flex; align-items: center; justify-content: space-between; direction: rtl; gap: 10px; min-width: 0; padding-block-start: 12px; border-block-start: 1px dashed var(--kafgir-color-border); }
+.menu-card .add-button {
+  flex: 0 0 auto;
+  gap: 6px;
+  min-width: 124px;
+  min-height: 44px;
+  padding: 6px 16px;
+  border-radius: var(--kafgir-radius-pill);
+  font-size: .86rem;
+  font-weight: 800;
+  box-shadow: 0 10px 18px -12px rgba(196, 77, 49, .9);
+}
+.menu-card .add-button:disabled { border-color: transparent; color: var(--kafgir-color-text-secondary); background: var(--kafgir-color-surface-muted); box-shadow: none; cursor: not-allowed; }
+.menu-card .quantity-add-control { grid-template-columns: 36px minmax(44px, 1fr) 36px; gap: 4px; padding: 3px; }
+.menu-card .quantity-add-button { width: 36px; height: 36px; border-radius: 50%; }
+.menu-card .quantity-add-status > small { font-size: .62rem; opacity: .9; }
 .menu-card-price { display: grid; align-content: end; direction: rtl; gap: 1px; min-width: 0; }
 .menu-card-price > span { color: var(--kafgir-color-text-secondary); font-size: var(--kafgir-type-caption); }
 .price { color: var(--kafgir-color-primary); font-size: var(--kafgir-type-price); font-weight: 700; line-height: 1.35; white-space: nowrap; }
@@ -1660,7 +1737,7 @@ select:disabled {
     width: min(100%, var(--kafgir-food-card-max-width));
     justify-self: center;
   }
-  .menu-card h3 { font-size: 1rem; }
+  .menu-card h3 { font-size: 1.05rem; }
   .menu-card-description { font-size: .8125rem; }
   .food-image, .food-placeholder { height: auto; min-height: 0; }
   .food-placeholder { padding: 7px 14px 10px; }
@@ -1817,11 +1894,38 @@ select:disabled {
   line-height: 1.45;
 }
 .rice-upgrade-option-card input { flex: 0 0 auto; width: 1rem; height: 1rem; }
+/* On the menu card the upgrade is a small switch: it reads as an option of the dish, not a form. */
+.menu-card .rice-upgrade-option-card { min-height: 42px; padding: .4rem .7rem; border-style: dashed; background: color-mix(in srgb, var(--kafgir-color-secondary-soft) 55%, var(--kafgir-color-surface-elevated)); }
+.menu-card .rice-upgrade-option-card input {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--kafgir-color-border-strong);
+  transition: background var(--kafgir-motion-fast) var(--kafgir-ease);
+  appearance: none;
+}
+.menu-card .rice-upgrade-option-card input::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-start: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
+  transition: transform var(--kafgir-motion-fast) var(--kafgir-ease);
+}
+.menu-card .rice-upgrade-option-card input:checked { background: var(--kafgir-color-secondary); }
+.menu-card .rice-upgrade-option-card input:checked::before { transform: translateX(-14px); }
+.menu-card .rice-upgrade-option-card:has(input:checked) { border-style: solid; background: var(--kafgir-color-secondary-soft); }
 .rice-upgrade-label { min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .rice-upgrade-price { flex:0 0 auto;margin-inline-start:auto;padding-inline-start:.6rem;border-inline-start:1px solid color-mix(in srgb,var(--kafgir-color-secondary) 26%,transparent);direction:rtl;white-space:nowrap; }
 @media (max-width:340px) {
-  .menu-card-action { grid-template-columns:1fr;align-items:stretch; }
-  .menu-card-action .price-display { justify-self:end; }
+  .menu-card-action { flex-wrap:wrap; }
+  .menu-card .add-button { flex:1 1 100%; }
   .food-purchase-action { grid-template-columns:1fr;align-items:stretch; }
   .food-purchase-action .price-display { justify-self:end; }
   .food-detail-page { padding-block-end:166px; }

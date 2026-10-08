@@ -56,4 +56,25 @@ describe('MenuItemCard', () => {
     expect(purchase).toContain('class="menu-card-action"')
     expect(purchase).toContain('260,000 تومان')
   })
+  const render = (item: DailyMenuItemDto) => renderToStaticMarkup(createElement(MenuItemCard, {
+    item,
+    persianRice: null,
+    cartItems: [],
+    onAdd: vi.fn(),
+    onQuantityChange: vi.fn(),
+  }))
+
+  it('warns only when a few portions are left', () => {
+    expect(render(food)).not.toContain('menu-card-stock')
+    const html = render({ ...food, soldPortions: 7, remainingPortions: 3 })
+    expect(html).toContain('فقط 3 پرس باقی مانده')
+    expect(html).not.toContain('disabled=""')
+  })
+
+  it('marks a sold-out dish and disables adding it', () => {
+    const html = render({ ...food, soldPortions: 10, remainingPortions: 0 })
+    expect(html).toContain('class="menu-card is-sold-out"')
+    expect(html).toContain('امروز تمام شد')
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>.*تمام شد/u)
+  })
 })

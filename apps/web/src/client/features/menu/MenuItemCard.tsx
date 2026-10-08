@@ -7,6 +7,8 @@ import { Icon } from '../../design-system/Icon'
 import { PriceDisplay } from '../../design-system/PriceDisplay'
 import { RiceUpgradeDialog } from '../../design-system/RiceUpgradeDialog'
 
+const lowStockThreshold = 5
+
 type Props = {
   item: DailyMenuItemDto
   persianRice: PersianRiceDto | null
@@ -35,26 +37,40 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
     : item.remainingPortions
   const canIncrease = quantity < maximum
 
-  return <article className="menu-card">
+  const soldOut = !item.isAvailable || item.remainingPortions <= 0
+  // A short "only a few left" note is the one honest nudge the card gives; it only shows when the
+  // kitchen really is close to the end of today's pot.
+  const lowStock = !soldOut && item.remainingPortions <= lowStockThreshold
+  const foodHref = `/foods/${item.slug}?menuItemId=${item.id}`
+
+  return <article className={`menu-card${lines.length > 0 ? ' is-in-cart' : ''}${soldOut ? ' is-sold-out' : ''}`}>
     <div className="card-media">
-      <Link href={`/foods/${item.slug}?menuItemId=${item.id}`} aria-label={`مشاهده جزئیات ${item.foodName}`}>
+      <Link href={foodHref} aria-label={`مشاهده جزئیات ${item.foodName}`}>
         <FoodImage src={item.imageUrl} alt={item.foodName} />
       </Link>
-      {item.primaryBadge && <span className="food-card-badge">
-        {item.primaryBadge.icon && <span aria-hidden="true">{item.primaryBadge.icon}</span>}
-        {item.primaryBadge.title}
-      </span>}
-      {item.discountPercentage && <span className="discount-card-badge">
-        <Icon name="discount" size="xs" /> {formatNumber(item.discountPercentage)}٪ تخفیف
-      </span>}
+      {(item.primaryBadge || item.discountPercentage) && <div className="menu-card-badges">
+        {item.primaryBadge && <span className="menu-card-badge">
+          {item.primaryBadge.icon && <span aria-hidden="true">{item.primaryBadge.icon}</span>}
+          {item.primaryBadge.title}
+        </span>}
+        {item.discountPercentage && <span className="menu-card-badge is-discount">
+          <Icon name="discount" size="xs" /> {formatNumber(item.discountPercentage)}٪ تخفیف
+        </span>}
+      </div>}
+      {soldOut
+        ? <span className="menu-card-stock is-sold-out">امروز تمام شد</span>
+        : lowStock && <span className="menu-card-stock">
+            <Icon name="clock" size="xs" /> فقط {formatNumber(item.remainingPortions)} پرس باقی مانده
+          </span>}
     </div>
     <div className="menu-card-body">
-      <h3 title={item.foodName}><Link href={`/foods/${item.slug}?menuItemId=${item.id}`}>{item.foodName}</Link></h3>
-      {item.foodDescription && <p className="menu-card-description" title={item.foodDescription}>{item.foodDescription}</p>}
-
       <div className="menu-card-meta" aria-label="اطلاعات غذا">
         <span><Icon name="freshIngredients" size="xs" /> پخت تازه امروز</span>
+        {item.category?.title && <span>{item.category.title}</span>}
       </div>
+      <h3 title={item.foodName}><Link href={foodHref}>{item.foodName}</Link></h3>
+      {item.foodDescription && <p className="menu-card-description" title={item.foodDescription}>{item.foodDescription}</p>}
+
       {/* Both answers add the dish right away — the dialog is the add action, not just a toggle — so
           the customer never has to check a box and then hunt for a separate add button. */}
       {confirmingRice && persianRice && <RiceUpgradeDialog
@@ -67,7 +83,7 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
       />}
       <div className="menu-card-purchase">
         {offersRice && <label className="rice-upgrade-option rice-upgrade-option-card">
-          <input type="checkbox" checked={withPersianRice} disabled={!riceAvailable && !upgradedInCart}
+          <input type="checkbox" role="switch" checked={withPersianRice} disabled={soldOut || (!riceAvailable && !upgradedInCart)}
             onChange={(event) => event.target.checked ? setConfirmingRice(true) : setWithPersianRice(false)} />
           <span className="rice-upgrade-label">{riceAvailable || upgradedInCart
             ? 'با برنج ایرانی'
@@ -79,27 +95,25 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
         </small>}
 
         <div className="menu-card-action">
-          <div>
-            <PriceDisplay
-              price={item.price + (withPersianRice && persianRice ? persianRice.price : 0)}
-              originalPrice={item.originalPrice}
-              discountPercentage={item.discountPercentage}
-              showDiscountPill={false}
-            />
-          </div>
+          <PriceDisplay
+            price={item.price + (withPersianRice && persianRice ? persianRice.price : 0)}
+            originalPrice={item.originalPrice}
+            discountPercentage={item.discountPercentage}
+            showDiscountPill={false}
+          />
           {isInCart
             ? <div className="add-button quantity-add-control" aria-label={`${item.foodName} در سبد خرید`}>
                 <button
                   type="button"
                   className="quantity-add-button"
                   onClick={() => onQuantityChange(item.id, quantity - 1, withPersianRice)}
-                  aria-label={`کم کردن ${item.foodName}`}
+                  aria-label={quantity === 1 ? `حذف ${item.foodName} از سبد` : `کم کردن ${item.foodName}`}
                 >
-                  <Icon name="minus" size="sm" />
+                  <Icon name={quantity === 1 ? 'delete' : 'minus'} size="sm" />
                 </button>
                 <span className="quantity-add-status">
                   <span>{formatNumber(quantity)}</span>
-                  <small>در سبد خرید</small>
+                  <small>در سبد</small>
                 </span>
                 <button
                   type="button"
@@ -111,9 +125,14 @@ export function MenuItemCard({ item, persianRice, cartItems, onAdd, onQuantityCh
                   <Icon name="add" size="sm" />
                 </button>
               </div>
-            : <button className="primary-button add-button" onClick={() => onAdd(item, withPersianRice)}>
-                <Icon name="cart" size="sm" />
-                <span>{withPersianRice ? 'افزودن با برنج ایرانی' : 'افزودن به سبد خرید'}</span>
+            : <button
+                type="button"
+                className="primary-button add-button"
+                disabled={soldOut}
+                onClick={() => onAdd(item, withPersianRice)}
+                aria-label={soldOut ? `${item.foodName} امروز تمام شده است` : `افزودن ${item.foodName} به سبد خرید`}
+              >
+                {soldOut ? <span>تمام شد</span> : <><Icon name="add" size="sm" /><span>{withPersianRice ? 'افزودن با برنج' : 'افزودن'}</span></>}
               </button>}
         </div>
       </div>
