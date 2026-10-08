@@ -8,6 +8,7 @@ import {
 } from './admin-ui'
 import { formatMoney, formatNumber, formatPersianDate, formatPersianDateTime, parseMoney } from './number-format'
 import { todayJalali, toIsoDate } from './persian-calendar'
+import { downloadCsv, fetchAllPages, toCsv } from './csv-export'
 
 /**
  * Customer payments for orders.
@@ -91,6 +92,28 @@ function PaymentsLedger() {
   useEffect(() => { void load() }, [load])
 
   const bucketOf = (key: Bucket) => totals?.[key] ?? { count: 0, amount: 0 }
+  const [exporting, setExporting] = useState(false)
+  const exportPayments = async () => {
+    setExporting(true)
+    try {
+      const search = paged.filters.search
+      const rows = await fetchAllPages((page, pageSize) =>
+        adminApi.payments({ page, pageSize }, filter === 'all' ? undefined : filter, search))
+      downloadCsv(`kafgir-payments-${filter}`, toCsv(rows, [
+        { header: 'شماره سفارش', value: (row) => row.orderNumber },
+        { header: 'مشتری', value: (row) => row.customerFullName },
+        { header: 'شماره تماس', value: (row) => row.customerPhoneNumber },
+        { header: 'روش', value: (row) => methodLabel[row.paymentMethod] },
+        { header: 'مبلغ (تومان)', value: (row) => row.amount },
+        { header: 'مسترد (تومان)', value: (row) => row.refundedAmount },
+        { header: 'دلیل استرداد', value: (row) => row.refundReason },
+        { header: 'وضعیت', value: (row) => statusLabel[row.status] },
+        { header: 'شماره پیگیری', value: (row) => row.trackingNumber ?? row.referenceNumber },
+        { header: 'زمان پرداخت', value: (row) => row.paidAt ? formatPersianDateTime(row.paidAt) : '' },
+        { header: 'زمان ثبت', value: (row) => formatPersianDateTime(row.createdAt) },
+      ]))
+    } catch (reason) { setMessage(errorText(reason)) } finally { setExporting(false) }
+  }
   const applyFilter = (next: Bucket) => { setFilter(next); paged.setFilters({ bucket: next }) }
 
   const parsedAmount = parseMoney(amount)
@@ -224,6 +247,8 @@ function PaymentsLedger() {
         <input dir="ltr" placeholder="1405-482917" value={paged.filters.search ?? ''}
           onChange={(event) => paged.setFilters({ search: event.target.value })} />
       </label>
+      <button type="button" className="payment-export" onClick={() => void exportPayments()}
+        disabled={exporting || paged.totalItems === 0}>{exporting ? 'در حال آماده‌سازی…' : 'خروجی اکسل (CSV)'}</button>
     </div>
 
     <section className="panel compact-grid-panel">

@@ -42,6 +42,7 @@ import { AuditLogPage } from './AuditLogPage'
 import { KitchenPage } from './KitchenPage'
 import { useNewOrderAlerts } from './new-order-alerts'
 import { isAdminOperationAllowed } from '../../shared/admin-permissions'
+import { downloadCsv, fetchAllPages, toCsv } from './csv-export'
 import { CustomerCommunicationPage } from './CustomerCommunicationPage'
 import { FoodTagGroupsPage, SupportSubjectsPage } from './ReferenceDataPages'
 import { DeliveryMethodsPage, PaymentMethodsPage } from './SettingsPages'
@@ -1939,7 +1940,31 @@ function ReportPage() {
     setPage: (next: number) => { void search(undefined, next) },
     setPageSize: (size: number) => { setPageSize(size); void search(undefined, 1, size) },
   }
-  return <PageFrame title="گزارش کل" actions={<span className="result-summary">{plainNumber(orders.length)} سفارش</span>}>
+  const exportOrders = async () => {
+    setBusy(true)
+    try {
+      const rows = await fetchAllPages((targetPage, size) => adminApi.orders({ ...query, page: targetPage, pageSize: size }))
+      downloadCsv(`kafgir-orders-${query.date}`, toCsv(rows, [
+        { header: 'شماره سفارش', value: (order) => order.orderNumber },
+        { header: 'نام مشتری', value: (order) => order.customerFullName },
+        { header: 'شماره تماس', value: (order) => order.customerPhoneNumber },
+        { header: 'وضعیت', value: (order) => statusLabel[order.status] },
+        { header: 'نوع دریافت', value: (order) => deliveryMethodLabel[order.deliveryMethod] },
+        { header: 'زمان تحویل', value: (order) => deliveryWindowLabel(order) },
+        { header: 'نوع فروش', value: (order) => paymentMethodLabel[order.paymentMethod] },
+        { header: 'غذاها', value: (order) => order.foodSummary },
+        { header: 'تعداد', value: (order) => order.totalQuantity },
+        { header: 'مبلغ (تومان)', value: (order) => order.totalAmount },
+        { header: 'زمان ثبت', value: (order) => dateTime(order.createdAt) },
+      ]))
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally { setBusy(false) }
+  }
+  return <PageFrame title="گزارش کل" actions={<>
+    <span className="result-summary">{plainNumber(result?.totalItems ?? orders.length)} سفارش</span>
+    <button type="button" onClick={() => void exportOrders()} disabled={busy || orders.length === 0}>خروجی اکسل (CSV)</button>
+  </>}>
     <form className="toolbar report-filters" onSubmit={search}>
       <DateField label="تاریخ" value={query.date}
         onChange={(date) => setQuery({ ...query, date })} />

@@ -9,6 +9,7 @@ import {
   formatMoney, formatNumber, formatPersianDate, formatPersianDateTime,
   isInvalidMoneyText, parseMoney,
 } from './number-format'
+import { downloadCsv, fetchAllPages, toCsv } from './csv-export'
 
 /**
  * Look up a customer and read their history.
@@ -117,13 +118,38 @@ export function CustomersPage() {
   const goToPage = (next: number) => runSearch({ ...query, page: next })
   const patch = (value: Partial<CustomerDirectoryQuery>) => setQuery((current) => ({ ...current, ...value }))
   const totals = selected?.totals
+  const [exporting, setExporting] = useState(false)
+  const exportCustomers = async () => {
+    setExporting(true)
+    try {
+      const rows = await fetchAllPages((targetPage, size) => adminApi.searchCustomers({ ...query, page: targetPage, pageSize: size }))
+      downloadCsv('kafgir-customers', toCsv(rows, [
+        { header: 'نام', value: (row) => row.preferredName },
+        { header: 'شماره تماس', value: (row) => row.phoneNumber },
+        { header: 'شیوه ورود', value: (row) => row.channel === 'telegram' ? 'تلگرام' : 'موبایل' },
+        { header: 'شهر', value: (row) => row.city },
+        { header: 'تاریخ عضویت', value: (row) => formatPersianDate(row.joinedAt) },
+        { header: 'تعداد سفارش', value: (row) => row.orderCount },
+        { header: 'سفارش لغوشده', value: (row) => row.cancelledCount },
+        { header: 'مجموع خرید (تومان)', value: (row) => row.totalSpent },
+        { header: 'آخرین سفارش', value: (row) => row.lastOrderAt ? formatPersianDateTime(row.lastOrderAt) : '' },
+      ]))
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally { setExporting(false) }
+  }
 
   return <PageFrame
     title="مشتریان"
     description="جست‌وجوی مشتری و مشاهده کامل سابقه سفارش، آدرس و نظرهای او."
-    actions={<button type="button" onClick={() => setShowAdvanced((value) => !value)}>
-      {showAdvanced ? 'بستن جست‌وجوی پیشرفته' : 'جست‌وجوی پیشرفته'}
-    </button>}
+    actions={<>
+      <button type="button" onClick={() => void exportCustomers()} disabled={exporting || !page?.totalItems}>
+        {exporting ? 'در حال آماده‌سازی…' : 'خروجی اکسل (CSV)'}
+      </button>
+      <button type="button" onClick={() => setShowAdvanced((value) => !value)}>
+        {showAdvanced ? 'بستن جست‌وجوی پیشرفته' : 'جست‌وجوی پیشرفته'}
+      </button>
+    </>}
   >
     <form className="panel admin-controls customer-search" onSubmit={submit}>
       <div className="toolbar customer-search-basic">

@@ -14,6 +14,7 @@ import {
 } from './admin-ui'
 import { formatMoney, formatNumber, formatPersianDate, moneyInputText, parseMoney } from './number-format'
 import { todayJalali, toIsoDate } from './persian-calendar'
+import { downloadCsv, toCsv } from './csv-export'
 
 /**
  * Purchases and the monthly picture.
@@ -167,7 +168,18 @@ export function PurchasesPage() {
   return <PageFrame
     title="خریدها"
     description="هر خرید یک سطر است: تاریخ، مبلغ و یک توضیح کوتاه. ماه هر خرید از روی تاریخ آن مشخص می‌شود."
-    actions={<MonthSelect value={month} onChange={setMonth} months={months} />}
+    actions={<>
+      <button type="button" disabled={!data?.purchases.length} onClick={() => data && downloadCsv(
+        `kafgir-purchases-${data.year}-${String(data.month).padStart(2, '0')}`,
+        toCsv(data.purchases, [
+          { header: 'تاریخ خرید', value: (row) => formatPersianDate(row.purchaseDate) },
+          { header: 'شرح', value: (row) => row.title },
+          { header: 'فروشنده', value: (row) => row.sellerName },
+          { header: 'مبلغ (تومان)', value: (row) => row.amount },
+          { header: 'یادداشت', value: (row) => row.notes },
+        ]))}>خروجی اکسل (CSV)</button>
+      <MonthSelect value={month} onChange={setMonth} months={months} />
+    </>}
   >
     <Message error={error} />
     {notice && <Message>{notice}</Message>}
