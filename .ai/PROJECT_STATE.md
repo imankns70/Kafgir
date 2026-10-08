@@ -1,5 +1,15 @@
 # Project state
 
+## 2026-10-08 — «حساب من» sections and review flow
+
+- The account opens on a profile card (name, phone, order/review/address counts) and a grouped menu:
+  سفارش‌های من، نظرسنجی و امتیازها، اطلاعات شخصی، آدرس‌های من، تماس، خروج. On phones the menu is
+  its own screen and each section opens with a «حساب من» back link; from 900px the menu stays beside
+  the open section. The order-success «پیگیری سفارش» opens straight to the orders section.
+- Orders are grouped into «در جریان» and past orders; order details, the reviews section and the
+  review dialog (also the post-delivery prompt) fold Persian rice into its dish and offer one-tap
+  remark chips that fill the comment. Styles live in `AccountUx.css`.
+
 ## 2026-10-08 — Cart photos, order item list, random order numbers
 
 - Cart lines carry the food's primary photo (from the add and refreshed by the cart snapshot). Each

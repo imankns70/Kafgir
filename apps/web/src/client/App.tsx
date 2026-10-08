@@ -11,7 +11,7 @@ import { MenuPage } from './features/menu/MenuPage'
 import { MenuPlanPage } from './features/menu/MenuPlanPage'
 import { OrderSuccess } from './features/orders/OrderSuccess'
 import { PostDeliveryReviewPrompt } from './features/orders/PostDeliveryReviewPrompt'
-import { ProfilePage } from './features/profile/ProfilePage'
+import { ProfilePage, type AccountSection } from './features/profile/ProfilePage'
 import { getTodayMenu, getTodayMenuCartSnapshot } from './services/menuApi'
 import { getCustomerSession, loginCustomerWithTelegram } from './services/customerApi'
 import { bindTelegramBackButton, getTelegramInitData } from './services/telegram'
@@ -28,6 +28,8 @@ const initialPage = (): Page => {
 
 function App() {
   const [page, setPage] = useState<Page>(initialPage)
+  const [profileSection, setProfileSection] = useState<AccountSection>('home')
+  const openAccount = () => { setProfileSection('home'); setPage('profile') }
   const [menu, setMenu] = useState<PublicDailyMenuPageDto | null>(null)
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartHydrated, setIsCartHydrated] = useState(false)
@@ -240,7 +242,7 @@ function App() {
           <BrandLogo variant="compact" />
         </button>
         <div className="header-actions">
-          <button className={`profile-button ${page === 'profile' ? 'active' : ''}`} onClick={() => setPage('profile')} aria-label="پروفایل و سفارش‌های من" aria-current={page === 'profile' ? 'page' : undefined}>
+          <button className={`profile-button ${page === 'profile' ? 'active' : ''}`} onClick={openAccount} aria-label="پروفایل و سفارش‌های من" aria-current={page === 'profile' ? 'page' : undefined}>
             <Icon name="profile" size="md" /><span>{isCustomerAuthenticated ? 'حساب من' : 'ورود'}</span>
           </button>
           <button className={`profile-button ${page === 'contact' ? 'active' : ''}`} onClick={() => setPage('contact')} aria-label="تماس با کفگیر" aria-current={page === 'contact' ? 'page' : undefined}>
@@ -267,11 +269,11 @@ function App() {
           onAuthenticationChange={setIsCustomerAuthenticated} />
       )}
       {page === 'success' && order && (
-        <OrderSuccess order={order} onBack={() => { setOrder(null); setPage('menu') }} onTrack={() => { setOrder(null); setPage('profile') }} />
+        <OrderSuccess order={order} onBack={() => { setOrder(null); setPage('menu') }} onTrack={() => { setOrder(null); setProfileSection('orders'); setPage('profile') }} />
       )}
       {page === 'plan' && <MenuPlanPage onBack={() => setPage('menu')} onOpenToday={() => setPage('menu')} />}
-      {page === 'profile' && <ProfilePage onBack={() => setPage('menu')} onAuthenticationChange={setIsCustomerAuthenticated} />}
-      {page === 'contact' && <ContactPage onBack={() => setPage('menu')} onAccount={() => setPage('profile')} />}
+      {page === 'profile' && <ProfilePage key={profileSection} initialSection={profileSection} onBack={() => setPage('menu')} onContact={() => setPage('contact')} onAuthenticationChange={setIsCustomerAuthenticated} />}
+      {page === 'contact' && <ContactPage onBack={() => setPage('menu')} onAccount={openAccount} />}
 
       {page !== 'success' && (
         <nav className="mobile-bottom-nav" aria-label="پیمایش اصلی">
@@ -290,7 +292,7 @@ function App() {
             <span className="nav-icon-wrap"><Icon name="cart" size="lg" />{cart.length > 0 && <span className="nav-count">{cart.length}</span>}</span>
             <span>سبد خرید</span>
           </button>
-          <button className={page === 'profile' ? 'active' : ''} onClick={() => setPage('profile')} aria-label={isCustomerAuthenticated ? 'حساب من' : 'ورود'} aria-current={page === 'profile' ? 'page' : undefined}>
+          <button className={page === 'profile' ? 'active' : ''} onClick={openAccount} aria-label={isCustomerAuthenticated ? 'حساب من' : 'ورود'} aria-current={page === 'profile' ? 'page' : undefined}>
             <Icon name="profile" size="lg" />
             <span>{isCustomerAuthenticated ? 'حساب من' : 'ورود'}</span>
           </button>

@@ -9,7 +9,7 @@ import {
   type CustomerOrderDetailDto,
   type CustomerOrdersPageDto,
 } from '../../types'
-import { CustomerOrderDetails, CustomerOrdersList, OrderProgress } from './CustomerOrders'
+import { awaitsReview, CustomerOrderDetails, CustomerOrdersList, isActiveOrder, OrderProgress, OrderReviewDialog } from './CustomerOrders'
 
 const activeSummary: CustomerOrdersPageDto['items'][number] = {
   id: 10,
@@ -132,5 +132,28 @@ describe('customer order history presentation', () => {
     }))
     expect(html).toContain('هنوز سفارشی ثبت نکرده‌اید')
     expect(html).toContain('مشاهده منوی امروز')
+  })
+
+  it('splits the list into orders in progress and past orders', () => {
+    const delivered = { ...activeSummary, id: 11, orderNumber: '1405-219604', status: OrderStatus.Delivered }
+    const page: CustomerOrdersPageDto = { items: [activeSummary, delivered], page: 1, pageSize: 10, totalItems: 2, totalPages: 1 }
+    const html = renderToStaticMarkup(createElement(CustomerOrdersList, {
+      orders: page, onOpen: () => undefined, onReview: () => undefined, onPage: () => undefined, onBrowse: () => undefined,
+    }))
+    expect(html.indexOf('در جریان')).toBeLessThan(html.indexOf('سفارش‌های قبلی'))
+    expect(html).toContain('امتیاز بدهید')
+    expect(isActiveOrder(activeSummary)).toBe(true)
+    expect(awaitsReview(delivered)).toBe(true)
+    expect(awaitsReview({ ...delivered, review: { id: 1, rating: 5, comment: null, createdAt: '', updatedAt: null } })).toBe(false)
+  })
+
+  it('offers quick remarks only once a rating is chosen', () => {
+    const render = (rating: number | null) => renderToStaticMarkup(createElement(OrderReviewDialog, {
+      orderNumber: '1405-219604', busy: false, error: null, onClose: () => undefined, onSave: () => undefined,
+      review: rating == null ? null : { id: 1, rating, comment: null, createdAt: '', updatedAt: null },
+    }))
+    expect(render(null)).not.toContain('review-remarks')
+    expect(render(5)).toContain('خوش‌طعم بود')
+    expect(render(2)).toContain('سرد رسید')
   })
 })
