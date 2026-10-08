@@ -5,6 +5,8 @@ import {
   configureDatabase,
   createOrder,
   createPayment,
+  editOrder,
+  reopenOrder,
   getAdminOrderDetail,
   getMonthlyReport,
   getProductionSheet,
@@ -101,9 +103,9 @@ integration.sequential('order money integrity', () => {
       await sql`DELETE FROM order_items WHERE order_id = ${id}`
       await sql`DELETE FROM orders WHERE id = ${id}`
     }
-    await sql`DELETE FROM daily_menu_items WHERE id = ${menuItemId}`
+    await sql`DELETE FROM daily_menu_items WHERE daily_menu_id = ${menuId}`
     await sql`DELETE FROM daily_menus WHERE id = ${menuId}`
-    await sql`DELETE FROM foods WHERE id = ${foodId}`
+    await sql`DELETE FROM foods WHERE category_id = ${categoryId}`
     await sql`DELETE FROM food_categories WHERE id = ${categoryId}`
     await sql`DELETE FROM audit_logs WHERE user_id = ${adminUserId}`
     await sql`DELETE FROM users WHERE id = ${adminUserId}`
@@ -198,5 +200,71 @@ integration.sequential('order money integrity', () => {
       { foodName: suffix, quantity: 3, withPersianRice: false },
     ])
     expect(sheet.orders.find((order) => order.id === pending.id)?.slotTitle).toBe('تحویل حضوری')
+  })
+
+  it('edits a confirmed order by the difference in portions and keeps the quoted price', async () => {
+    const extraFoodId = (await sql<{ id: number }[]>`
+      INSERT INTO foods (name,slug,category_id,default_price,allows_persian_rice,is_persian_rice,is_active,created_at,updated_at)
+      VALUES (${`دوم ${suffix}`},${`om2-${suffix}`},${categoryId},250000,false,false,true,NOW(),NOW()) RETURNING id`)[0]!.id
+    const extraItemId = (await sql<{ id: number }[]>`
+      INSERT INTO daily_menu_items (daily_menu_id,food_id,price,capacity_portions,sold_portions,is_available,created_at)
+      VALUES (${menuId},${extraFoodId},250000,3,0,true,NOW()) RETURNING id`)[0]!.id
+    const order = await placeOrder(2)
+    await updateOrderStatus(order.id, { newStatus: OrderStatus.Confirmed })
+    const sold = async (id: number) => (await sql<{ sold: number }[]>`SELECT sold_portions AS sold FROM daily_menu_items WHERE id = ${id}`)[0]!.sold
+    const soldBefore = await sold(menuItemId)
+    // Today's price changed after the customer ordered; their line keeps 400,000.
+    await sql`UPDATE daily_menu_items SET price = 450000 WHERE id = ${menuItemId}`
+
+    await editOrder(order.id, {
+      fullName: 'گیرنده تازه', phoneNumber: '09000000099', city: 'کرج', addressLine: 'خیابان تازه',
+      items: [{ dailyMenuItemId: menuItemId, quantity: 1 }, { dailyMenuItemId: extraItemId, quantity: 2 }],
+      reason: 'تماس مشتری',
+    }, adminUserId)
+    await sql`UPDATE daily_menu_items SET price = 400000 WHERE id = ${menuItemId}`
+
+    const detail = await getAdminOrderDetail(order.id)
+    expect(detail.subtotalAmount).toBe(400_000 + 500_000)
+    expect(detail.totalAmount).toBe(detail.subtotalAmount + detail.deliveryFee)
+    expect(detail.customerFullName).toBe('گیرنده تازه')
+    expect(detail.addressLine).toBe('خیابان تازه')
+    expect(await sold(menuItemId)).toBe(soldBefore - 1)
+    expect(await sold(extraItemId)).toBe(2)
+    const log = await listAuditLogs({ page: 1, pageSize: 50, entityType: 'order' } as never)
+    expect(log.items.find((entry) => entry.entityId === order.id && entry.action === 'order.edit')?.details)
+      .toContain('دلیل: تماس مشتری')
+
+    // Only one portion of the extra dish is left, so asking for two more than held is refused.
+    await expect(editOrder(order.id, {
+      fullName: 'گیرنده تازه', phoneNumber: '09000000099',
+      items: [{ dailyMenuItemId: extraItemId, quantity: 4 }],
+    }, adminUserId)).rejects.toThrow(/پرس/u)
+
+    await updateOrderStatus(order.id, { newStatus: OrderStatus.Preparing })
+    await expect(editOrder(order.id, {
+      fullName: 'x', phoneNumber: '09000000099', items: [{ dailyMenuItemId: menuItemId, quantity: 1 }],
+    }, adminUserId)).rejects.toThrow(/آشپزخانه/u)
+  })
+
+  it('reopens a wrongly delivered or cancelled order one step back, with the reason on record', async () => {
+    const delivered = await placeOrder(1)
+    await updateOrderStatus(delivered.id, { newStatus: OrderStatus.Confirmed })
+    await updateOrderStatus(delivered.id, { newStatus: OrderStatus.Delivered })
+    expect(await reopenOrder(delivered.id, { reason: 'اشتباهی تحویل زده شد' }, adminUserId)).toBe(OrderStatus.Ready)
+    const detail = await getAdminOrderDetail(delivered.id)
+    expect(detail.status).toBe(OrderStatus.Ready)
+    expect(detail.deliveredAt ?? null).toBeNull()
+    expect(detail.statusChanges.at(-1)?.note).toContain('اشتباهی تحویل زده شد')
+
+    const cancelled = await placeOrder(1)
+    await updateOrderStatus(cancelled.id, { newStatus: OrderStatus.Cancelled })
+    expect(await reopenOrder(cancelled.id, { reason: 'مشتری منصرف شد' }, adminUserId)).toBe(OrderStatus.PendingConfirmation)
+
+    const refunded = await placeOrder(1)
+    const payment = await paidPayment(refunded.id, 400_000)
+    await updateOrderStatus(refunded.id, { newStatus: OrderStatus.Cancelled })
+    await refundPayment(payment, { amount: 400_000, reason: 'لغو' }, adminUserId)
+    await expect(reopenOrder(refunded.id, { reason: 'برگشت' }, adminUserId)).rejects.toThrow(/مسترد/u)
+    await expect(reopenOrder(delivered.id, { reason: 'دوباره' }, adminUserId)).rejects.toThrow()
   })
 })

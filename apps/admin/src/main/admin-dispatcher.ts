@@ -12,6 +12,8 @@ import {
   updateDailyMenuItemSchema,
   updateDailyMenuSettingsSchema,
   updateOrderStatusSchema,
+  orderEditSchema,
+  orderReopenSchema,
   deliveryTimeSlotWriteSchema,
   deliveryDayOverrideWriteSchema,
   courierWriteSchema,
@@ -82,6 +84,8 @@ import {
   updateMenuItem,
   updateMenuSettings,
   updateOrderStatus,
+  editOrder,
+  reopenOrder,
   changePaymentStatus,
   closeDatabase,
   testDatabaseConnection,
@@ -271,6 +275,10 @@ export async function dispatchAdminOperation(
         updateOrderStatusSchema.parse(body.value),
         principal.userId,
       )
+    case 'orders.edit':
+      return editOrder(numberField(body, 'id'), orderEditSchema.parse(body.value), principal.userId)
+    case 'orders.reopen':
+      return reopenOrder(numberField(body, 'id'), orderReopenSchema.parse(body.value), principal.userId)
     case 'support.conversations.list':
       return listAdminSupportConversations(body.status == null
         ? undefined : supportConversationStatusSchema.parse(Number(body.status)))

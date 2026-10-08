@@ -157,6 +157,7 @@ tr.selected-row:hover{background:#fff0c8}
 /* Shared order invoice preview and A4 printing */
 .invoice-dialog{position:fixed;z-index:100;inset:0;display:grid;place-items:center;padding:24px}
 .invoice-dialog-backdrop{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;background:#2b2b2b99;cursor:default}
+.invoice-dialog-backdrop:hover{border:0;background:#2b2b2b99}
 .invoice-dialog-card{position:relative;display:grid;width:min(880px,calc(100vw - 48px));max-height:calc(100vh - 48px);gap:10px;overflow:auto;border:1px solid var(--border);border-radius:18px;padding:14px;background:#fffaf3;box-shadow:0 24px 64px #2b2b2b55}
 .invoice-dialog-actions{position:sticky;z-index:2;top:0;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;padding:4px;background:#fffaf3ee;backdrop-filter:blur(8px)}
 .invoice-print-error{align-self:center;margin-inline-end:auto;color:var(--error,#b33a32);font-size:13px;font-weight:700}
@@ -872,3 +873,23 @@ td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-ali
 .share-cell{position:relative;min-width:120px;text-align:right}
 .share-cell .share-bar{position:absolute;inset-block:8px;inset-inline-start:8px;max-inline-size:calc(100% - 16px);border-radius:6px;background:#5a7d2e2e}
 .share-cell span:last-child{position:relative;padding-inline-start:4px}
+
+/* Order correction and status reopen dialogs. */
+.order-edit-card{width:min(760px,calc(100vw - 48px));gap:14px;padding:20px}
+.order-reopen-card{width:min(520px,calc(100vw - 48px))}
+.order-edit-head h2{margin:0 0 4px;font-size:19px}.order-edit-head p{margin:0;color:var(--muted);font-size:13px;line-height:1.8}
+.order-edit-section{display:grid;gap:10px}.order-edit-section h3{margin:0;font-size:15px}
+.order-edit-items td.text-cell{text-align:right}.order-edit-items .badge{margin-inline-start:8px}
+.order-edit-items td{padding:8px}
+.qty-stepper{display:inline-flex;align-items:center;gap:4px}
+.qty-stepper button{width:32px;height:32px;padding:0;font-size:17px;line-height:1}
+.qty-stepper input{width:52px;min-height:32px;border:1px solid var(--border);border-radius:8px;text-align:center;background:#fff}
+.order-edit-add{display:flex;gap:8px}.order-edit-add select{flex:1;min-width:0;min-height:40px;border:1px solid var(--border);border-radius:10px;padding:6px 10px;background:#fff}
+.order-edit-total{margin:0;font-size:14px}.order-edit-total strong{color:var(--primary)}
+.order-edit-total .up{color:var(--success)}.order-edit-total .down{color:var(--error)}
+.order-edit-contact{grid-template-columns:repeat(3,minmax(0,1fr))}.order-edit-contact h3,.order-edit-contact .wide{grid-column:1/-1}
+.order-edit-contact textarea{min-height:auto}
+.order-reopen-reason{display:grid;gap:6px;font-size:13px;font-weight:500}
+.order-reopen-reason textarea{border:1px solid var(--border);border-radius:10px;padding:8px 11px;background:#fff}
+.order-edit-actions{display:flex;gap:8px;justify-content:flex-start}
+.orders-detail-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}

@@ -11,6 +11,7 @@ import { formatPersianDateTime } from './number-format'
 
 const actionLabel: Record<string, string> = {
   'order.status': 'تغییر وضعیت سفارش',
+  'order.edit': 'ویرایش سفارش',
   'payment.create': 'ثبت پرداخت',
   'payment.status': 'تغییر وضعیت پرداخت',
   'payment.refund': 'استرداد',

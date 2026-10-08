@@ -25,7 +25,7 @@ Operations features
 - [x] C2 Sound and desktop notification for new orders.
 - [x] C3 CSV export for orders, payments, customers and purchases.
 - [x] C4 Sales report by dish, average basket, cancellation rate, by delivery slot and payment method.
-- [ ] C5 Edit an order's items and address before it is prepared; Owner can revert a wrong final status.
+- [x] C5 Edit an order's items and address before it is prepared; Owner can revert a wrong final status.
 - [ ] C6 Customer notes, tags and blocking.
 - [ ] C7 Discount codes (coupons).
 - [ ] C8 SMS order-status notifications for customers without Telegram.

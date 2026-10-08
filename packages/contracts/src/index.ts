@@ -721,6 +721,29 @@ export const updateOrderStatusSchema = z.object({
   statusNote: z.string().max(1000).nullable().optional(),
 })
 
+/**
+ * An operator's correction to an order that has not gone into the kitchen yet. `items` is the whole
+ * new list of stored lines (Persian rice is its own line here, as it is in the kitchen's counts).
+ * Existing lines keep the price the customer was quoted; added dishes take today's menu price.
+ */
+export const orderEditSchema = z.object({
+  fullName: z.string().trim().min(1).max(150),
+  phoneNumber: z.string().trim().min(5).max(30),
+  city: z.string().trim().max(100).nullable().optional(),
+  addressLine: z.string().trim().max(1000).nullable().optional(),
+  customerNote: z.string().trim().max(1000).nullable().optional(),
+  items: z.array(z.object({
+    dailyMenuItemId: z.number().int().positive(),
+    quantity: z.number().int().min(1).max(100),
+  })).min(1, 'سفارش دست‌کم یک قلم غذا لازم دارد.'),
+  reason: z.string().trim().max(500).nullable().optional(),
+})
+
+/** Undoing a wrongly recorded final status. Owner only, and always with a reason. */
+export const orderReopenSchema = z.object({
+  reason: z.string().trim().min(3, 'دلیل بازگرداندن وضعیت را بنویسید.').max(500),
+})
+
 export const adminLoginSchema = z.object({
   username: z.string().trim().min(1),
   password: z.string().min(1),
@@ -850,6 +873,8 @@ export type DailyMenuItemWriteRequest = z.infer<typeof dailyMenuItemWriteSchema>
 export type UpdateDailyMenuItemRequest = z.infer<typeof updateDailyMenuItemSchema>
 export type UpdateDailyMenuSettingsRequest = z.infer<typeof updateDailyMenuSettingsSchema>
 export type UpdateOrderStatusRequest = z.infer<typeof updateOrderStatusSchema>
+export type OrderEditRequest = z.infer<typeof orderEditSchema>
+export type OrderReopenRequest = z.infer<typeof orderReopenSchema>
 export type AdminLoginRequest = z.infer<typeof adminLoginSchema>
 export type AdminLoginResponse = z.infer<typeof adminLoginResponseSchema>
 export type AdminDashboardSummaryDto = z.infer<typeof dashboardSummarySchema>

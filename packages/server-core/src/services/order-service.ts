@@ -12,6 +12,8 @@ import {
   type PagedResult,
   type OrderSummaryDto,
   type UpdateOrderStatusRequest,
+  type OrderEditRequest,
+  type OrderReopenRequest,
 } from '@kafgir/contracts'
 import type { TransactionSql } from 'postgres'
 import { sqlClient } from '../db/client'
@@ -50,6 +52,7 @@ type OrderRecord = {
   customerFullName: string
   customerPhoneNumber: string
   addressLine: string | null
+  deliveryCity: string
   status: OrderStatus
   paymentMethod: number
   deliveryMethod: number
@@ -533,7 +536,7 @@ export async function getOrder(id: number): Promise<OrderDto> {
     SELECT id, order_number AS "orderNumber", customer_profile_id AS "customerId",
            delivery_full_name AS "customerFullName",
            delivery_phone_number AS "customerPhoneNumber",
-           delivery_address_line AS "addressLine",
+           delivery_address_line AS "addressLine", delivery_city AS "deliveryCity",
            status, payment_method AS "paymentMethod", delivery_method AS "deliveryMethod",
            subtotal_amount::float8 AS "subtotalAmount", delivery_fee::float8 AS "deliveryFee",
            total_amount::float8 AS "totalAmount", customer_note AS "customerNote",
@@ -806,6 +809,172 @@ export async function updateOrderStatus(id: number, request: UpdateOrderStatusRe
     }
   })
   logger.info({ event: 'order.status.changed', orderId: id, userId, newStatus: request.newStatus }, 'وضعیت سفارش تغییر کرد')
+}
+
+/** Statuses in which the kitchen has not started, so the basket and address can still change. */
+const editableStatuses = [OrderStatus.PendingConfirmation, OrderStatus.Confirmed]
+
+/**
+ * Correct an order before it reaches the kitchen: who and where, and which dishes in what quantity.
+ *
+ * Lines that stay keep the unit price the customer was quoted; added dishes take today's menu price.
+ * A confirmed order already holds its portions, so only the difference is reserved or released; a
+ * pending one reserves nothing yet, and the edit is only checked against what is left. The delivery
+ * charge and the courier snapshot are about the trip, not the basket, and stay as they were.
+ */
+export async function editOrder(id: number, request: OrderEditRequest, userId: number): Promise<void> {
+  await sqlClient.begin(async (tx) => {
+    const orders = await tx<{ status: OrderStatus; deliveryFee: number; subtotal: number; orderNumber: string }[]>`
+      SELECT status, delivery_fee::float8 AS "deliveryFee", subtotal_amount::float8 AS subtotal,
+             order_number AS "orderNumber"
+      FROM orders WHERE id = ${id} FOR UPDATE
+    `
+    const order = orders[0]
+    if (!order) throw new NotFoundError()
+    if (!editableStatuses.includes(order.status)) {
+      throw new AppError('فقط سفارشی که هنوز به آشپزخانه نرفته (در انتظار تأیید یا تأییدشده) قابل ویرایش است.')
+    }
+    const reserved = order.status === OrderStatus.Confirmed
+
+    const existing = await tx<{ id: number; dailyMenuItemId: number; quantity: number; unitPrice: number; originalUnitPrice: number | null; foodName: string; dailyMenuId: number }[]>`
+      SELECT oi.id, oi.daily_menu_item_id AS "dailyMenuItemId", oi.quantity, oi.unit_price::float8 AS "unitPrice",
+             oi.original_unit_price::float8 AS "originalUnitPrice", oi.food_name AS "foodName",
+             d.daily_menu_id AS "dailyMenuId"
+      FROM order_items oi JOIN daily_menu_items d ON d.id = oi.daily_menu_item_id
+      WHERE oi.order_id = ${id}
+      ORDER BY oi.id
+    `
+    const wanted = new Map<number, number>()
+    for (const item of request.items) wanted.set(item.dailyMenuItemId, (wanted.get(item.dailyMenuItemId) ?? 0) + item.quantity)
+    const before = new Map(existing.map((line) => [line.dailyMenuItemId, line]))
+    const ids = [...new Set([...wanted.keys(), ...before.keys()])]
+    const menuItems = await tx<{ id: number; dailyMenuId: number; name: string; price: number; originalPrice: number | null; remaining: number; isPersianRice: boolean; allowsPersianRice: boolean }[]>`
+      SELECT i.id, i.daily_menu_id AS "dailyMenuId", f.name,
+             COALESCE(i.discount_price, i.price)::float8 AS price,
+             CASE WHEN i.discount_price IS NOT NULL THEN i.price::float8 ELSE NULL END AS "originalPrice",
+             i.capacity_portions - i.sold_portions AS remaining,
+             f.is_persian_rice AS "isPersianRice", f.allows_persian_rice AS "allowsPersianRice"
+      FROM daily_menu_items i JOIN foods f ON f.id = i.food_id
+      WHERE i.id = ANY(${sqlClient.array(ids)}::int[])
+      ORDER BY i.id
+      FOR UPDATE OF i
+    `
+    const menu = new Map(menuItems.map((item) => [item.id, item]))
+    const menuId = existing[0]?.dailyMenuId ?? menuItems[0]?.dailyMenuId
+    let ricePortions = 0
+    let ricePartners = 0
+    for (const [menuItemId, quantity] of wanted) {
+      const item = menu.get(menuItemId)
+      if (!item) throw new AppError('یکی از غذاهای انتخاب‌شده در منو پیدا نشد.')
+      if (item.dailyMenuId !== menuId) throw new AppError(`«${item.name}» در منوی روز این سفارش نیست.`)
+      const held = reserved ? before.get(menuItemId)?.quantity ?? 0 : 0
+      if (quantity - held > item.remaining) {
+        throw new AppError(`از «${item.name}» فقط ${Math.max(0, item.remaining + held)} پرس برای این سفارش در دسترس است.`)
+      }
+      if (item.isPersianRice) ricePortions += quantity
+      else if (item.allowsPersianRice) ricePartners += quantity
+    }
+    if (ricePortions > ricePartners) {
+      throw new AppError('برنج ایرانی بیشتر از غذاهایی است که برنج ایرانی می‌پذیرند.')
+    }
+
+    // Stock moves by the difference only, and only when the order already holds portions.
+    if (reserved) {
+      for (const menuItemId of ids) {
+        const delta = (wanted.get(menuItemId) ?? 0) - (before.get(menuItemId)?.quantity ?? 0)
+        if (delta !== 0) {
+          await tx`UPDATE daily_menu_items SET sold_portions = GREATEST(0, sold_portions + ${delta}) WHERE id = ${menuItemId}`
+        }
+      }
+    }
+
+    const changes: string[] = []
+    for (const line of existing) {
+      const quantity = wanted.get(line.dailyMenuItemId)
+      if (quantity === undefined) {
+        await tx`DELETE FROM order_items WHERE id = ${line.id}`
+        changes.push(`حذف ${line.foodName}`)
+      } else if (quantity !== line.quantity) {
+        await tx`UPDATE order_items SET quantity = ${quantity}, total_price = ${line.unitPrice * quantity} WHERE id = ${line.id}`
+        changes.push(`${line.foodName}: ${line.quantity} ← ${quantity}`)
+      }
+    }
+    for (const [menuItemId, quantity] of wanted) {
+      if (before.has(menuItemId)) continue
+      const item = menu.get(menuItemId)!
+      await tx`
+        INSERT INTO order_items (order_id, daily_menu_item_id, original_unit_price, food_name, unit_price, quantity, total_price)
+        VALUES (${id}, ${menuItemId}, ${item.originalPrice}, ${item.name}, ${item.price}, ${quantity}, ${item.price * quantity})
+      `
+      changes.push(`افزودن ${item.name} × ${quantity}`)
+    }
+
+    const totals = await tx<{ subtotal: number }[]>`
+      SELECT COALESCE(SUM(total_price), 0)::float8 AS subtotal FROM order_items WHERE order_id = ${id}
+    `
+    const subtotal = totals[0]!.subtotal
+    if (subtotal !== order.subtotal) changes.push(`مبلغ غذا: ${formatToman(order.subtotal)} ← ${formatToman(subtotal)}`)
+    const city = optionalText(request.city)
+    const addressLine = optionalText(request.addressLine)
+    const contact = await tx<{ changed: boolean }[]>`
+      UPDATE orders o SET
+        delivery_full_name = ${request.fullName.trim()},
+        delivery_phone_number = ${normalizePhone(request.phoneNumber)},
+        delivery_city = COALESCE(${city}, o.delivery_city),
+        delivery_address_line = COALESCE(${addressLine}, o.delivery_address_line),
+        customer_note = ${optionalText(request.customerNote)},
+        subtotal_amount = ${subtotal},
+        total_amount = ${subtotal} + o.delivery_fee
+      FROM (SELECT delivery_full_name, delivery_phone_number, delivery_city, delivery_address_line FROM orders WHERE id = ${id}) old
+      WHERE o.id = ${id}
+      RETURNING (old.delivery_full_name, old.delivery_phone_number, old.delivery_city, old.delivery_address_line)
+        IS DISTINCT FROM (o.delivery_full_name, o.delivery_phone_number, o.delivery_city, o.delivery_address_line) AS changed
+    `
+    if (contact[0]?.changed) changes.push('نام، تلفن یا آدرس اصلاح شد')
+    const reason = optionalText(request.reason)
+    await tx`
+      INSERT INTO audit_logs (action, entity_type, entity_id, user_id, details, created_at)
+      VALUES ('order.edit', 'order', ${id}, ${userId},
+              ${[changes.join('؛ ') || 'بدون تغییر', reason ? `دلیل: ${reason}` : null].filter(Boolean).join(' — ')}, NOW())
+    `
+  })
+  logger.info({ event: 'order.edit', orderId: id, userId }, 'سفارش ویرایش شد')
+}
+
+/**
+ * Undo a final status recorded by mistake. A delivered order goes back to «آماده تحویل»; a cancelled
+ * one goes back to «در انتظار تأیید», so confirming it again reserves its portions through the normal
+ * path. Money already handed back makes that a different conversation, so it is refused.
+ */
+export async function reopenOrder(id: number, request: OrderReopenRequest, userId: number): Promise<OrderStatus> {
+  const target = await sqlClient.begin(async (tx) => {
+    const orders = await tx<{ status: OrderStatus }[]>`SELECT status FROM orders WHERE id = ${id} FOR UPDATE`
+    const order = orders[0]
+    if (!order) throw new NotFoundError()
+    let next: OrderStatus
+    if (order.status === OrderStatus.Delivered) {
+      next = OrderStatus.Ready
+      await tx`UPDATE orders SET status = ${next}, delivered_at = NULL WHERE id = ${id}`
+    } else if (order.status === OrderStatus.Cancelled) {
+      const refunded = await tx<{ value: boolean }[]>`
+        SELECT EXISTS(SELECT 1 FROM payments WHERE order_id = ${id} AND refunded_amount > 0) AS value`
+      if (refunded[0]?.value) {
+        throw new AppError('برای این سفارش وجه مسترد شده است؛ به‌جای بازگرداندن، سفارش تازه ثبت کنید.')
+      }
+      next = OrderStatus.PendingConfirmation
+      await tx`UPDATE orders SET status = ${next}, cancelled_at = NULL, confirmed_at = NULL WHERE id = ${id}`
+    } else {
+      throw new AppError('فقط سفارش تحویل‌شده یا لغوشده را می‌توان به وضعیت قبل بازگرداند.')
+    }
+    await tx`
+      INSERT INTO order_status_histories (order_id, from_status, to_status, note, changed_at, changed_by_user_id)
+      VALUES (${id}, ${order.status}, ${next}, ${`بازگرداندن وضعیت: ${request.reason.trim()}`}, ${sqlTimestamp(new Date())},
+              ${userId > 0 ? userId : null})
+    `
+    return next
+  })
+  logger.info({ event: 'order.reopen', orderId: id, userId, newStatus: target }, 'وضعیت سفارش بازگردانده شد')
+  return target
 }
 
 /**

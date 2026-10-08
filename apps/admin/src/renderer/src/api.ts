@@ -20,6 +20,8 @@ import type {
   OrderSummaryDto,
   UpdateDailyMenuItemRequest,
   UpdateOrderStatusRequest,
+  OrderEditRequest,
+  OrderReopenRequest,
   PurchaseWriteRequest,
   PurchaseDto,
   MonthPurchasesDto,
@@ -376,6 +378,8 @@ export const adminApi = {
   createOrder: (order: CreateOrderRequest) => request<OrderDto>('/api/admin/orders', 'POST', order),
   updateOrderStatus: (id: number, update: UpdateOrderStatusRequest) =>
     request<void>(`/api/admin/orders/${id}/status`, 'PATCH', update),
+  editOrder: (id: number, value: OrderEditRequest) => socialInvoke<void>('orders.edit', { id, value }, true),
+  reopenOrder: (id: number, value: OrderReopenRequest) => socialInvoke<number>('orders.reopen', { id, value }, true),
   // Purchases and the monthly picture. All four go straight over IPC — they have no HTTP route,
   // because only the desktop app records what the kitchen spent.
   monthPurchases: (year: number, month: number) =>

@@ -61,6 +61,8 @@ export const adminOperations = [
   'orders.get',
   'orders.create',
   'orders.updateStatus',
+  'orders.edit',
+  'orders.reopen',
   'support.conversations.list',
   'support.conversations.get',
   'support.conversations.reply',

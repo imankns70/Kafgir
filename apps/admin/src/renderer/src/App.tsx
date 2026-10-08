@@ -43,6 +43,7 @@ import { KitchenPage } from './KitchenPage'
 import { useNewOrderAlerts } from './new-order-alerts'
 import { isAdminOperationAllowed } from '../../shared/admin-permissions'
 import { downloadCsv, fetchAllPages, toCsv } from './csv-export'
+import { OrderEditDialog, OrderReopenDialog, isOrderEditable, isOrderReopenable } from './OrderEditDialog'
 import { CustomerCommunicationPage } from './CustomerCommunicationPage'
 import { FoodTagGroupsPage, SupportSubjectsPage } from './ReferenceDataPages'
 import { DeliveryMethodsPage, PaymentMethodsPage } from './SettingsPages'
@@ -639,7 +640,7 @@ function OrderDetails({ order }: { order: AdminOrderDetailDto }) {
   </div>
 }
 
-function OrdersPage() {
+function OrdersPage({ roles }: { roles: string[] }) {
   const [result, setResult] = useState<PagedResult<OrderSummaryDto> | null>(null)
   // Refs so the debounced/auto-refresh loader always reads the current page without re-creating itself.
   const [page, setPage] = useState(1)
@@ -654,6 +655,9 @@ function OrdersPage() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<'edit' | 'reopen' | null>(null)
+  const canEdit = isAdminOperationAllowed('orders.edit', roles)
+  const canReopen = isAdminOperationAllowed('orders.reopen', roles)
   const selectedId = selected?.id
   const load = useCallback(async (showBusy = true) => {
     if (showBusy) setBusy(true)
@@ -748,7 +752,15 @@ function OrdersPage() {
         {/* Actions belong to a chosen order; three disabled buttons over an empty pane read as broken. */}
         {selected && <div className="orders-detail-actions">
           <OrderStatusActions status={selected.status} busy={busy} onChange={(next) => void changeStatus(next)} />
+          {canEdit && isOrderEditable(selected.status) &&
+            <button type="button" className="secondary-outline" disabled={busy} onClick={() => setDialog('edit')}>ویرایش اقلام و آدرس</button>}
+          {canReopen && isOrderReopenable(selected.status) &&
+            <button type="button" className="secondary-outline" disabled={busy} onClick={() => setDialog('reopen')}>بازگرداندن وضعیت</button>}
         </div>}
+        {selected && dialog === 'edit' && <OrderEditDialog order={selected} onClose={() => setDialog(null)}
+          onSaved={() => { setDialog(null); setMessage('تغییرات سفارش ذخیره شد.'); void load() }} />}
+        {selected && dialog === 'reopen' && <OrderReopenDialog order={selected} onClose={() => setDialog(null)}
+          onSaved={(next) => { setDialog(null); setMessage(`وضعیت سفارش به «${statusLabel[next]}» برگشت.`); void load() }} />}
         <h2>جزئیات سفارش</h2>
         {selected
           ? <OrderDetails order={selected} />
@@ -2083,7 +2095,7 @@ export function App() {
     couriers: <CouriersPage />,
     'courier-days': <CourierDaysPage />,
     'courier-accounting': <CourierAccountingPage />,
-    orders: <OrdersPage />,
+    orders: <OrdersPage roles={roles} />,
     manual: <ManualOrderPage />,
     'customer-communication': <CustomerCommunicationPage />,
     foods: <FoodsPage onCreate={() => openFoodEditor(null)} onEdit={openFoodEditor} onPhotos={openFoodPhotos} onTags={openFoodTags} />,
