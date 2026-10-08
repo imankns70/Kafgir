@@ -14,6 +14,7 @@ import { ButtonLoading } from '../../design-system/ButtonLoading'
 import { OtpCodeInput } from '../../design-system/OtpCodeInput'
 import { DeliverySlotPicker } from './DeliverySlotPicker'
 import { SavedAddressPicker } from './SavedAddressPicker'
+import { CheckoutStepCaption } from './CheckoutStepCaption'
 import type { CheckoutStep } from '../cart/CartPage'
 import { formatMoney, formatNumber } from '../../utils/format'
 import {
@@ -346,7 +347,11 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     {isLoadingProfile && <p className="muted">در حال بررسی اطلاعات قبلی شما…</p>}
     {profileMessage && <div className="form-hint">{profileMessage}</div>}
     {authenticationMessage && <div className="checkout-auth-success" role="status"><Icon name="confirm" size="sm" />{authenticationMessage}</div>}
-    {authentication === 'authenticated' && customerProfile && <section className="checkout-customer-identity" aria-label="هویت متصل به سفارش">
+    {/* On a phone the card is only worth its space when it asks for something: linking a phone to a
+        Telegram account. A confirmed sign-in is already evident from the filled-in fields. */}
+    {authentication === 'authenticated' && customerProfile && <section
+      className={`checkout-customer-identity${authenticationMethod === 'telegram' && !customerProfile.phoneNumberConfirmed ? '' : ' checkout-desktop-only'}`}
+      aria-label="هویت متصل به سفارش">
       <div className="checkout-customer-identity-icon"><Icon name="profile" size="md" /></div>
       <div className="checkout-customer-identity-copy">
         <strong>{authenticationMethod === 'telegram' ? 'ورود امن با تلگرام' : 'ورود با موبایل تاییدشده'}</strong>
@@ -404,15 +409,24 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       </button>
     </section>}
     <div className="checkout-step-block" data-step="delivery">
-      <h2 className="section-title checkout-step-heading checkout-mobile-only">اطلاعات تحویل</h2>
+      <div className="checkout-step-header checkout-mobile-only">
+        <CheckoutStepCaption index={1} />
+        <h2 className="section-title checkout-step-heading">اطلاعات تحویل</h2>
+      </div>
       <label className="field">نام و نام خانوادگی<input value={form.fullName} onChange={(e) => setField('fullName', e.target.value)} autoComplete="name" /></label>
       <label className="field">شماره موبایل{authentication === 'guest' ? ' (برای ورود و پیگیری سفارش)' : ''}<input className="ltr-value" dir="ltr" value={form.phoneNumber} onChange={(e) => setField('phoneNumber', e.target.value)} inputMode="tel" autoComplete="tel" readOnly={authenticationMethod === 'phone'} /></label>
       {/* The two method selects share one row on desktop but belong to different wizard steps, so
           each is rendered twice: the paired row for desktop and a single field for its own step.
           They read and write the same state, and only one copy is ever displayed. */}
-      <label className="field checkout-mobile-only">روش دریافت<select value={form.deliveryMethod} onChange={(e) => setField('deliveryMethod', Number(e.target.value) as DeliveryMethod)}>
-        {orderOptions?.deliveryMethods.map((item) => <option key={item.method} value={item.method}>{item.title}</option>)}
-      </select></label>
+      <fieldset className="checkout-choice-group checkout-segmented checkout-mobile-only">
+        <legend>روش دریافت</legend>
+        {orderOptions?.deliveryMethods.map((item) => <label key={item.method} className={form.deliveryMethod === item.method ? 'is-selected' : undefined}>
+          <input type="radio" name="checkout-delivery-method" checked={form.deliveryMethod === item.method}
+            onChange={() => setField('deliveryMethod', item.method)} />
+          <Icon name={item.method === DeliveryMethod.Delivery ? 'delivery' : 'homeCook'} size="sm" />
+          <span>{item.title}</span>
+        </label>)}
+      </fieldset>
     </div>
 
     <div className="form-grid two-columns checkout-desktop-only">
@@ -425,11 +439,23 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
     </div>
 
     <div className="checkout-step-block" data-step="payment">
-      <h2 className="section-title checkout-step-heading checkout-mobile-only">پرداخت و تایید</h2>
-      <label className="field checkout-mobile-only">روش پرداخت<select value={form.paymentMethod} onChange={(e) => setField('paymentMethod', Number(e.target.value) as PaymentMethod)}>
-        {orderOptions?.paymentMethods.map((item) => <option key={item.method} value={item.method}>{item.title}</option>)}
-      </select></label>
-      <div className="form-hint">{selectedPayment?.description}</div>
+      <div className="checkout-step-header checkout-mobile-only">
+        <CheckoutStepCaption index={3} />
+        <h2 className="section-title checkout-step-heading">پرداخت و تایید</h2>
+      </div>
+      <fieldset className="checkout-choice-group checkout-payment-options checkout-mobile-only">
+        <legend>روش پرداخت</legend>
+        {orderOptions?.paymentMethods.map((item) => <label key={item.method} className={form.paymentMethod === item.method ? 'is-selected' : undefined}>
+          <input type="radio" name="checkout-payment-method" checked={form.paymentMethod === item.method}
+            onChange={() => setField('paymentMethod', item.method)} />
+          <span className="checkout-choice-copy">
+            <strong>{item.title}</strong>
+            {item.description && <small>{item.description}</small>}
+          </span>
+        </label>)}
+      </fieldset>
+      {/* Phones show each method's description inside its own option. */}
+      <div className="form-hint checkout-desktop-only">{selectedPayment?.description}</div>
       {isBelowMinimum && <div className="form-error" role="alert">حداقل مبلغ سفارش برای این روش {formatMoney(selectedDelivery!.minimumOrderAmount)} است.</div>}
     </div>
 
@@ -443,13 +469,16 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       {form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress && <label className="field">آدرس<textarea value={form.addressLine} onChange={(e) => setField('addressLine', e.target.value)} /></label>}
       {wizardStep === 'delivery' && error && <div className="form-error" role="alert">{error}</div>}
       <div className="checkout-wizard-actions">
-        <button type="button" className="outline-button" onClick={() => onWizardStepChange?.('cart')}>مرحله قبل</button>
+        <button type="button" className="outline-button checkout-secondary-action" onClick={() => onWizardStepChange?.('cart')}>مرحله قبل</button>
         <button type="button" className="primary-button" onClick={() => advanceTo('time', deliveryStepError())}>ادامه به زمان تحویل <Icon name="back" size="sm" /></button>
       </div>
     </div>
 
     <div className="checkout-step-block" data-step="time">
-      <h2 className="section-title checkout-step-heading checkout-mobile-only">زمان تحویل</h2>
+      <div className="checkout-step-header checkout-mobile-only">
+        <CheckoutStepCaption index={2} />
+        <h2 className="section-title checkout-step-heading">زمان تحویل</h2>
+      </div>
       {/* Express belongs with the times, because it is the answer to the same question: when. Picking
           it puts the window list out of use rather than hiding it, so the customer can see what they
           are giving up and change their mind. */}
@@ -470,13 +499,13 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       </div>
       {wizardStep === 'time' && error && <div className="form-error" role="alert">{error}</div>}
       <div className="checkout-wizard-actions">
-        <button type="button" className="outline-button" onClick={() => onWizardStepChange?.('delivery')}>مرحله قبل</button>
+        <button type="button" className="outline-button checkout-secondary-action" onClick={() => onWizardStepChange?.('delivery')}>مرحله قبل</button>
         <button type="button" className="primary-button" onClick={() => advanceTo('payment', timeStepError())}>ادامه به پرداخت <Icon name="back" size="sm" /></button>
       </div>
     </div>
 
     <div className="checkout-step-block" data-step="payment">
-      <label className="field">توضیح سفارش<textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
+      <label className="field checkout-note-field"><span>توضیح سفارش <small>(اختیاری)</small></span><textarea value={form.customerNote} onChange={(e) => setField('customerNote', e.target.value)} /></label>
 
       {/* The delivery charge is shown as its own line, never folded into the total: the customer should
           be able to read غذا + ارسال = پرداختی without doing arithmetic to find the difference. */}
@@ -505,7 +534,7 @@ export function CheckoutForm({ items, isCartVerified, isCheckingCart, onRefreshC
       {/* The final action shares the pinned bar with «مرحله قبل» on a phone. On desktop the bar is
           `display: contents`, so the submit button stays an ordinary last child of the form. */}
       <div className="checkout-wizard-actions checkout-submit-actions">
-      <button type="button" className="outline-button checkout-mobile-only" onClick={() => onWizardStepChange?.('time')}>مرحله قبل</button>
+      <button type="button" className="outline-button checkout-secondary-action checkout-mobile-only" onClick={() => onWizardStepChange?.('time')}>مرحله قبل</button>
       <button className="primary-button full-width" disabled={isSubmitting || isCheckingCart || isLoadingProfile || isLoadingOptions || isLoadingPricing || isDeliveryUnpriced || showLogin || !isCartVerified || Boolean(cartIssue) || isBelowMinimum || !selectedDelivery || !selectedPayment || items.length === 0 || (!expressChosen && deliveryTimeSlotId == null)}>{isSubmitting
         ? <ButtonLoading label={form.deliveryMethod === DeliveryMethod.Delivery && !selectedSavedAddress ? 'در حال ثبت سفارش و آدرس…' : 'در حال ثبت سفارش…'} />
         : isCheckingCart ? 'در حال بررسی موجودی…' : authentication === 'guest' ? 'ورود و ثبت سفارش' : 'ثبت سفارش'}</button>

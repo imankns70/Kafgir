@@ -1,5 +1,13 @@
 # Decisions
 
+## 2026-10-08 — The phone checkout wizard is one card per step
+
+- On phones a checkout step is one card: a «مرحله N از ۴» caption, the step title, its fields and the
+  pinned action bar. Page-level chrome (title, step trail, «ادامه خرید» header link, the confirmed
+  identity card) is desktop-only; the way back to shopping lives in the cart step's bar.
+- Short fixed choices (delivery method, payment method) are buttons or radio cards on phones rather
+  than selects. Desktop keeps the existing single-page form.
+
 ## 2026-09-04 — Monthly planning reuses the daily-menu aggregate
 
 - A monthly plan is a date-oriented view over existing daily menus, not a second menu entity. A food

@@ -4,7 +4,7 @@ import { formatMoney, formatNumber } from '../../utils/format'
 import { Icon } from '../../design-system/Icon'
 import { PriceDisplay } from '../../design-system/PriceDisplay'
 import { cartItemIssue } from '../../services/cartReconciliation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 export function removalWouldEmptyCart(items: CartItem[], itemId: number, nextQuantity: number) {
   return nextQuantity <= 0
@@ -12,12 +12,14 @@ export function removalWouldEmptyCart(items: CartItem[], itemId: number, nextQua
     && items[0]?.dailyMenuItemId === itemId
 }
 
-export function CartSummary({ items, onQuantityChange, deliveryCost }: {
+export function CartSummary({ items, onQuantityChange, deliveryCost, stepCaption }: {
   items: CartItem[]
   onQuantityChange: (id: number, quantity: number, withPersianRice?: boolean) => void
   /** Resolved by checkout. Shown on phones, where the payment screen with the same figures is three
    *  steps away; on desktop the form's own totals are already beside the basket. */
   deliveryCost?: { fee: number | null; isLoading: boolean }
+  /** The checkout wizard's «مرحله ۱ از ۴», shown above the title on phones. */
+  stepCaption?: ReactNode
 }) {
   const [pendingEmptyItem, setPendingEmptyItem] = useState<CartItem | null>(null)
   const keepButton = useRef<HTMLButtonElement | null>(null)
@@ -50,6 +52,7 @@ export function CartSummary({ items, onQuantityChange, deliveryCost }: {
   }
 
   return <section className="panel">
+    {stepCaption}
     <h2 className="section-title">سبد خرید{items.length > 0 && <span className="cart-item-count">{formatNumber(items.length)} قلم</span>}</h2>
     {items.length === 0 && <p className="muted">سبد خرید شما خالی است.</p>}
     {/* A long basket used to push the total and the whole checkout form below the fold. The list

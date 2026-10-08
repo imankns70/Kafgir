@@ -1,5 +1,18 @@
 # Project state
 
+## 2026-10-08 — Mobile checkout wizard redesign
+
+- On phones each checkout step is a single card opening with «مرحله N از ۴» and the step title. The
+  page header («مرحله نهایی»/«ثبت سفارش»), the step trail and the signed-in identity card are
+  desktop-only; the identity card still shows on phones when it asks a Telegram customer to link a
+  phone. «ادامه خرید» moved into the cart step's bottom bar as a small secondary button beside the
+  primary action, and «مرحله قبل» uses the same compact style.
+- Delivery method is a two-button choice and payment methods are radio cards carrying their own
+  descriptions; the slot picker's duplicate «زمان تحویل» title is hidden inside the wizard. Desktop
+  checkout is unchanged.
+- `Icon` sizes SVGs through `style` instead of `width`/`height` attributes: Chromium 141 does not
+  resolve `var()` in SVG attributes, so icons stretched to fill their containers there.
+
 ## 2026-10-07 — Today's menu no longer depends on the monthly plan
 
 - «منوی امروز» in Electron Admin always shows an add form. Without a reserved row, the operator picks a

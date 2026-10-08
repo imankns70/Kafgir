@@ -1448,7 +1448,6 @@ select:disabled {
    children of their original grid — so the desktop layout is exactly what it was, and only the
    phone breakpoint turns the wrappers into something that can be hidden a step at a time. */
 .checkout-step-block { display: contents; }
-.checkout-steps,
 .checkout-wizard-actions { display: none; }
 /* The bar that carries the submit button is the exception: on desktop it dissolves so its button
    stays exactly where it was in the form. */
@@ -1460,62 +1459,6 @@ select:disabled {
   .checkout-page[data-wizard-step="delivery"] .checkout-step-block:not([data-step="delivery"]),
   .checkout-page[data-wizard-step="time"] .checkout-step-block:not([data-step="time"]),
   .checkout-page[data-wizard-step="payment"] .checkout-step-block:not([data-step="payment"]) { display: none; }
-
-  /* Chevrons rather than separate pills: each segment points left, the direction the customer is
-     travelling in an RTL page, so the bar reads as «here → next» instead of three equal tabs. The
-     row starts at the right edge, where the first step is. */
-  /* Labels with a small chevron between them, running right to left. Only the step the customer is
-     on is filled; the rest are plain text, so the bar reads as a trail rather than four coloured
-     blocks competing with the page. */
-  .checkout-steps {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    flex-wrap: nowrap;
-    gap: 0;
-    margin: 0 0 14px;
-    padding: 0;
-    list-style: none;
-  }
-  .checkout-step { display: flex; align-items: center; min-width: 0; }
-  /* A rotated corner, pointing the way the customer is travelling in an RTL page. */
-  .checkout-step + .checkout-step::before {
-    content: '';
-    flex: none;
-    width: 6px;
-    height: 6px;
-    margin-inline: 7px;
-    /* Bottom + inline-end borders rotated a quarter turn is the standard «‹»: in an RTL page that
-       points at the step the customer is heading for, not the one behind them. */
-    border-inline-end: 1.5px solid var(--kafgir-color-border-strong);
-    border-block-end: 1.5px solid var(--kafgir-color-border-strong);
-    transform: rotate(45deg);
-  }
-  .checkout-step > button {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    min-width: 0;
-    min-height: 30px;
-    border: 0;
-    border-radius: var(--kafgir-radius-pill);
-    padding: 4px 2px;
-    color: var(--kafgir-color-text-muted);
-    background: transparent;
-    font-size: var(--kafgir-type-caption);
-    font-weight: 700;
-  }
-  /* A finished step is the only one that can be tapped, so it is the only one that carries a tick. */
-  .checkout-step.is-done > button { color: var(--kafgir-color-primary); }
-  .checkout-step.is-current > button {
-    color: var(--kafgir-color-text-on-primary);
-    background: var(--kafgir-color-primary);
-    padding-inline: 10px;
-  }
-  .checkout-step-number { display: inline-grid; flex: none; place-items: center; font-size: .72rem; }
-  /* An upcoming step is a plain word: its number adds nothing the position does not already say. */
-  .checkout-step:not(.is-current):not(.is-done) .checkout-step-number { display: none; }
-  .checkout-step-title-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* The step's own action bar stays on the bottom edge of the screen, above the app's tab bar, so
      «ادامه» is reachable without scrolling to the end of a long step. */
@@ -1537,7 +1480,56 @@ select:disabled {
   .checkout-wizard-actions button { min-height: 46px; }
   .checkout-wizard-actions .full-width { grid-column: 1 / -1; }
   .checkout-submit-actions .full-width { grid-column: auto; }
-  .checkout-step-block[data-step="cart"] .checkout-wizard-actions { grid-template-columns: minmax(0, 1fr); }
+  /* «ادامه خرید» and «مرحله قبل» are the way out, not the way forward: smaller and quieter than the
+     primary action beside them. */
+  .checkout-wizard-actions .checkout-secondary-action { min-height: 40px; align-self: center; padding: 6px 12px; font-size: var(--kafgir-type-body-sm); }
+
+  /* Each step is one card that opens with where the customer is and what the step is for. */
+  .checkout-page { gap: 0; }
+  .checkout-step-caption {
+    display: block;
+    margin-block-end: 2px;
+    color: var(--kafgir-color-primary);
+    font-size: var(--kafgir-type-caption);
+    font-weight: 700;
+  }
+  .checkout-form { gap: 14px; }
+  .checkout-step-header .section-title { margin: 0; }
+  .checkout-form input[readonly] { color: var(--kafgir-color-text-secondary); background: var(--kafgir-color-background-secondary); }
+
+  /* Two-option choices read faster as buttons than as a select the customer has to open. */
+  .checkout-choice-group { display: grid; gap: 8px; min-width: 0; margin: 0; border: 0; padding: 0; }
+  .checkout-choice-group legend { margin-block-end: 6px; padding: 0; color: var(--kafgir-color-text-primary); font-size: var(--kafgir-type-body-sm); font-weight: 500; }
+  .checkout-choice-group label {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    border: 1px solid var(--kafgir-color-border);
+    border-radius: var(--kafgir-radius-md);
+    padding: 10px 12px;
+    color: var(--kafgir-color-text-primary);
+    background: var(--kafgir-color-surface-elevated);
+    cursor: pointer;
+    transition: border-color var(--kafgir-motion-fast) var(--kafgir-ease), background-color var(--kafgir-motion-fast) var(--kafgir-ease);
+  }
+  .checkout-choice-group label.is-selected { border-color: var(--kafgir-color-primary); background: var(--kafgir-color-primary-soft); box-shadow: inset 0 0 0 1px var(--kafgir-color-primary); }
+  .checkout-choice-group input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--kafgir-color-primary); }
+  .checkout-choice-group label:has(input:focus-visible) { outline: 3px solid var(--kafgir-color-focus); outline-offset: 2px; }
+  .checkout-segmented { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .checkout-segmented label { justify-content: center; font-weight: 700; }
+  .checkout-segmented input { position: absolute; opacity: 0; pointer-events: none; }
+  .checkout-segmented label svg { color: var(--kafgir-color-secondary); }
+  .checkout-segmented label.is-selected svg { color: var(--kafgir-color-primary); }
+  .checkout-choice-copy { display: grid; gap: 2px; min-width: 0; }
+  .checkout-choice-copy small { color: var(--kafgir-color-text-secondary); font-size: var(--kafgir-type-caption); line-height: 1.7; }
+
+  .checkout-note-field small { color: var(--kafgir-color-text-muted); font-weight: 400; }
+  .checkout-note-field textarea { min-height: 64px; }
+
+  /* The checkout already names the step; the window list does not need a second «زمان تحویل». */
+  .checkout-page .delivery-slot-title { display: none; }
 }
 
 /* Desktop keeps the single-page form exactly as it was, so the parts that exist only for the wizard —

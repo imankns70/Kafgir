@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react'
 import type { CartItem, OrderDto } from '../../types'
 import { CartSummary } from './CartSummary'
 import { CheckoutForm } from '../orders/CheckoutForm'
+import { CheckoutStepCaption } from '../orders/CheckoutStepCaption'
 import { ButtonLoading } from '../../design-system/ButtonLoading'
 import { Icon } from '../../design-system/Icon'
-import { formatNumber } from '../../utils/format'
 
 /**
  * Checkout is one page on desktop and a three-step wizard on phones, where the full page meant
@@ -14,13 +14,6 @@ import { formatNumber } from '../../utils/format'
  * because the controls that change it are hidden on wider screens.
  */
 export type CheckoutStep = 'cart' | 'delivery' | 'time' | 'payment'
-
-const allCheckoutSteps: { id: CheckoutStep; title: string }[] = [
-  { id: 'cart', title: 'سبد' },
-  { id: 'delivery', title: 'تحویل' },
-  { id: 'time', title: 'زمان' },
-  { id: 'payment', title: 'پرداخت' },
-]
 
 type Props = {
   items: CartItem[]
@@ -39,9 +32,7 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
   // The courier charge is fetched and interpreted by the checkout form; the cart step only displays
   // what the form resolved, so a phone customer sees the real cost before leaving the basket.
   const [deliveryCost, setDeliveryCost] = useState<{ fee: number | null; isLoading: boolean }>({ fee: null, isLoading: true })
-  const checkoutSteps = allCheckoutSteps
   const requiresAttention = !isChecking && (!isVerified || messages.length > 0)
-  const stepIndex = checkoutSteps.findIndex((candidate) => candidate.id === step)
 
   // A new step starts at its own beginning: without this the customer lands halfway down the next
   // step, at the scroll position the previous one ended on.
@@ -57,18 +48,10 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
 
 
   return <main className="checkout-page" data-wizard-step={step}>
-    <div className="page-actions"><div><span className="eyebrow"><Icon name="confirm" size="sm" /> مرحله نهایی</span><h1 className="section-title">ثبت سفارش</h1></div><button className="checkout-back-link" onClick={onBack}>ادامه خرید <Icon name="back" size="sm" /></button></div>
-    <ol className="checkout-steps" aria-label="مراحل ثبت سفارش">
-      {checkoutSteps.map((candidate, index) => <li key={candidate.id} className={`checkout-step ${index < stepIndex ? 'is-done' : ''} ${candidate.id === step ? 'is-current' : ''}`}>
-        {/* Only completed steps are reachable from here; moving forward goes through the step's own
-            button, which validates before it lets the customer past. */}
-        <button type="button" disabled={index >= stepIndex} aria-current={candidate.id === step ? 'step' : undefined}
-          onClick={() => setStep(candidate.id)}>
-          <span className="checkout-step-number" aria-hidden="true">{index < stepIndex ? <Icon name="confirm" size="xs" /> : formatNumber(index + 1)}</span>
-          <span className="checkout-step-title-text">{candidate.title}</span>
-        </button>
-      </li>)}
-    </ol>
+    {/* On a phone the step's card is the whole page: the page title, the shopping link and a step
+        trail only pushed the form down, so they are desktop-only and «ادامه خرید» lives in the
+        cart step's bottom bar instead. */}
+    <div className="page-actions checkout-desktop-only"><div><span className="eyebrow"><Icon name="confirm" size="sm" /> مرحله نهایی</span><h1 className="section-title">ثبت سفارش</h1></div><button className="checkout-back-link" onClick={onBack}>ادامه خرید <Icon name="back" size="sm" /></button></div>
     <div className="checkout-step-block" data-step="cart">
       {requiresAttention && <section className="cart-sync-panel has-warning" role="alert" aria-live="polite">
         <span className="cart-sync-icon"><Icon name="info" size="md" /></span>
@@ -80,9 +63,11 @@ export function CartPage({ items, messages, isChecking, isVerified, onRefresh, o
         </div>
         <button type="button" onClick={onRefresh} disabled={isChecking}>{isChecking ? <ButtonLoading label="در حال بررسی موجودی…" /> : <><Icon name="refresh" size="sm" /> به‌روزرسانی موجودی</>}</button>
       </section>}
-      <CartSummary items={items} onQuantityChange={onQuantityChange} deliveryCost={deliveryCost} />
+      <CartSummary items={items} onQuantityChange={onQuantityChange} deliveryCost={deliveryCost}
+        stepCaption={<CheckoutStepCaption index={0} />} />
       <div className="checkout-wizard-actions">
-        <button type="button" className="primary-button full-width" disabled={items.length === 0} onClick={() => setStep('delivery')}>
+        <button type="button" className="outline-button checkout-secondary-action" onClick={onBack}>ادامه خرید</button>
+        <button type="button" className="primary-button" disabled={items.length === 0} onClick={() => setStep('delivery')}>
           ادامه به اطلاعات تحویل <Icon name="back" size="sm" />
         </button>
       </div>
