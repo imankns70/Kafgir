@@ -48,7 +48,7 @@ export function PaymentsPage() {
   // The bucket filter runs in SQL. Filtering the loaded page instead would hide matching rows that
   // happen to sit on another page.
   const paged = useServerPagedGrid<CustomerPaymentDto, BucketFilters>(
-    ({ page, pageSize, bucket }) => adminApi.payments({ page, pageSize }, bucket === 'all' ? undefined : bucket),
+    ({ page, pageSize, bucket, search }) => adminApi.payments({ page, pageSize }, bucket === 'all' ? undefined : bucket, search),
     { bucket: 'all' },
   )
   const [totals, setTotals] = useState<Record<Bucket, { count: number; amount: number }> | null>(null)
@@ -188,6 +188,11 @@ export function PaymentsPage() {
         ['pending', 'در انتظار بررسی'], ['refunded', 'مستردشده']] as Array<[Bucket, string]>)
         .map(([key, label]) => <button type="button" key={key}
           className={filter === key ? 'active' : ''} onClick={() => applyFilter(key)}>{label}</button>)}
+      <label className="payment-order-search">
+        <span>شماره سفارش</span>
+        <input dir="ltr" placeholder="1405-482917" value={paged.filters.search ?? ''}
+          onChange={(event) => paged.setFilters({ search: event.target.value })} />
+      </label>
     </div>
 
     <section className="panel compact-grid-panel">

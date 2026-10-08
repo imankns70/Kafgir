@@ -12,6 +12,7 @@ import {
 } from '@kafgir/contracts'
 import type { PagedResult } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
+import { orderNumberSearchDigits } from '../domain/order-number'
 import { pagedResult, resolvePaging } from '../db/paginate'
 import { AppError, NotFoundError } from '../errors'
 import { logger } from '../logging/logger'
@@ -334,6 +335,8 @@ export async function listAdminOrderReviews(
   const from = query.from || null
   const to = query.to || null
   const search = query.search?.trim() || null
+  // The same text, reduced to digits, also finds an order number typed with Persian digits or no dash.
+  const searchDigits = orderNumberSearchDigits(search)
   const rows = await sqlClient<ReviewRow[]>`
     SELECT r.id, r.order_id AS "orderId", o.order_number AS "orderNumber",
            r.customer_profile_id AS "customerProfileId", cp.preferred_name AS "customerName",
@@ -351,6 +354,8 @@ export async function listAdminOrderReviews(
       AND (${to}::date IS NULL OR r.created_at < (${to}::date + 1))
       AND (${search}::text IS NULL
            OR o.order_number ILIKE '%'||${search}||'%'
+           OR (${searchDigits}::text IS NOT NULL
+               AND regexp_replace(o.order_number, '[^0-9]', '', 'g') LIKE '%'||${searchDigits}||'%')
            OR cp.preferred_name ILIKE '%'||${search}||'%'
            OR cp.default_phone_number ILIKE '%'||${search}||'%')
     ORDER BY (r.handling_status = ${OrderReviewHandlingStatus.New}) DESC, r.rating ASC,

@@ -9,6 +9,9 @@
   add-on into its dish; customer order summaries return structured `foodItems` for this.
 - New order numbers are `<Persian year>-<six random digits>` (e.g. `1405-482917`) instead of a
   running counter that exposed order volume. Existing orders keep their old numbers.
+- Admin finds orders by number in «سفارش‌ها», the full report, «پرداخت‌های سفارش» (new search box) and
+  customer-review handling. Input is reduced to digits, so Persian digits, a missing dash or just
+  the six-digit part all match; a number search ignores the report's date and covers every day.
 
 ## 2026-10-08 — Order success page and active-order pill spacing
 

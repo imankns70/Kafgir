@@ -312,6 +312,7 @@ export async function dispatchAdminOperation(
         typeof body.bucket === 'string' ? body.bucket as PaymentBucket : undefined,
         body.page == null ? undefined : Number(body.page),
         body.pageSize == null ? undefined : Number(body.pageSize),
+        typeof body.search === 'string' ? body.search : null,
       )
     case 'payments.totals': return paymentBucketTotals()
     case 'payments.create':

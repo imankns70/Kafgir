@@ -28,7 +28,7 @@ import {
 } from '../domain/courier-rules'
 import { logger } from '../logging/logger'
 import { formatTelegramOrderInvoice } from '../domain/order-invoice'
-import { generateOrderNumber } from '../domain/order-number'
+import { generateOrderNumber, orderNumberSearchDigits } from '../domain/order-number'
 import { formatToman } from '../domain/money'
 
 const defaultCity = 'اندیمشک'
@@ -608,7 +608,7 @@ async function searchOrderRows(
   const status = query.status ?? null
   const deliveryMethod = query.deliveryMethod ?? null
   const paymentMethod = query.paymentMethod ?? null
-  const orderNumber = optionalText(query.orderNumber)
+  const orderNumber = orderNumberSearchDigits(query.orderNumber)
   const customerName = optionalText(query.customerName)
   const phoneNumber = optionalText(query.phoneNumber)
   const foodName = optionalText(query.foodName)
@@ -643,12 +643,16 @@ async function searchOrderRows(
            COUNT(*) OVER ()::int AS "totalCount"
     FROM orders o
     LEFT JOIN order_items oi ON oi.order_id = o.id
-    WHERE o.created_at >= (${query.date}::date AT TIME ZONE 'Asia/Tehran')
-      AND o.created_at < ((${query.date}::date + 1) AT TIME ZONE 'Asia/Tehran')
+    -- Looking an order up by its number is a search across every day: the operator has the number
+    -- in hand (from a customer or a receipt) and should not first have to know the order's date.
+    WHERE (${orderNumber}::text IS NOT NULL OR (
+        o.created_at >= (${query.date}::date AT TIME ZONE 'Asia/Tehran')
+        AND o.created_at < ((${query.date}::date + 1) AT TIME ZONE 'Asia/Tehran')
+      ))
       AND (${status}::int IS NULL OR o.status = ${status})
       AND (${deliveryMethod}::int IS NULL OR o.delivery_method = ${deliveryMethod})
       AND (${paymentMethod}::int IS NULL OR o.payment_method = ${paymentMethod})
-      AND (${orderNumber}::text IS NULL OR o.order_number ILIKE '%' || ${orderNumber} || '%')
+      AND (${orderNumber}::text IS NULL OR regexp_replace(o.order_number, '[^0-9]', '', 'g') LIKE '%' || ${orderNumber} || '%')
       AND (${customerName}::text IS NULL OR o.delivery_full_name ILIKE '%' || ${customerName} || '%')
       AND (${phoneNumber}::text IS NULL OR o.delivery_phone_number ILIKE '%' || ${phoneNumber} || '%')
       AND (${foodName}::text IS NULL OR EXISTS (

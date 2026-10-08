@@ -147,7 +147,7 @@ const directOperation = (
     // Paginated reads carry their filters and paging in the query string; the generic branch below
     // discards them, which would silently return page 1 forever.
     if (operation === 'payments.list') {
-      return { operation, payload: { bucket: params.get('bucket') || undefined, ...pageParams(params) } }
+      return { operation, payload: { bucket: params.get('bucket') || undefined, search: params.get('search') || undefined, ...pageParams(params) } }
     }
     return { operation, payload: body === undefined ? undefined : { value: body } }
   }
@@ -383,8 +383,8 @@ export const adminApi = {
   months: () => socialInvoke<MonthListItemDto[]>('months.list'),
   month: (year: number, month: number) =>
     socialInvoke<MonthlyReportDto>('months.get', { year, month }),
-  payments: (paging?: PageRequest, bucket?: string) =>
-    request<PagedResult<CustomerPaymentDto>>(`/api/admin/payments?${pageQuery(paging, { bucket })}`),
+  payments: (paging?: PageRequest, bucket?: string, search?: string | null) =>
+    request<PagedResult<CustomerPaymentDto>>(`/api/admin/payments?${pageQuery(paging, { bucket, search: search || undefined })}`),
   /** Totals across every payment, so the metric cards do not count only the visible page. */
   paymentTotals: () => socialInvoke<Record<
     'all' | 'successful' | 'failed' | 'pending' | 'refunded', { count: number; amount: number }

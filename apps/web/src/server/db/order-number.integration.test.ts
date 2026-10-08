@@ -7,6 +7,7 @@ import {
   generateOrderNumber,
   orderNumberPattern,
   persianBusinessYear,
+  searchOrders,
 } from '@kafgir/server-core'
 import postgres from 'postgres'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
@@ -184,6 +185,21 @@ integration.sequential('order number generation', () => {
 
     expect(new Set(created).size).toBe(8)
     for (const value of created) expect(value).toMatch(orderNumberPattern)
+  })
+
+  it('lets admin find an order by any typing of its number, on any day', async () => {
+    const orderNumber = await placeOrder()
+    const suffix = orderNumber.slice(year.length + 1)
+    const persian = orderNumber.replace(/\d/g, (digit) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]!)
+    // A date the order was not placed on: a number search must not be limited to the report's day.
+    const otherDay = '2000-01-01'
+    for (const typed of [orderNumber, persian, orderNumber.replace('-', ''), suffix]) {
+      const found = await searchOrders({ date: otherDay, orderNumber: typed })
+      expect(found.map((row) => row.orderNumber)).toContain(orderNumber)
+    }
+    // Without a number the date still applies.
+    const sameDayOnly = await searchOrders({ date: otherDay })
+    expect(sameDayOnly.map((row) => row.orderNumber)).not.toContain(orderNumber)
   })
 
   it('keeps every order number unique in the table', async () => {

@@ -6,6 +6,7 @@ import type {
 } from '@kafgir/contracts'
 import { OrderStatus, PaymentStatus } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
+import { orderNumberSearchDigits } from '../domain/order-number'
 import { pagedResult, resolvePaging } from '../db/paginate'
 import { AppError, NotFoundError } from '../errors'
 import { isAllowedPaymentTransition } from '../domain/payment-rules'
@@ -149,13 +150,16 @@ export async function listPayments(
   bucket: PaymentBucket = 'all',
   page?: number,
   pageSize?: number,
+  search?: string | null,
 ): Promise<PagedResult<CustomerPaymentDto>> {
   const paging = resolvePaging(page, pageSize)
+  const orderNumber = orderNumberSearchDigits(search)
   const rows = await sqlClient<Array<PaymentRow & { totalCount: number }>>`
     SELECT ${paymentColumns}, COUNT(*) OVER ()::int AS "totalCount"
     FROM payments p
     JOIN orders o ON o.id = p.order_id
     WHERE ${bucketFilter(bucket)}
+      AND (${orderNumber}::text IS NULL OR regexp_replace(o.order_number, '[^0-9]', '', 'g') LIKE '%' || ${orderNumber} || '%')
     ORDER BY p.created_at DESC, p.id DESC
     LIMIT ${paging.limit} OFFSET ${paging.offset}
   `

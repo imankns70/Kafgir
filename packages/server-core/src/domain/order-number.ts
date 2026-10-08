@@ -37,3 +37,18 @@ export async function generateOrderNumber(
   }
   throw new Error(`No free order number for ${year} after ${maxAttempts} attempts.`)
 }
+
+/**
+ * The digits an operator typed to find an order, for matching against the order number's digits.
+ * Persian and Arabic-Indic digits become Latin and everything else (the dash, `#`, spaces) is
+ * dropped, so `۱۴۰۵-۴۸۲۹۱۷`, `1405482917` and `482917` all find `1405-482917`. Null when nothing
+ * searchable remains.
+ */
+export function orderNumberSearchDigits(input: string | null | undefined): string | null {
+  if (!input) return null
+  const digits = input
+    .replace(/[۰-۹]/g, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)))
+    .replace(/\D/g, '')
+  return digits || null
+}

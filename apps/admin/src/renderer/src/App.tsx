@@ -708,7 +708,7 @@ function OrdersPage() {
         <form className="toolbar order-filters" onSubmit={search}>
           <label>وضعیت<select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">همه وضعیت‌ها</option>
             {Object.entries(statusLabel).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-          <label>شماره سفارش<input dir="ltr" value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} /></label>
+          <label title="شماره را کامل یا بخشی از آن وارد کنید؛ جست‌وجو همه روزها را می‌گردد.">شماره سفارش<input dir="ltr" placeholder="1405-482917" value={orderNumber} onChange={(event) => setOrderNumber(event.target.value)} /></label>
           <button className="primary" disabled={busy}>{busy ? 'در حال دریافت…' : 'جستجو'}</button>
         </form>
         <div className="panel table-panel orders-table-panel">
@@ -1891,7 +1891,7 @@ function ReportPage() {
       <DateField label="تاریخ" value={query.date}
         onChange={(date) => setQuery({ ...query, date })} />
       <label>وضعیت<select value={query.status ?? ''} onChange={(event) => setQuery({ ...query, status: event.target.value ? Number(event.target.value) as OrderStatus : undefined })}><option value="">همه وضعیت‌ها</option>{Object.entries(statusLabel).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-      <label>شماره سفارش<input value={query.orderNumber ?? ''} onChange={(event) => setQuery({ ...query, orderNumber: event.target.value })} /></label>
+      <label title="جست‌وجو با شماره سفارش، تاریخ را نادیده می‌گیرد و همه روزها را می‌گردد.">شماره سفارش<input dir="ltr" placeholder="1405-482917" value={query.orderNumber ?? ''} onChange={(event) => setQuery({ ...query, orderNumber: event.target.value })} /></label>
       <label>نام مشتری<input value={query.customerName ?? ''} onChange={(event) => setQuery({ ...query, customerName: event.target.value })} /></label>
       <label>شماره تماس<input dir="ltr" value={query.phoneNumber ?? ''} onChange={(event) => setQuery({ ...query, phoneNumber: event.target.value })} /></label>
       <label>نوع دریافت<select value={query.deliveryMethod ?? ''} onChange={(event) => setQuery({ ...query, deliveryMethod: event.target.value ? Number(event.target.value) as DeliveryMethod : undefined })}><option value="">همه روش‌ها</option><option value={DeliveryMethod.Pickup}>حضوری</option><option value={DeliveryMethod.Delivery}>ارسال</option></select></label>
