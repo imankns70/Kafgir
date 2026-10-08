@@ -961,7 +961,7 @@ select:disabled {
 
 /* The courier charge next to the basket total: on a phone the payment screen carrying the same
    figures is three steps away, and «جمع اقلام» alone reads as the amount to pay. */
-.cart-delivery-cost { display: grid; gap: 6px; margin-block-start: 8px; padding: 0 4px; font-size: var(--kafgir-type-body-sm); }
+.cart-delivery-cost { display: grid; gap: 6px; margin-block-start: 12px; border-block-start: 1px dashed var(--kafgir-color-border-strong); padding: 10px 4px 0; font-size: var(--kafgir-type-body-sm); }
 .cart-delivery-cost > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--kafgir-color-text-secondary); }
 .cart-delivery-cost strong { color: var(--kafgir-color-text-primary); }
 .cart-delivery-cost-final { padding-block-start: 6px; border-block-start: 1px dashed var(--kafgir-color-border); }

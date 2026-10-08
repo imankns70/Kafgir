@@ -104,8 +104,11 @@ export function CartSummary({ items, onQuantityChange, deliveryCost, stepCaption
       </div>
     })}
     </div>
-    <div className="cart-total"><span>جمع اقلام قابل سفارش</span><span>{formatMoney(total)}</span></div>
+    {/* On phones the food total joins the courier charge and final amount as one plain list, instead
+        of a highlighted box above two lighter rows. */}
+    <div className={`cart-total${deliveryCost && items.length > 0 ? ' checkout-desktop-only' : ''}`}><span>جمع اقلام قابل سفارش</span><span>{formatMoney(total)}</span></div>
     {deliveryCost && items.length > 0 && <div className="cart-delivery-cost checkout-mobile-only">
+      <div><span>جمع غذاها</span><strong>{formatMoney(total)}</strong></div>
       <div><span>هزینه پیک</span><strong>{deliveryCost.isLoading
         ? 'در حال محاسبه…'
         : deliveryCost.fee === null ? 'هنوز مشخص نشده' : formatMoney(deliveryCost.fee)}</strong></div>
