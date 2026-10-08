@@ -32,6 +32,10 @@ export function useBottomSheetDrag({ isOpen, onClose }: { isOpen: boolean; onClo
   const viewport = () => (typeof window === 'undefined' ? 0 : window.innerHeight)
 
   const onPointerDown = useCallback((event: PointerEvent<HTMLElement>) => {
+    // A press on a control inside the drag area (the header's close button) is that control's, not a
+    // drag: capturing the pointer here would swallow its click, so the sheet could not be closed.
+    const control = (event.target as HTMLElement).closest('button, a, input, textarea, select')
+    if (control && control !== event.currentTarget) return
     const sheet = event.currentTarget.closest<HTMLElement>('[data-sheet]')
     if (!sheet) return
     dragStart.current = { y: event.clientY, height: sheet.getBoundingClientRect().height }

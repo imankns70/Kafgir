@@ -21,15 +21,23 @@ import type { CartItem, DailyMenuItemDto, OrderDto, PublicDailyMenuPageDto, Pers
 
 type Page = 'menu' | 'plan' | 'cart' | 'profile' | 'contact' | 'success'
 
+const requestedPage = () => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('page')
+
 const initialPage = (): Page => {
-  if (typeof window === 'undefined') return 'menu'
-  return new URLSearchParams(window.location.search).get('page') === 'cart' ? 'cart' : 'menu'
+  const requested = requestedPage()
+  if (requested === 'cart') return 'cart'
+  // Links from outside the app shell (the active-order sheet on a food page) land on these.
+  if (requested === 'orders') return 'profile'
+  if (requested === 'contact') return 'contact'
+  return 'menu'
 }
 
 function App() {
   const [page, setPage] = useState<Page>(initialPage)
-  const [profileSection, setProfileSection] = useState<AccountSection>('home')
-  const openAccount = () => { setProfileSection('home'); setPage('profile') }
+  const [profileSection, setProfileSection] = useState<AccountSection>(() => requestedPage() === 'orders' ? 'orders' : 'home')
+  // Bumped on every explicit visit so the account remounts on the requested section.
+  const [profileVisit, setProfileVisit] = useState(0)
+  const openAccount = () => { setProfileSection('home'); setProfileVisit((visit) => visit + 1); setPage('profile') }
   const [menu, setMenu] = useState<PublicDailyMenuPageDto | null>(null)
   const [cart, setCart] = useState<CartItem[]>([])
   const [isCartHydrated, setIsCartHydrated] = useState(false)
@@ -90,6 +98,18 @@ function App() {
   }
 
   useEffect(() => { void loadMenu() }, [])
+
+  // The active-order sheet lives outside this component; it asks for a page with a cancelable event
+  // and falls back to a full navigation when nothing handled it.
+  useEffect(() => {
+    const navigate = (event: Event) => {
+      const target = (event as CustomEvent<string>).detail
+      if (target === 'orders') { event.preventDefault(); setProfileSection('orders'); setProfileVisit((visit) => visit + 1); setPage('profile') }
+      if (target === 'contact') { event.preventDefault(); setPage('contact') }
+    }
+    window.addEventListener('kafgir:navigate', navigate)
+    return () => window.removeEventListener('kafgir:navigate', navigate)
+  }, [])
 
   useEffect(() => {
     let isActive = true
@@ -272,7 +292,7 @@ function App() {
         <OrderSuccess order={order} onBack={() => { setOrder(null); setPage('menu') }} onTrack={() => { setOrder(null); setProfileSection('orders'); setPage('profile') }} />
       )}
       {page === 'plan' && <MenuPlanPage onBack={() => setPage('menu')} onOpenToday={() => setPage('menu')} />}
-      {page === 'profile' && <ProfilePage key={profileSection} initialSection={profileSection} onBack={() => setPage('menu')} onContact={() => setPage('contact')} onAuthenticationChange={setIsCustomerAuthenticated} />}
+      {page === 'profile' && <ProfilePage key={`${profileSection}-${profileVisit}`} initialSection={profileSection} onBack={() => setPage('menu')} onContact={() => setPage('contact')} onAuthenticationChange={setIsCustomerAuthenticated} />}
       {page === 'contact' && <ContactPage onBack={() => setPage('menu')} onAccount={openAccount} />}
 
       {page !== 'success' && (

@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { OrderItemList } from './ActiveOrderTracker'
+import { formatSinceUpdate, OrderItemList } from './ActiveOrderTracker'
 import type { CustomerOrderSummaryDto } from './types'
 
 const order = (foodItems: CustomerOrderSummaryDto['foodItems']) => ({
@@ -32,5 +32,14 @@ describe('active order item list', () => {
 
   it('falls back to the summary text when no item rows came back', () => {
     expect(renderToStaticMarkup(createElement(OrderItemList, { order: order([]) }))).toContain('fallback')
+  })
+})
+
+describe('active order freshness', () => {
+  it('says how long ago the status changed', () => {
+    const now = new Date('2026-10-08T10:00:00.000Z').getTime()
+    expect(formatSinceUpdate('2026-10-08T09:59:40.000Z', now)).toBe('همین الان')
+    expect(formatSinceUpdate('2026-10-08T09:55:00.000Z', now)).toBe('5 دقیقه پیش')
+    expect(formatSinceUpdate('2026-10-08T07:30:00.000Z', now)).toBe('2 ساعت پیش')
   })
 })

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { buildInvoiceOrderLines } from '@kafgir/contracts'
-import { Icon } from './design-system/Icon'
+import { Icon, type IconName } from './design-system/Icon'
 import { useBottomSheetDrag } from './design-system/useBottomSheetDrag'
 import {
   confirmCustomerOrderDelivered,
@@ -26,23 +26,56 @@ const steps = [
   { status: OrderStatus.Ready, label: 'آماده تحویل' },
 ] as const
 
-const statusCopy: Partial<Record<OrderStatus, { title: string; description: string }>> = {
+type StatusLook = { title: string; description: string; icon: IconName; tone: 'waiting' | 'confirmed' | 'cooking' | 'ready' }
+
+const statusCopy: Partial<Record<OrderStatus, StatusLook>> = {
   [OrderStatus.PendingConfirmation]: {
     title: 'در انتظار تأیید',
     description: 'سفارشت ثبت شده و منتظر تأیید آشپزخانه است.',
+    icon: 'clock',
+    tone: 'waiting',
   },
   [OrderStatus.Confirmed]: {
     title: 'سفارش تأیید شد',
     description: 'سفارش تأیید شده و در صف آماده‌سازی قرار دارد.',
+    icon: 'confirm',
+    tone: 'confirmed',
   },
   [OrderStatus.Preparing]: {
     title: 'در حال آماده‌سازی',
     description: 'غذای شما در آشپزخانه در حال آماده‌شدن است.',
+    icon: 'kitchen',
+    tone: 'cooking',
   },
   [OrderStatus.Ready]: {
     title: 'آماده تحویل',
     description: 'سفارش آماده است. بعد از دریافت، تحویل را همین‌جا تأیید کنید.',
+    icon: 'packaging',
+    tone: 'ready',
   },
+}
+
+const lookFor = (status: OrderStatus): StatusLook => statusCopy[status] ?? statusCopy[OrderStatus.PendingConfirmation]!
+
+/** «همین الان», «۵ دقیقه پیش», «۲ ساعت پیش» — a status is read for how fresh it is, not its clock time. */
+export function formatSinceUpdate(value: string, now = Date.now()): string {
+  const minutes = Math.max(0, Math.round((now - new Date(value).getTime()) / 60_000))
+  if (minutes < 1) return 'همین الان'
+  if (minutes < 60) return `${formatNumber(minutes)} دقیقه پیش`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${formatNumber(hours)} ساعت پیش`
+  return formatPersianDateTime(value)
+}
+
+function deliveryWindowOf(order: CustomerOrderSummaryDto) {
+  if (order.deliveryStartTime && order.deliveryEndTime) return `${order.deliveryStartTime} تا ${order.deliveryEndTime}`
+  return null
+}
+
+/** Asks the app shell for one of its pages; a page outside the shell (a food page) navigates instead. */
+function openAppPage(page: 'orders' | 'contact') {
+  const handled = !window.dispatchEvent(new CustomEvent('kafgir:navigate', { detail: page, cancelable: true }))
+  if (!handled) window.location.assign(`/?page=${page}`)
 }
 
 function activeStepIndex(status: OrderStatus) {
@@ -218,7 +251,6 @@ export function ActiveOrderTracker() {
     return () => document.documentElement.classList.remove('has-active-order-pill')
   }, [showsPill])
   const primaryIndex = primaryOrder ? activeStepIndex(primaryOrder.status) : 0
-  const primaryProgress = ((primaryIndex + 1) / steps.length) * 100
 
   const confirmDelivery = async (order: CustomerOrderSummaryDto) => {
     if (confirmingId != null) return
@@ -249,16 +281,14 @@ export function ActiveOrderTracker() {
     return notice ? <div className="active-order-toast" role="status"><Icon name="confirm" size="sm" /> {notice}</div> : null
   }
 
-  const primaryCopy = statusCopy[primaryOrder.status] ?? statusCopy[OrderStatus.PendingConfirmation]!
-  const selectedCopy = selectedOrder
-    ? statusCopy[selectedOrder.status] ?? statusCopy[OrderStatus.PendingConfirmation]!
-    : primaryCopy
+  const primaryLook = lookFor(primaryOrder.status)
+  const selectedLook = selectedOrder ? lookFor(selectedOrder.status) : primaryLook
   const selectedIndex = selectedOrder ? activeStepIndex(selectedOrder.status) : 0
-  const deliveryWindow = selectedOrder?.deliveryTimeSlotTitle
-    ? `${selectedOrder.deliveryTimeSlotTitle}${selectedOrder.deliveryStartTime && selectedOrder.deliveryEndTime
-      ? `، ${selectedOrder.deliveryStartTime} تا ${selectedOrder.deliveryEndTime}`
-      : ''}`
-    : null
+  const selectedWindow = selectedOrder ? deliveryWindowOf(selectedOrder) : null
+  const primaryWindow = deliveryWindowOf(primaryOrder)
+  const readyCount = orders.filter((order) => order.status === OrderStatus.Ready).length
+  const multiple = orders.length > 1
+  const pillLook = multiple && readyCount > 0 ? lookFor(OrderStatus.Ready) : primaryLook
 
   return <>
     {notice && <div className="active-order-toast" role="status"><Icon name="confirm" size="sm" /> {notice}</div>}
@@ -266,90 +296,94 @@ export function ActiveOrderTracker() {
     <aside className="active-order-tracker-root" aria-live="polite">
       <button
         type="button"
-        className="active-order-pill"
+        className={`active-order-pill tone-${pillLook.tone}`}
         onClick={() => {
           setSelectedOrderId((current) => current ?? primaryOrder.id)
           setActionError(null)
           setExpanded(true)
         }}
-        aria-label={orders.length > 1
-          ? `${formatNumber(orders.length)} سفارش جاری؛ مشاهده وضعیت`
-          : `سفارش جاری ${primaryOrder.orderNumber}؛ ${primaryCopy.title}. مشاهده وضعیت`}
+        aria-label={multiple
+          ? `${formatNumber(orders.length)} سفارش در جریان؛ مشاهده وضعیت`
+          : `سفارش ${primaryOrder.orderNumber}؛ ${primaryLook.title}. مشاهده وضعیت`}
       >
-        <span className="active-order-pill-icon" aria-hidden="true"><Icon name="orders" size="sm" /></span>
+        <span className="active-order-pill-icon" aria-hidden="true"><Icon name={pillLook.icon} size="md" /></span>
         <span className="active-order-pill-copy">
-          <small>{orders.length > 1
-            ? `${formatNumber(orders.length)} سفارش جاری`
-            : `سفارش #${formatNumber(primaryOrder.orderNumber)}`}</small>
-          <strong>{orders.length > 1 ? 'مشاهده وضعیت سفارش‌ها' : primaryCopy.title}</strong>
-          <span className="active-order-mini-progress" aria-hidden="true"><i style={{ width: `${primaryProgress}%` }} /></span>
+          <strong>{multiple ? `${formatNumber(orders.length)} سفارش در جریان` : primaryLook.title}</strong>
+          <small>{multiple
+            ? readyCount > 0 ? `${formatNumber(readyCount)} سفارش آماده تحویل است` : 'برای دیدن وضعیت هر سفارش بزنید'
+            : <><bdi dir="ltr">#{primaryOrder.orderNumber}</bdi>{primaryWindow && <> · تحویل {primaryWindow}</>}</>}</small>
+          {!multiple && <span className="active-order-pill-steps" aria-hidden="true">
+            {steps.map((step, index) => <i key={step.status} className={index < primaryIndex ? 'done' : index === primaryIndex ? 'now' : ''} />)}
+          </span>}
         </span>
-        <span className="active-order-pill-action">پیگیری <Icon name="back" size="xs" /></span>
+        <span className="active-order-pill-open" aria-hidden="true"><Icon name="back" size="sm" /></span>
       </button>
     </aside>
 
     {expanded && selectedOrder && <>
       <button type="button" className="active-order-sheet-backdrop" aria-label="بستن وضعیت سفارش" onClick={() => setExpanded(false)} />
-      <section className="active-order-sheet" role="dialog" aria-modal="true" aria-labelledby="active-order-title" {...sheetProps}>
+      <section className={`active-order-sheet tone-${selectedLook.tone}`} role="dialog" aria-modal="true" aria-labelledby="active-order-title" {...sheetProps}>
         {/* The grip is the drag target: pull up to enlarge, down to shrink, further down to close.
             A plain tap toggles the two sizes for anyone who cannot drag. */}
         <button type="button" className="active-order-sheet-handle" aria-label="تغییر اندازه پنجره سفارش" {...gripProps} />
         <header className="active-order-sheet-header" onPointerDown={gripProps.onPointerDown} onPointerMove={gripProps.onPointerMove} onPointerUp={gripProps.onPointerUp} onPointerCancel={gripProps.onPointerCancel}>
           <div>
-            <span>{orders.length > 1 ? 'سفارش‌های در جریان' : 'سفارش جاری'}</span>
-            <h2 id="active-order-title">{orders.length > 1
-              ? `${formatNumber(orders.length)} سفارش فعال`
-              : <><bdi>#{formatNumber(selectedOrder.orderNumber)}</bdi> · {selectedCopy.title}</>}</h2>
+            <span>{multiple ? `${formatNumber(orders.length)} سفارش در جریان` : 'سفارش در جریان'}</span>
+            <h2 id="active-order-title"><bdi dir="ltr">#{selectedOrder.orderNumber}</bdi></h2>
           </div>
-          <button type="button" className="active-order-sheet-close" aria-label="بستن" onClick={() => setExpanded(false)}>×</button>
+          <button type="button" className="active-order-sheet-close" aria-label="بستن" onClick={() => setExpanded(false)}><Icon name="cancel" size="sm" /></button>
         </header>
 
-        {orders.length > 1 && <div className="active-order-list" aria-label="فهرست سفارش‌های جاری">
+        {multiple && <div className="active-order-tabs" role="tablist" aria-label="سفارش‌های در جریان">
           {orders.map((order) => {
-            const copy = statusCopy[order.status] ?? statusCopy[OrderStatus.PendingConfirmation]!
-            const index = activeStepIndex(order.status)
-            return <button key={order.id} type="button"
-              className={`active-order-list-item ${order.id === selectedOrder.id ? 'selected' : ''}`}
+            const look = lookFor(order.status)
+            return <button key={order.id} type="button" role="tab" aria-selected={order.id === selectedOrder.id}
+              className={`active-order-tab tone-${look.tone}${order.id === selectedOrder.id ? ' selected' : ''}`}
               onClick={() => {
                 setSelectedOrderId(order.id)
                 setDeliveryConfirmId(null)
                 setActionError(null)
               }}>
-              <span className="active-order-list-main">
-                <strong><bdi>#{formatNumber(order.orderNumber)}</bdi></strong>
-                <small>{copy.title}</small>
-              </span>
-              <span className="active-order-list-foods">{order.foodSummary || 'سفارش ثبت‌شده'}</span>
-              <span className="active-order-list-progress" aria-hidden="true"><i style={{ width: `${((index + 1) / steps.length) * 100}%` }} /></span>
+              <i aria-hidden="true" />
+              <span><bdi dir="ltr">#{order.orderNumber.split('-').pop()}</bdi><small>{look.title}</small></span>
             </button>
           })}
         </div>}
 
-        <div className="active-order-current-state">
-          <span className="active-order-state-icon" aria-hidden="true"><Icon name="orders" size="lg" /></span>
+        <div className={`active-order-hero tone-${selectedLook.tone}`}>
+          <span className="active-order-hero-icon" aria-hidden="true"><Icon name={selectedLook.icon} size="lg" /></span>
           <div>
-            <strong>{selectedCopy.title}</strong>
-            <p>{selectedCopy.description}</p>
-            <time>آخرین به‌روزرسانی: {formatPersianDateTime(orderLastUpdate(selectedOrder))}</time>
+            <strong>{selectedLook.title}</strong>
+            <p>{selectedLook.description}</p>
+            <time dateTime={orderLastUpdate(selectedOrder)}>به‌روزرسانی {formatSinceUpdate(orderLastUpdate(selectedOrder))}</time>
           </div>
         </div>
 
-        <ol className="active-order-steps" aria-label="مراحل سفارش">
+        <ol className="active-order-track" aria-label="مراحل سفارش">
           {steps.map((step, index) => {
-            const reached = index <= selectedIndex
+            const done = index < selectedIndex
             const current = index === selectedIndex
-            return <li key={step.status} className={`${reached ? 'reached' : ''} ${current ? 'current' : ''}`} aria-current={current ? 'step' : undefined}>
-              <span className="active-order-step-dot">{index < selectedIndex ? '✓' : current ? '●' : '○'}</span>
+            return <li key={step.status} className={`${done ? 'done' : ''}${current ? ' now' : ''}`} aria-current={current ? 'step' : undefined}>
+              <span className="active-order-track-bar" aria-hidden="true" />
               <small>{step.label}</small>
             </li>
           })}
         </ol>
 
-        <div className="active-order-sheet-summary">
-          <div><span className="active-order-summary-icon"><Icon name="orders" size="sm" /></span><div><small>اقلام سفارش</small><OrderItemList order={selectedOrder} /></div></div>
-          {deliveryWindow && <div><span className="active-order-summary-icon"><Icon name="clock" size="sm" /></span><p><small>زمان تحویل</small><strong>{deliveryWindow}</strong></p></div>}
-          <div><span className="active-order-summary-icon"><Icon name="location" size="sm" /></span><p><small>نشانی تحویل</small><strong>{selectedOrder.deliveryCity}، {selectedOrder.addressLine}</strong></p></div>
-        </div>
+        {selectedWindow && <div className="active-order-window">
+          <Icon name="clock" size="md" />
+          <div><small>زمان تحویل{selectedOrder.deliveryTimeSlotTitle ? ` · ${selectedOrder.deliveryTimeSlotTitle}` : ''}</small><strong>{selectedWindow}</strong></div>
+        </div>}
+
+        <section className="active-order-block" aria-label="اقلام سفارش">
+          <h3><Icon name="food" size="sm" /> اقلام سفارش</h3>
+          <OrderItemList order={selectedOrder} />
+        </section>
+
+        <section className="active-order-block" aria-label="نشانی تحویل">
+          <h3><Icon name="location" size="sm" /> نشانی تحویل</h3>
+          <p>{selectedOrder.deliveryCity}، {selectedOrder.addressLine}</p>
+        </section>
 
         {selectedOrder.status === OrderStatus.Ready && <div className="active-order-delivery-action">
           {deliveryConfirmId === selectedOrder.id
@@ -366,12 +400,17 @@ export function ActiveOrderTracker() {
               </div>
             : <button type="button" className="primary-button active-order-received-button"
                 onClick={() => { setActionError(null); setDeliveryConfirmId(selectedOrder.id) }}>
-                <Icon name="confirm" size="sm" /> تحویل گرفتم
+                <Icon name="confirm" size="sm" /> سفارش را تحویل گرفتم
               </button>}
         </div>}
 
         {actionError && <div className="active-order-action-error" role="alert">{actionError}</div>}
-        <p className="active-order-sheet-note">این پنجره تا زمان تحویل یا لغو سفارش روی موبایل در دسترس می‌ماند و وضعیت آن خودکار به‌روزرسانی می‌شود.</p>
+
+        <div className="active-order-links">
+          <button type="button" onClick={() => { setExpanded(false); openAppPage('orders') }}><Icon name="orders" size="sm" /> جزئیات کامل</button>
+          <button type="button" onClick={() => { setExpanded(false); openAppPage('contact') }}><Icon name="support" size="sm" /> پشتیبانی</button>
+        </div>
+        <p className="active-order-sheet-note"><span aria-hidden="true" /> وضعیت خودکار به‌روز می‌شود تا سفارش تحویل یا لغو شود.</p>
       </section>
     </>}
   </>
