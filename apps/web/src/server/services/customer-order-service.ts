@@ -60,6 +60,11 @@ export async function listCustomerOrderCards(
            o.delivery_address_line AS "addressLine", o.created_at AS "createdAt",
            COALESCE(SUM(oi.quantity), 0)::int AS "totalQuantity",
            COALESCE(string_agg(oi.food_name || ' × ' || oi.quantity, '، ' ORDER BY oi.id), '') AS "foodSummary",
+           COALESCE(jsonb_agg(jsonb_build_object(
+             'id', oi.id, 'dailyMenuItemId', oi.daily_menu_item_id, 'foodName', oi.food_name,
+             'allowsPersianRice', f.allows_persian_rice, 'isPersianRice', f.is_persian_rice,
+             'unitPrice', oi.unit_price::float8, 'quantity', oi.quantity, 'totalPrice', oi.total_price::float8
+           ) ORDER BY oi.id) FILTER (WHERE oi.id IS NOT NULL), '[]'::jsonb) AS "foodItems",
            o.delivery_date::text AS "deliveryDate",
            o.delivery_time_slot_title AS "deliveryTimeSlotTitle",
            to_char(o.delivery_start_time, 'HH24:MI') AS "deliveryStartTime",
@@ -72,6 +77,8 @@ export async function listCustomerOrderCards(
            ) END AS review
     FROM orders o
     LEFT JOIN order_items oi ON oi.order_id = o.id
+    LEFT JOIN daily_menu_items dmi ON dmi.id = oi.daily_menu_item_id
+    LEFT JOIN foods f ON f.id = dmi.food_id
     LEFT JOIN LATERAL (
       SELECT p.status FROM payments p WHERE p.order_id = o.id
       ORDER BY p.created_at DESC, p.id DESC LIMIT 1

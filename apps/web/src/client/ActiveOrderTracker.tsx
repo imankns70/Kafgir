@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { buildInvoiceOrderLines } from '@kafgir/contracts'
 import { Icon } from './design-system/Icon'
 import { useBottomSheetDrag } from './design-system/useBottomSheetDrag'
 import {
@@ -51,6 +52,30 @@ function activeStepIndex(status: OrderStatus) {
 function orderLastUpdate(order: CustomerOrderSummaryDto) {
   const matching = [...order.statusHistories].reverse().find((history) => history.toStatus === order.status)
   return matching?.changedAt ?? order.createdAt
+}
+
+const persianRiceSuffix = ' (با برنج ایرانی)'
+
+/**
+ * One row per food with its quantity, instead of a comma-run sentence. The Persian-rice add-on is a
+ * separate stored line; it is folded into its dish here exactly as the invoice does, and shown as a
+ * small tag under the dish's name.
+ */
+export function OrderItemList({ order }: { order: CustomerOrderSummaryDto }) {
+  const lines = buildInvoiceOrderLines(order.foodItems ?? [])
+  if (lines.length === 0) return <strong>{order.foodSummary || 'سفارش ثبت‌شده'}</strong>
+  return <ul className="active-order-items">
+    {lines.map((line) => {
+      const withRice = line.key.includes(':rice:')
+      return <li key={line.key}>
+        <span className="active-order-item-name">
+          {withRice ? line.foodName.replace(persianRiceSuffix, '') : line.foodName}
+          {withRice && <small className="active-order-item-addon">با برنج ایرانی</small>}
+        </span>
+        <span className="active-order-item-qty">{formatNumber(line.quantity)}×</span>
+      </li>
+    })}
+  </ul>
 }
 
 export function ActiveOrderTracker() {
@@ -321,7 +346,7 @@ export function ActiveOrderTracker() {
         </ol>
 
         <div className="active-order-sheet-summary">
-          <div><span className="active-order-summary-icon"><Icon name="orders" size="sm" /></span><p><small>اقلام سفارش</small><strong>{selectedOrder.foodSummary || 'سفارش ثبت‌شده'}</strong></p></div>
+          <div><span className="active-order-summary-icon"><Icon name="orders" size="sm" /></span><div><small>اقلام سفارش</small><OrderItemList order={selectedOrder} /></div></div>
           {deliveryWindow && <div><span className="active-order-summary-icon"><Icon name="clock" size="sm" /></span><p><small>زمان تحویل</small><strong>{deliveryWindow}</strong></p></div>}
           <div><span className="active-order-summary-icon"><Icon name="location" size="sm" /></span><p><small>نشانی تحویل</small><strong>{selectedOrder.deliveryCity}، {selectedOrder.addressLine}</strong></p></div>
         </div>

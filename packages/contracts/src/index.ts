@@ -456,6 +456,8 @@ export const customerOrderSummarySchema = orderSummarySchema.extend({
   paymentStatus: z.nativeEnum(PaymentStatus).nullable(),
   statusHistories: z.array(orderStatusHistorySchema),
   review: orderReviewSchema.nullable(),
+  /** The order's lines with their rice flags, so a list can fold the Persian-rice add-on into its dish. */
+  foodItems: z.array(orderItemSchema).default([]),
 })
 
 export const customerOrdersPageSchema = z.object({

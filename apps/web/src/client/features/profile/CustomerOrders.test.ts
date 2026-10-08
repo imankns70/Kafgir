@@ -26,6 +26,7 @@ const activeSummary: CustomerOrdersPageDto['items'][number] = {
   createdAt: '2026-08-09T08:00:00.000Z',
   totalQuantity: 2,
   foodSummary: 'قورمه‌سبزی × ۲',
+  foodItems: [],
   statusHistories: [{
     fromStatus: OrderStatus.PendingConfirmation,
     toStatus: OrderStatus.Confirmed,
