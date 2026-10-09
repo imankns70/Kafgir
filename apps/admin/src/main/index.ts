@@ -7,6 +7,7 @@ import {
   authenticateAdmin,
   currentAdminRoles,
   exportDatabaseSnapshot,
+  cancelStalePendingOrders,
   assertReferenceDataSchemaReady,
   closeDatabase,
   configureDatabase,
@@ -56,6 +57,21 @@ let configuredFingerprint: string | null = null
 let runtimeConfigurationPromise: Promise<void> | null = null
 let databaseClosedForQuit = false
 let socialAutomationTimer: ReturnType<typeof setInterval> | null = null
+/** Sweeps unconfirmed orders while anyone is signed in, in case no web scheduler is configured. */
+let pendingOrderTimer: ReturnType<typeof setInterval> | null = null
+
+function startPendingOrderTimer() {
+  if (pendingOrderTimer) clearInterval(pendingOrderTimer)
+  const sweep = () => void cancelStalePendingOrders().catch((error) =>
+    desktopLogger().warn({ event: 'order.autoCancel.failed', err: error }, 'لغو خودکار سفارش‌ها انجام نشد'))
+  pendingOrderTimer = setInterval(sweep, 5 * 60_000)
+  sweep()
+}
+
+function stopPendingOrderTimer() {
+  if (pendingOrderTimer) clearInterval(pendingOrderTimer)
+  pendingOrderTimer = null
+}
 
 function developmentUploadRoot() {
   return app.isPackaged
@@ -162,6 +178,7 @@ function registerIpc() {
     principal = await authenticateAdmin(request)
     principalCheckedAt = Date.now()
     startSocialAutomationTimer()
+    startPendingOrderTimer()
     return {
       fullName: principal.fullName,
       username: principal.username,
@@ -173,6 +190,7 @@ function registerIpc() {
     principal = null
     if (socialAutomationTimer) clearInterval(socialAutomationTimer)
     socialAutomationTimer = null
+    stopPendingOrderTimer()
     desktopLogger().info({ event: 'auth.logout' }, 'خروج از حساب مدیریت')
   })
   ipcMain.handle('admin:invoke', async (event, request: AdminOperationRequest) => {
@@ -350,6 +368,7 @@ app.on('before-quit', (event) => {
   event.preventDefault()
   principal = null
   if (socialAutomationTimer) clearInterval(socialAutomationTimer)
+  stopPendingOrderTimer()
   void closeDatabase().finally(() => {
     databaseClosedForQuit = true
     app.quit()

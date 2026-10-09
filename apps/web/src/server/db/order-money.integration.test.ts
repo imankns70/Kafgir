@@ -6,6 +6,9 @@ import {
   createOrder,
   createPayment,
   editOrder,
+  cancelStalePendingOrders,
+  getPendingOrderPolicy,
+  savePendingOrderPolicy,
   getCustomerNotificationSettings,
   listRecentNotifications,
   saveCustomerNotificationSettings,
@@ -373,6 +376,31 @@ integration.sequential('order money integrity', () => {
       expect(log.find((item) => item.orderNumber === order.orderNumber)?.target).toBe('0900***0088')
     } finally {
       await saveCustomerNotificationSettings(before, adminUserId)
+    }
+  })
+
+  it('auto-cancels an unconfirmed order after the timeout, but never one with money on it', async () => {
+    const before = await getPendingOrderPolicy()
+    try {
+      const forgotten = await placeOrder(1)
+      const paid = await placeOrder(1)
+      await paidPayment(paid.id, 100_000)
+      const fresh = await placeOrder(1)
+      await sql`UPDATE orders SET created_at = NOW() - INTERVAL '2 hours' WHERE id IN (${forgotten.id}, ${paid.id})`
+      await sql`UPDATE orders SET created_at = NOW() WHERE id = ${fresh.id}`
+
+      await savePendingOrderPolicy({ autoCancelAfterMinutes: 0, cancelAfterServiceDay: false }, adminUserId)
+      expect(await cancelStalePendingOrders()).toBe(0)
+
+      await savePendingOrderPolicy({ autoCancelAfterMinutes: 30, cancelAfterServiceDay: false }, adminUserId)
+      expect(await cancelStalePendingOrders()).toBeGreaterThanOrEqual(1)
+      const status = async (id: number) => (await getAdminOrderDetail(id)).status
+      expect(await status(forgotten.id)).toBe(OrderStatus.Cancelled)
+      expect(await status(paid.id)).toBe(OrderStatus.PendingConfirmation)
+      expect(await status(fresh.id)).toBe(OrderStatus.PendingConfirmation)
+      expect((await getAdminOrderDetail(forgotten.id)).statusChanges.at(-1)?.note).toContain('لغو خودکار')
+    } finally {
+      await savePendingOrderPolicy(before, adminUserId)
     }
   })
 })

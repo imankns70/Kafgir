@@ -38,6 +38,7 @@ import {
   couponWriteSchema,
   customerNotificationSettingsSchema,
   staffCreateSchema,
+  pendingOrderPolicySchema,
   staffUpdateSchema,
   staffPasswordSchema,
   paymentMethodSettingWriteSchema,
@@ -88,6 +89,8 @@ import {
   saveCustomerNotificationSettings,
   listRecentNotifications,
   listStaff,
+  getPendingOrderPolicy,
+  savePendingOrderPolicy,
   createStaff,
   updateStaff,
   resetStaffPassword,
@@ -402,6 +405,9 @@ export async function dispatchAdminOperation(
     case 'notifications.list': return listRecentNotifications()
     // The backup is written to a file by the main process (backup:export), never sent to the page.
     case 'backup.export': throw new Error('پشتیبان‌گیری فقط از دکمه صفحه پشتیبان‌گیری انجام می‌شود.')
+    case 'pendingOrders.policy.get': return getPendingOrderPolicy()
+    case 'pendingOrders.policy.save':
+      return savePendingOrderPolicy(pendingOrderPolicySchema.parse(body.value), principal.userId)
     case 'staff.list': return listStaff()
     case 'staff.create': return createStaff(staffCreateSchema.parse(body.value), principal.userId)
     case 'staff.update': return updateStaff(numberField(body, 'id'), staffUpdateSchema.parse(body.value), principal.userId)

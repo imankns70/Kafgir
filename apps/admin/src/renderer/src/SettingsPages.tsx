@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type {
+  PendingOrderPolicy,
   DeliveryMethodSettingDto,
   PaymentMethodSettingDto,
 } from '@kafgir/contracts'
@@ -186,6 +187,7 @@ export function DeliveryMethodsPage() {
     {notice && <Message>{notice}</Message>}
     <Message>هزینه ارسال به مبلغ سفارش اضافه می‌شود و در همان لحظه ثبت سفارش در فاکتور ذخیره می‌ماند؛ تغییر بعدی آن سفارش‌های گذشته را عوض نمی‌کند.</Message>
     <Message>برای روش‌هایی که با پیک انجام می‌شوند، هزینه ارسال از پیکربندی همان روز تحویل خوانده می‌شود و در این صفحه تعیین نمی‌گردد؛ فقط یک منبع برای قیمت ارسال وجود دارد.</Message>
+    <PendingOrderPolicyCard />
     <ListState loading={loading} error={error} isEmpty={rows.length === 0} emptyText="روشی پیکربندی نشده است." />
     <div className="settings-method-grid">{rows.map((row) => {
       const draft = drafts[row.method] ?? row
@@ -247,4 +249,51 @@ export function DeliveryMethodsPage() {
       </article>
     })}</div>
   </PageFrame>
+}
+
+/**
+ * Auto-cancel for orders nobody confirmed. Shown only to those who may change it (Owner); for others
+ * the policy read is refused and the card stays out of the way.
+ */
+function PendingOrderPolicyCard() {
+  const [policy, setPolicy] = useState<PendingOrderPolicy | null>(null)
+  const [minutes, setMinutes] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void adminApi.pendingOrderPolicy().then((value) => {
+      setPolicy(value)
+      setMinutes(value.autoCancelAfterMinutes ? String(value.autoCancelAfterMinutes) : '')
+    }).catch(() => setPolicy(null))
+  }, [])
+  if (!policy) return null
+
+  const save = async () => {
+    const parsed = minutes.trim() ? Number(minutes.trim().replace(/[۰-۹]/gu, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))) : 0
+    if (!Number.isInteger(parsed) || parsed < 0 || parsed > 1440) { setError('زمان باید عدد صحیح بین ۰ تا ۱۴۴۰ دقیقه باشد.'); return }
+    setBusy(true)
+    setError(null)
+    try {
+      setPolicy(await adminApi.savePendingOrderPolicy({ ...policy, autoCancelAfterMinutes: parsed }))
+      setMessage('قانون لغو خودکار ذخیره شد.')
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    finally { setBusy(false) }
+  }
+
+  return <section className="panel pending-policy">
+    <h2>لغو خودکار سفارش‌های تأییدنشده</h2>
+    <p className="muted">سفارشی که در این مدت تأیید نشود لغو می‌شود و مشتری خبردار می‌شود. سفارشی که پرداخت شده یا پرداختش در انتظار بررسی است هرگز خودکار لغو نمی‌شود.</p>
+    <div className="pending-policy-fields">
+      <label>لغو پس از (دقیقه)<input inputMode="numeric" value={minutes} placeholder="خاموش"
+        onChange={(event) => setMinutes(event.target.value)} /></label>
+      <label className="switch"><input type="checkbox" checked={policy.cancelAfterServiceDay}
+        onChange={(event) => setPolicy({ ...policy, cancelAfterServiceDay: event.target.checked })} />
+        لغو سفارش در انتظار وقتی روز سرویسش گذشته است</label>
+      <button type="button" className="primary" disabled={busy} onClick={() => void save()}>{busy ? 'در حال ذخیره…' : 'ذخیره'}</button>
+    </div>
+    {message && <Message>{message}</Message>}
+    {error && <Message error={error} />}
+  </section>
 }

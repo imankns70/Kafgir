@@ -38,6 +38,7 @@ import type {
   CustomerNotificationSettings,
   NotificationLogItemDto,
   StaffUserDto,
+  PendingOrderPolicy,
   CourierCashHandoverDto,
   LeftoverItemDto,
   LeftoverWriteRequest,
@@ -450,6 +451,9 @@ export const adminApi = {
     socialInvoke<CustomerNotificationSettings>('notifications.settings.save', { value }, true),
   notifications: () => socialInvoke<NotificationLogItemDto[]>('notifications.list'),
   staff: () => socialInvoke<StaffUserDto[]>('staff.list'),
+  pendingOrderPolicy: () => socialInvoke<PendingOrderPolicy>('pendingOrders.policy.get'),
+  savePendingOrderPolicy: (value: PendingOrderPolicy) =>
+    socialInvoke<PendingOrderPolicy>('pendingOrders.policy.save', { value }, true),
   createStaff: (value: StaffCreateRequest) => socialInvoke<StaffUserDto>('staff.create', { value }, true),
   updateStaff: (id: number, value: StaffUpdateRequest) => socialInvoke<StaffUserDto>('staff.update', { id, value }, true),
   resetStaffPassword: (id: number, value: StaffPasswordRequest) =>

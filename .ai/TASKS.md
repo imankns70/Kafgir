@@ -36,7 +36,7 @@ Smaller improvements
 - [x] D1 Estimated cost per portion and margin per dish.
 - [x] D2 Record leftover portions per day.
 - [x] D3 Database backup export from Admin.
-- [ ] D4 Auto-cancel pending orders nobody confirmed in time.
+- [x] D4 Auto-cancel pending orders nobody confirmed in time.
 - [x] D5 Kitchen ticket and bag-label printing.
 - [x] D6 Delivery-fee margin (customer charge vs courier pay) in reports.
 - [ ] Apply migrations `0026_order_money_integrity.sql`, `0027_customer_notes_tags_blocking.sql`, `0028_coupons.sql`, `0029_sms_status_notifications.sql`, `0030_courier_cash_handovers.sql`, `0031_food_estimated_cost.sql` and `0032_menu_leftovers.sql` to Neon and any other deployed database before releasing.

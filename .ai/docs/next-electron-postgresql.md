@@ -53,6 +53,8 @@ The processor:
 3. Sends Telegram messages through the Bot API and status SMS through SMS.ir (`SMSIR_LINE_NUMBER`;
    the `console` provider in development). Status SMS are queued only for customers without a Telegram
    chat, and only when the Owner enables them under Admin › تنظیمات › اطلاع‌رسانی به مشتری.
+   Before sending, the same call cancels pending orders that passed the Owner's auto-cancel rule
+   (Admin › تنظیمات › روش‌های دریافت); the desktop app also sweeps every five minutes while signed in.
 4. Marks success as sent.
 5. Applies exponential retry delay or a terminal failed state.
 

@@ -19,6 +19,7 @@ export * from './money.js'
 export * from './coupon.js'
 export * from './notification.js'
 export * from './staff.js'
+export * from './order-rules-settings.js'
 
 export const nullableText = z.string().trim().nullable().optional()
 

@@ -98,6 +98,8 @@ export const adminOperations = [
   'notifications.settings.save',
   'notifications.list',
   'backup.export',
+  'pendingOrders.policy.get',
+  'pendingOrders.policy.save',
   'staff.list',
   'staff.create',
   'staff.update',
