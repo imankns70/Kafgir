@@ -29,6 +29,10 @@ const options: LoggerOptions = {
       'headers.authorization', 'telegramInitData', '*.telegramInitData', 'DATABASE_URL',
       'connectionString', '*.connectionString', 'bytes', '*.bytes', 'receipt',
       'phoneNumber', '*.phoneNumber', 'normalizedPhoneNumber',
+      // A database error carries its SQL and bound values, which can be a customer's name, phone or
+      // address; the message and code are enough to diagnose it.
+      'err.parameters', 'err.query', 'err.args', '*.err.parameters', '*.err.query',
+      'addressLine', '*.addressLine', 'address', '*.address',
     ],
     censor: '[REDACTED]',
   },

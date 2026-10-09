@@ -210,5 +210,8 @@ describe('owner-only change log and purchase deletion', () => {
     expect(isAdminOperationAllowed('purchases.delete', ['KitchenAdmin'])).toBe(false)
     expect(isAdminOperationAllowed('purchases.update', ['KitchenAdmin'])).toBe(true)
     expect(isAdminOperationAllowed('payments.unpaid', ['OrderManager'])).toBe(true)
+    // Server logs are diagnostics, not kitchen work, and can mention customers.
+    expect(isAdminOperationAllowed('logs.server', ['KitchenAdmin'])).toBe(false)
+    expect(isAdminOperationAllowed('logs.server', ['OrderManager'])).toBe(true)
   })
 })

@@ -22,7 +22,6 @@ const kitchenOperations = new Set<AdminOperation>([
   'customers.lookup', 'orders.search', 'orders.get', 'orders.create', 'orders.updateStatus', 'orders.edit',
   'support.conversations.list', 'support.conversations.get', 'support.conversations.reply',
   'support.conversations.setClosed', 'support.reviews.list', 'support.reviews.setStatus', 'support.reviews.reply',
-  'logs.server',
   // The kitchen does the shopping, so it writes the purchase down, corrects it and sees the month it
   // lands in. Deleting one changes the month's books, so that stays with Owner.
   'purchases.month', 'purchases.create', 'purchases.update',
