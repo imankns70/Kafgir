@@ -571,6 +571,8 @@ export const foodSchema = z.object({
   tagIds: z.array(z.number().int().positive()),
   images: z.array(foodImageSchema),
   defaultPrice: z.number(),
+  /** Admin-only estimate of what one portion costs to make. */
+  estimatedCostPerPortion: z.number().nonnegative().nullable().default(null),
   imageUrl: z.string().nullable().optional(),
   allowsPersianRice: z.boolean().default(false),
   isPersianRice: z.boolean().default(false),
@@ -593,6 +595,7 @@ export const foodWriteSchema = z.object({
   images: z.array(foodImageWriteSchema).max(10).default([])
     .refine((values) => values.filter((image) => image.isPrimary).length <= 1, 'فقط یک تصویر می‌تواند اصلی باشد.'),
   defaultPrice: z.number().nonnegative(),
+  estimatedCostPerPortion: z.number().nonnegative().nullable().optional(),
   imageUrl: z.string().trim().max(2000).nullable().optional(),
   allowsPersianRice: z.boolean().default(false),
   isPersianRice: z.boolean().default(false),

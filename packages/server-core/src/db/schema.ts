@@ -250,6 +250,8 @@ export const foods = pgTable('foods', {
   categoryId: integer('category_id').notNull().references(() => foodCategories.id, { onDelete: 'restrict' }),
   primaryBadgeTagId: integer('primary_badge_tag_id').references(() => foodTags.id, { onDelete: 'set null' }),
   defaultPrice: money('default_price').notNull().default(0),
+  /** Rough cost of one portion, for an estimated margin. Admin-only; never customer-facing. */
+  estimatedCostPerPortion: money('estimated_cost_per_portion'),
   imageUrl: varchar('image_url', { length: 2000 }),
   // Every dish includes foreign rice in its price. This offers the paid Persian rice upgrade.
   allowsPersianRice: boolean('allows_persian_rice').notNull().default(false),
@@ -259,6 +261,7 @@ export const foods = pgTable('foods', {
   createdAt: utcTimestamp('created_at').notNull(),
   updatedAt: utcTimestamp('updated_at').notNull(),
 }, (table) => [
+  check('foods_estimated_cost_check', sql`${table.estimatedCostPerPortion} IS NULL OR ${table.estimatedCostPerPortion} >= 0`),
   uniqueIndex('foods_slug_uidx').on(table.slug),
   uniqueIndex('foods_name_normalized_uidx').on(sql`lower(btrim(${table.name}))`),
   index('foods_category_id_idx').on(table.categoryId),

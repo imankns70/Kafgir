@@ -238,7 +238,10 @@ integration.sequential('monthly business summary', () => {
     expect(analysis.cancellationPercent).toBe(50)
     expect(analysis.averageBasket).toBe(1_000_000)
     expect(analysis.averagePortions).toBe(2)
-    expect(analysis.dishes).toEqual([{ foodName: suffix, portions: 2, orders: 1, sales: 1_000_000 }])
+    expect(analysis.dishes).toEqual([{ foodName: suffix, portions: 2, orders: 1, sales: 1_000_000, estimatedCost: null }])
+    // Once the dish has a cost, the month shows portions × cost.
+    await sql`UPDATE foods SET estimated_cost_per_portion = 180000 WHERE id = ${foodId}`
+    expect((await getMonthlyReport(year, month)).analysis.dishes[0]!.estimatedCost).toBe(360_000)
     expect(analysis.slots).toEqual([{ label: 'بدون بازه ارسال', orders: 1, sales: 1_000_000 }])
     expect(analysis.paymentMethods).toEqual([{ paymentMethod: PaymentMethod.Cash, orders: 1, sales: 1_000_000 }])
   })

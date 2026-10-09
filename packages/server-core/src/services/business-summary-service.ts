@@ -172,8 +172,13 @@ async function salesAnalysis(range: JalaliMonthRange): Promise<SalesAnalysisDto>
       FROM (${monthOrders()}) m`,
     sqlClient<SalesAnalysisDto['dishes']>`
       SELECT i.food_name AS "foodName", SUM(i.quantity)::int AS portions,
-        COUNT(DISTINCT i.order_id)::int AS orders, SUM(i.total_price)::float8 AS sales
+        COUNT(DISTINCT i.order_id)::int AS orders, SUM(i.total_price)::float8 AS sales,
+        -- Only a dish whose every line has a cost gets one; a partial sum would understate it.
+        CASE WHEN BOOL_AND(f.estimated_cost_per_portion IS NOT NULL)
+          THEN SUM(i.quantity * f.estimated_cost_per_portion)::float8 END AS "estimatedCost"
       FROM order_items i JOIN (${monthOrders()}) m ON m.id = i.order_id
+      JOIN daily_menu_items d ON d.id = i.daily_menu_item_id
+      JOIN foods f ON f.id = d.food_id
       WHERE m.status = ${soldStatus}
       GROUP BY i.food_name
       ORDER BY sales DESC, portions DESC, i.food_name`,

@@ -955,3 +955,6 @@ td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-ali
 .courier-cash-title{margin:6px 0 0;font-size:16px}
 .courier-cash-hint{margin:0;font-size:13px}
 .order-courier-select{min-height:34px;max-width:100%;border:1px solid var(--border);border-radius:8px;padding:4px 8px;background:#fff}
+.margin-negative{color:var(--error);font-weight:700}
+.sales-cost-hint{margin:-4px 0 0;font-size:12px}
+.food-cost-field{max-width:360px}

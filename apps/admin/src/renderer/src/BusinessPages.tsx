@@ -352,17 +352,28 @@ const paymentMethodName: Record<number, string> = {
 /** A share of the month's food sales, for the bar beside each row. */
 const shareOf = (part: number, whole: number) => whole > 0 ? Math.round((part / whole) * 1000) / 10 : 0
 
-function ShareTable<T extends { orders: number; sales: number }>({ title, label, rows, extra }: {
+/** «۳۲۰,۰۰۰ تومان (۴۰٪)» — margin in tomans and as a share of the dish's sales. */
+export function dishMarginText(sales: number, cost: number | null) {
+  if (cost == null || sales <= 0) return '—'
+  const margin = sales - cost
+  return `${formatMoney(margin)} (${formatNumber(Math.round((margin / sales) * 100))}٪)`
+}
+
+type ShareColumn<T> = { header: string; value: (row: T) => string; className?: (row: T) => string | undefined }
+
+function ShareTable<T extends { orders: number; sales: number }>({ title, label, rows, extra, after = [] }: {
   title: string
   label: (row: T) => string
   rows: T[]
-  extra?: { header: string; value: (row: T) => string }
+  extra?: ShareColumn<T>
+  /** Columns after the share, e.g. a dish's estimated cost and margin. */
+  after?: ShareColumn<T>[]
 }) {
   const total = rows.reduce((sum, row) => sum + row.sales, 0)
   return <section className="sales-share">
     <h3>{title}</h3>
     {rows.length === 0 ? <p className="muted">سفارش تحویل‌شده‌ای در این ماه نیست.</p> : <table>
-      <thead><tr><th>{title.replace(/^فروش /u, '')}</th>{extra && <th>{extra.header}</th>}<th>سفارش</th><th>فروش (تومان)</th><th>سهم</th></tr></thead>
+      <thead><tr><th>{title.replace(/^فروش /u, '')}</th>{extra && <th>{extra.header}</th>}<th>سفارش</th><th>فروش (تومان)</th><th>سهم</th>{after.map((column) => <th key={column.header}>{column.header}</th>)}</tr></thead>
       <tbody>{rows.map((row) => {
         const share = shareOf(row.sales, total)
         return <tr key={label(row)}>
@@ -371,6 +382,7 @@ function ShareTable<T extends { orders: number; sales: number }>({ title, label,
           <td>{formatNumber(row.orders)}</td>
           <td>{formatMoney(row.sales)}</td>
           <td className="share-cell"><span className="share-bar" style={{ inlineSize: `${share}%` }} /><span>{formatNumber(share, 1)}٪</span></td>
+          {after.map((column) => <td key={column.header} className={column.className?.(row)}>{column.value(row)}</td>)}
         </tr>
       })}</tbody>
     </table>}
@@ -389,7 +401,17 @@ export function SalesAnalysis({ analysis }: { analysis: SalesAnalysisDto }) {
         <small>{formatNumber(analysis.cancelledOrders)} لغو از {formatNumber(analysis.cancelledOrders + analysis.deliveredOrders)}</small></article>
     </div>
     <ShareTable title="فروش غذا" rows={analysis.dishes} label={(row) => row.foodName}
-      extra={{ header: 'پرس', value: (row) => formatNumber(row.portions) }} />
+      extra={{ header: 'پرس', value: (row) => formatNumber(row.portions) }}
+      after={[
+        { header: 'هزینه برآوردی', value: (row) => row.estimatedCost == null ? '—' : formatMoney(row.estimatedCost) },
+        {
+          header: 'حاشیه برآوردی',
+          value: (row) => dishMarginText(row.sales, row.estimatedCost),
+          className: (row) => row.estimatedCost != null && row.sales - row.estimatedCost < 0 ? 'margin-negative' : undefined,
+        },
+      ]} />
+    {analysis.dishes.some((dish) => dish.estimatedCost == null) &&
+      <p className="muted sales-cost-hint">برای دیدن حاشیه، «هزینه برآوردی هر پرس» را در صفحه ویرایش غذا وارد کنید. هزینه با رقم امروز حساب می‌شود.</p>}
     <div className="sales-share-pair">
       <ShareTable title="فروش بازه ارسال" rows={analysis.slots} label={(row) => row.label} />
       <ShareTable title="فروش روش پرداخت" rows={analysis.paymentMethods}

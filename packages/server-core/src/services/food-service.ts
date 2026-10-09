@@ -19,6 +19,7 @@ type FoodRecord = {
   categoryId: number
   primaryBadgeTagId: number | null
   defaultPrice: number
+  estimatedCostPerPortion: number | null
   imageUrl: string | null
   allowsPersianRice: boolean
   isPersianRice: boolean
@@ -62,7 +63,8 @@ function foodRows(search: string, paging: ResolvedPaging | null) {
            allergy_information AS "allergyInformation",
            preparation_time_minutes AS "preparationTimeMinutes",
            category_id AS "categoryId", primary_badge_tag_id AS "primaryBadgeTagId",
-           default_price::float8 AS "defaultPrice", image_url AS "imageUrl",
+           default_price::float8 AS "defaultPrice", estimated_cost_per_portion::float8 AS "estimatedCostPerPortion",
+           image_url AS "imageUrl",
            allows_persian_rice AS "allowsPersianRice", is_persian_rice AS "isPersianRice",
            is_active AS "isActive",
            COUNT(*) OVER ()::int AS "totalCount"
@@ -95,7 +97,8 @@ export async function getFood(id: number): Promise<FoodDto> {
            allergy_information AS "allergyInformation",
            preparation_time_minutes AS "preparationTimeMinutes",
            category_id AS "categoryId", primary_badge_tag_id AS "primaryBadgeTagId",
-           default_price::float8 AS "defaultPrice", image_url AS "imageUrl",
+           default_price::float8 AS "defaultPrice", estimated_cost_per_portion::float8 AS "estimatedCostPerPortion",
+           image_url AS "imageUrl",
            allows_persian_rice AS "allowsPersianRice", is_persian_rice AS "isPersianRice",
            is_active AS "isActive"
     FROM foods WHERE id = ${id} LIMIT 1
@@ -177,7 +180,7 @@ export async function createFood(request: FoodWriteRequest): Promise<FoodDto> {
         INSERT INTO foods
           (name, slug, description, full_description, ingredients, portion_description,
            allergy_information, preparation_time_minutes, category_id, primary_badge_tag_id,
-           default_price, image_url, allows_persian_rice, is_persian_rice,
+           default_price, estimated_cost_per_portion, image_url, allows_persian_rice, is_persian_rice,
            is_active, created_at, updated_at)
         VALUES
           (${request.name}, ${request.slug}, ${request.description ?? null},
@@ -185,6 +188,7 @@ export async function createFood(request: FoodWriteRequest): Promise<FoodDto> {
            ${request.portionDescription ?? null}, ${request.allergyInformation ?? null},
            ${request.preparationTimeMinutes ?? null}, ${request.categoryId},
            ${request.primaryBadgeTagId ?? null}, ${request.defaultPrice},
+           ${request.estimatedCostPerPortion ?? null},
            ${primaryImageUrl(request)}, ${request.allowsPersianRice},
            ${request.isPersianRice}, ${request.isActive}, NOW(), NOW())
         RETURNING id
@@ -222,6 +226,8 @@ export async function updateFood(id: number, request: FoodWriteRequest): Promise
             category_id = ${request.categoryId},
             primary_badge_tag_id = ${request.primaryBadgeTagId ?? null},
             default_price = ${request.defaultPrice}, image_url = ${primaryImageUrl(request)},
+            estimated_cost_per_portion = CASE WHEN ${request.estimatedCostPerPortion === undefined}
+              THEN estimated_cost_per_portion ELSE ${request.estimatedCostPerPortion ?? null}::numeric END,
             allows_persian_rice = ${request.allowsPersianRice},
             is_persian_rice = ${request.isPersianRice},
             is_active = ${request.isActive}, updated_at = NOW()

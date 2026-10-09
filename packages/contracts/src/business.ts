@@ -111,6 +111,8 @@ export const salesAnalysisSchema = z.object({
     portions: z.number().int().nonnegative(),
     orders: z.number().int().nonnegative(),
     sales: z.number().nonnegative(),
+    /** Portions × the dish's estimated cost today; null until a cost is entered for the dish. */
+    estimatedCost: z.number().nonnegative().nullable().default(null),
   })),
   slots: z.array(z.object({
     label: z.string(),

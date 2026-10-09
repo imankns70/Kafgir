@@ -936,7 +936,7 @@ const emptyFood = (categoryId = 0): FoodWriteRequest => ({
   name: '', slug: '', description: null, fullDescription: null, ingredients: null,
   portionDescription: null, allergyInformation: null, preparationTimeMinutes: null,
   categoryId, tagIds: [], primaryBadgeTagId: null, images: [],
-  defaultPrice: 0, imageUrl: null, allowsPersianRice: false, isPersianRice: false, isActive: true,
+  defaultPrice: 0, estimatedCostPerPortion: null, imageUrl: null, allowsPersianRice: false, isPersianRice: false, isActive: true,
 })
 
 type PendingPhoto = { file: File; preview: string }
@@ -957,6 +957,7 @@ const foodWriteFromDto = (food: FoodDto, overrides: Partial<FoodWriteRequest> = 
     primaryBadgeTagId: food.primaryBadgeTagId,
     images,
     defaultPrice: food.defaultPrice,
+    estimatedCostPerPortion: food.estimatedCostPerPortion,
     imageUrl: images.find((image) => image.isPrimary)?.imageUrl ?? images[0]?.imageUrl ?? food.imageUrl ?? null,
     allowsPersianRice: food.allowsPersianRice,
     isPersianRice: food.isPersianRice,
@@ -1017,6 +1018,7 @@ function FoodEditorPage({
   const [categories, setCategories] = useState<FoodCategoryDto[]>([])
   const [existingFoods, setExistingFoods] = useState<FoodDto[]>([])
   const [form, setForm] = useState<FoodWriteRequest>(emptyFood())
+  const [costText, setCostText] = useState('')
   const [savedFood, setSavedFood] = useState<FoodDto | null>(null)
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -1037,13 +1039,14 @@ function FoodEditorPage({
           const food = foodRows.find((row) => row.id === foodId)
           if (!food) throw new Error('غذا پیدا نشد.')
           setSavedFood(food)
+          setCostText(food.estimatedCostPerPortion == null ? '' : moneyInputText(food.estimatedCostPerPortion))
           setForm({
             name: food.name, slug: food.slug, description: food.description,
             fullDescription: food.fullDescription, ingredients: food.ingredients,
             portionDescription: food.portionDescription, allergyInformation: food.allergyInformation,
             preparationTimeMinutes: food.preparationTimeMinutes, categoryId: food.categoryId,
             tagIds: food.tagIds, primaryBadgeTagId: food.primaryBadgeTagId,
-            images: [], defaultPrice: food.defaultPrice,
+            images: [], defaultPrice: food.defaultPrice, estimatedCostPerPortion: food.estimatedCostPerPortion,
             imageUrl: null, allowsPersianRice: food.allowsPersianRice,
             isPersianRice: food.isPersianRice, isActive: food.isActive,
           })
@@ -1068,6 +1071,10 @@ function FoodEditorPage({
     event.preventDefault()
     if (existingFoods.some((food) => food.id !== foodId && normalizedFoodName(food.name) === normalizedFoodName(form.name))) {
       setError('نام غذا تکراری است.')
+      return
+    }
+    if (isInvalidMoneyText(costText)) {
+      setError('هزینه برآوردی هر پرس باید عددی صحیح و نامنفی به تومان باشد.')
       return
     }
     setUploading(true)
@@ -1125,6 +1132,14 @@ function FoodEditorPage({
         <label>مواد اولیه<textarea value={form.ingredients ?? ''} onChange={(event) => setForm({ ...form, ingredients: event.target.value || null })} /></label>
         <label>مقدار و محتویات هر پرس<textarea value={form.portionDescription ?? ''} onChange={(event) => setForm({ ...form, portionDescription: event.target.value || null })} /></label>
         <label>مواد حساسیت‌زا<textarea value={form.allergyInformation ?? ''} onChange={(event) => setForm({ ...form, allergyInformation: event.target.value || null })} /></label>
+      </div>
+      <div className="food-cost-field">
+        <AmountField label="هزینه برآوردی هر پرس (تومان، اختیاری)" value={costText} placeholder="180,000"
+          hint="فقط برای گزارش حاشیه سود در «ماه‌ها»؛ به مشتری نشان داده نمی‌شود."
+          onChange={(value) => {
+            setCostText(value)
+            setForm({ ...form, estimatedCostPerPortion: value.trim() ? parseMoney(value) : null })
+          }} />
       </div>
     </form>
       <section className="customer-food-preview"><h3>پیش‌نمایش اطلاعات مشتری</h3><strong>{form.name || 'عنوان غذا'}</strong><span>{categories.find((category) => category.id === form.categoryId)?.title}</span><p>{form.description || 'توضیح کوتاه غذا'}</p>{form.allergyInformation && <em>حساسیت‌زا: {form.allergyInformation}</em>}</section>
