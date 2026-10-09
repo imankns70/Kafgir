@@ -22,6 +22,7 @@ const actionLabel: Record<string, string> = {
   'staff.create': 'ساخت کاربر مدیریت',
   'staff.update': 'ویرایش کاربر مدیریت',
   'staff.password': 'تغییر رمز کاربر',
+  'backup.export': 'تهیه نسخه پشتیبان',
   'payment.create': 'ثبت پرداخت',
   'payment.status': 'تغییر وضعیت پرداخت',
   'payment.refund': 'استرداد',

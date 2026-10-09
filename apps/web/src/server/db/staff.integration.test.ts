@@ -4,6 +4,7 @@ import {
   configureDatabase,
   createStaff,
   currentAdminRoles,
+  exportDatabaseSnapshot,
   listStaff,
   resetStaffPassword,
   updateStaff,
@@ -75,5 +76,18 @@ integration.sequential('staff accounts', () => {
       .rejects.toThrow(/خودتان/u)
     await expect(updateStaff(owner!, { fullName: 'مالک آزمون', roles: ['OrderManager'], isActive: true }, owner!))
       .rejects.toThrow(/خودتان/u)
+  })
+
+  it('exports every business table but never a login secret', async () => {
+    const snapshot = await exportDatabaseSnapshot(createdIds[0]!)
+    expect(snapshot.format).toBe('kafgir-backup')
+    expect(snapshot.tables).toHaveProperty('orders')
+    expect(snapshot.tables).toHaveProperty('payments')
+    expect(snapshot.tables).not.toHaveProperty('customer_otp_challenges')
+    const owner = snapshot.tables.users!.find((row) => row.username === `owner.${tag}`)
+    expect(owner).toBeDefined()
+    expect(owner).not.toHaveProperty('password_hash')
+    expect(owner).not.toHaveProperty('security_stamp')
+    expect(JSON.stringify(snapshot)).not.toContain('scrypt$')
   })
 })

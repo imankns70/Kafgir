@@ -97,6 +97,7 @@ export const adminOperations = [
   'notifications.settings.get',
   'notifications.settings.save',
   'notifications.list',
+  'backup.export',
   'staff.list',
   'staff.create',
   'staff.update',

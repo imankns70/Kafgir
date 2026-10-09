@@ -22,7 +22,11 @@ export interface AdminBridge {
   resolveMediaUrl(imageUrl: string): Promise<string>
   desktopLogs(limit?: number): Promise<Array<Record<string, unknown>>>
   printInvoice(request: InvoicePrintRequest): Promise<void>
+  /** Null when the save dialog was cancelled. */
+  exportBackup(): Promise<BackupExportResult | null>
 }
+
+export type BackupExportResult = { filePath: string; tables: number; rows: number; bytes: number; redacted: string[] }
 
 const bridge: AdminBridge = {
   login: (request) => ipcRenderer.invoke('auth:login', request),
@@ -36,6 +40,7 @@ const bridge: AdminBridge = {
   resolveMediaUrl: (imageUrl) => ipcRenderer.invoke('media:resolve-url', imageUrl),
   desktopLogs: (limit) => ipcRenderer.invoke('logs:desktop', limit),
   printInvoice: (request) => ipcRenderer.invoke('print:invoice', request),
+  exportBackup: () => ipcRenderer.invoke('backup:export'),
 }
 
 contextBridge.exposeInMainWorld('kafgir', bridge)

@@ -35,7 +35,7 @@ Operations features
 Smaller improvements
 - [x] D1 Estimated cost per portion and margin per dish.
 - [x] D2 Record leftover portions per day.
-- [ ] D3 Database backup export from Admin.
+- [x] D3 Database backup export from Admin.
 - [ ] D4 Auto-cancel pending orders nobody confirmed in time.
 - [x] D5 Kitchen ticket and bag-label printing.
 - [x] D6 Delivery-fee margin (customer charge vs courier pay) in reports.

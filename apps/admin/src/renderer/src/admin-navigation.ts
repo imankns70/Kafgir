@@ -8,7 +8,7 @@ export type Page = 'dashboard' | 'orders' | 'manual' | 'foods' | 'food-editor' |
   | 'social-rules' | 'social-suggestions' | 'social-history' | 'customer-communication'
   | 'food-tag-groups' | 'support-subjects'
   | 'payment-methods' | 'delivery-methods' | 'customer-report' | 'customers' | 'site-analytics'
-  | 'couriers' | 'courier-days' | 'courier-accounting' | 'coupons' | 'notifications' | 'staff'
+  | 'couriers' | 'courier-days' | 'courier-accounting' | 'coupons' | 'notifications' | 'staff' | 'backup'
 
 export type NavigationGroupId =
   'sales' | 'catalog' | 'finance' | 'social' | 'reference' | 'settings'
@@ -144,6 +144,7 @@ export const navigationGroups: NavigationGroup[] = [
       { page: 'staff', label: 'کاربران و نقش‌ها', operation: 'staff.list' },
       { page: 'notifications', label: 'اطلاع‌رسانی به مشتری', operation: 'notifications.settings.get' },
       { page: 'audit-log', label: 'گزارش تغییرات', operation: 'audit.list' },
+      { page: 'backup', label: 'پشتیبان‌گیری', operation: 'backup.export' },
       { page: 'logs', label: 'گزارش رویدادها', operation: 'logs.server' },
     ],
   },

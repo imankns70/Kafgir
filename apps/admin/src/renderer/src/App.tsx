@@ -43,6 +43,7 @@ import { AuditLogPage } from './AuditLogPage'
 import { CouponsPage } from './CouponsPage'
 import { NotificationsPage } from './NotificationsPage'
 import { StaffPage } from './StaffPage'
+import { BackupPage } from './BackupPage'
 import { KitchenPage } from './KitchenPage'
 import { useNewOrderAlerts } from './new-order-alerts'
 import { isAdminOperationAllowed } from '../../shared/admin-permissions'
@@ -2163,6 +2164,7 @@ export function App() {
     coupons: <CouponsPage />,
     notifications: <NotificationsPage />,
     staff: <StaffPage />,
+    backup: <BackupPage />,
     kitchen: <KitchenPage />,
     'food-tag-groups': <FoodTagGroupsPage />,
     'support-subjects': <SupportSubjectsPage />,

@@ -1,8 +1,12 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { writeFile } from 'node:fs/promises'
+import { gzipSync } from 'node:zlib'
+import { isAdminOperationAllowed } from '../shared/admin-permissions'
 import { join, resolve } from 'node:path'
 import {
   authenticateAdmin,
   currentAdminRoles,
+  exportDatabaseSnapshot,
   assertReferenceDataSchemaReady,
   closeDatabase,
   configureDatabase,
@@ -224,6 +228,32 @@ function registerIpc() {
       return `${webBase}${imageUrl}`
     }
     throw new Error('Invalid media URL.')
+  })
+  ipcMain.handle('backup:export', async (event) => {
+    assertTrustedSender(event)
+    await ensureConfigured()
+    await refreshPrincipal()
+    if (!principal || !isAdminOperationAllowed('backup.export', principal.roles)) {
+      throw new Error('پشتیبان‌گیری فقط برای مالک مجاز است.')
+    }
+    const day = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tehran' })
+    const target = await dialog.showSaveDialog(mainWindow ?? undefined as never, {
+      title: 'ذخیره نسخه پشتیبان کفگیر',
+      defaultPath: `kafgir-backup-${day}.json.gz`,
+      filters: [{ name: 'Kafgir backup', extensions: ['gz'] }],
+    })
+    if (target.canceled || !target.filePath) return null
+    const snapshot = await exportDatabaseSnapshot(principal.userId)
+    const bytes = gzipSync(Buffer.from(JSON.stringify(snapshot), 'utf8'))
+    await writeFile(target.filePath, bytes)
+    desktopLogger().info({ event: 'backup.export', bytes: bytes.length }, 'نسخه پشتیبان ذخیره شد')
+    return {
+      filePath: target.filePath,
+      tables: Object.keys(snapshot.tables).length,
+      rows: Object.values(snapshot.tables).reduce((sum, rows) => sum + rows.length, 0),
+      bytes: bytes.length,
+      redacted: snapshot.redacted,
+    }
   })
   ipcMain.handle('logs:desktop', (event, limit?: number) => {
     assertTrustedSender(event)
