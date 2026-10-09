@@ -21,6 +21,7 @@ import {
   courierSettlementWriteSchema,
   courierCashHandoverWriteSchema,
   orderCourierAssignSchema,
+  leftoverWriteSchema,
   socialChannelWriteSchema,
   socialPostWriteSchema,
   socialRuleWriteSchema,
@@ -95,6 +96,8 @@ import {
   paymentReconciliation,
   listAuditLogs,
   getProductionSheet,
+  getLeftovers,
+  saveLeftovers,
   listOrdersSince,
   removeMenuItem,
   searchOrdersPaged,
@@ -374,6 +377,8 @@ export async function dispatchAdminOperation(
     case 'payments.reconciliation': return paymentReconciliation(textField(body, 'date'))
     case 'orders.since': return listOrdersSince(body.afterId == null ? null : Number(body.afterId))
     case 'kitchen.sheet': return getProductionSheet(textField(body, 'date'))
+    case 'kitchen.leftovers': return getLeftovers(textField(body, 'date'))
+    case 'kitchen.saveLeftovers': return saveLeftovers(leftoverWriteSchema.parse(body.value), principal.userId)
     case 'audit.list':
       return listAuditLogs({
         entityType: typeof body.entityType === 'string' ? body.entityType : null,

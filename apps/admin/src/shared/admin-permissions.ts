@@ -18,7 +18,7 @@ const kitchenOperations = new Set<AdminOperation>([
   'supportSubjects.list',
   'foods.list', 'foods.create', 'foods.update', 'foods.setActive',
   'menus.get', 'menus.settings', 'menus.addItem', 'menus.updateItem', 'menus.removeItem',
-  'kitchen.sheet', 'orders.since',
+  'kitchen.sheet', 'kitchen.leftovers', 'kitchen.saveLeftovers', 'orders.since',
   'customers.lookup', 'orders.search', 'orders.get', 'orders.create', 'orders.updateStatus', 'orders.edit',
   'support.conversations.list', 'support.conversations.get', 'support.conversations.reply',
   'support.conversations.setClosed', 'support.reviews.list', 'support.reviews.setStatus', 'support.reviews.reply',

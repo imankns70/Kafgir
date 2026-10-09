@@ -106,6 +106,9 @@ export const salesAnalysisSchema = z.object({
   /** Net food sales per delivered order; null when nothing was delivered. */
   averageBasket: z.number().nonnegative().nullable(),
   averagePortions: z.number().nonnegative().nullable(),
+  /** Portions recorded as left over this month, and their share of sold + left over on those days. */
+  leftoverPortions: z.number().int().nonnegative().default(0),
+  leftoverPercent: z.number().nonnegative().nullable().default(null),
   dishes: z.array(z.object({
     foodName: z.string(),
     portions: z.number().int().nonnegative(),

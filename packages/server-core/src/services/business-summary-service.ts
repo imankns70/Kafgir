@@ -161,7 +161,12 @@ async function salesAnalysis(range: JalaliMonthRange): Promise<SalesAnalysisDto>
     SELECT o.* FROM orders o
     WHERE ${orderServiceDate('o')} >= ${range.fromDate}::date
       AND ${orderServiceDate('o')} < ${range.toExclusiveDate}::date`
-  const [counts, dishes, slots, methods] = await Promise.all([
+  const leftoverQuery = sqlClient<Array<{ leftover: number; sold: number }>>`
+    SELECT COALESCE(SUM(i.leftover_portions), 0)::int AS leftover,
+           COALESCE(SUM(i.sold_portions) FILTER (WHERE i.leftover_portions IS NOT NULL), 0)::int AS sold
+    FROM daily_menu_items i JOIN daily_menus m ON m.id = i.daily_menu_id
+    WHERE m.menu_date >= ${range.fromDate}::date AND m.menu_date < ${range.toExclusiveDate}::date`
+  const [counts, dishes, slots, methods, leftovers] = await Promise.all([
     sqlClient<Array<{ delivered: number; cancelled: number; netSales: number; portions: number }>>`
       SELECT
         COUNT(*) FILTER (WHERE m.status = ${soldStatus})::int AS delivered,
@@ -197,7 +202,9 @@ async function salesAnalysis(range: JalaliMonthRange): Promise<SalesAnalysisDto>
       WHERE m.status = ${soldStatus}
       GROUP BY m.payment_method
       ORDER BY sales DESC`,
+    leftoverQuery,
   ])
+  const { leftover = 0, sold: soldOnCountedDays = 0 } = leftovers[0] ?? {}
   const { delivered = 0, cancelled = 0, netSales = 0, portions = 0 } = counts[0] ?? {}
   return {
     deliveredOrders: delivered,
@@ -205,6 +212,9 @@ async function salesAnalysis(range: JalaliMonthRange): Promise<SalesAnalysisDto>
     cancellationPercent: delivered + cancelled > 0 ? Math.round((cancelled / (delivered + cancelled)) * 1000) / 10 : null,
     averageBasket: delivered > 0 ? Math.round(netSales / delivered) : null,
     averagePortions: delivered > 0 ? Math.round((portions / delivered) * 10) / 10 : null,
+    leftoverPortions: leftover,
+    leftoverPercent: leftover + soldOnCountedDays > 0
+      ? Math.round((leftover / (leftover + soldOnCountedDays)) * 1000) / 10 : null,
     dishes: [...dishes],
     slots: slots.map((row) => ({ label: slotLabel(row), orders: row.orders, sales: row.sales })),
     paymentMethods: [...methods],

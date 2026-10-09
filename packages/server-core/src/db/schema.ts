@@ -330,11 +330,15 @@ export const dailyMenuItems = pgTable('daily_menu_items', {
   discountPrice: money('discount_price'),
   capacityPortions: integer('capacity_portions').notNull(),
   soldPortions: integer('sold_portions').notNull().default(0),
+  /** Portions left unsold at the end of the day, as the kitchen counted them; null until recorded. */
+  leftoverPortions: integer('leftover_portions'),
+  leftoverRecordedAt: utcTimestamp('leftover_recorded_at'),
   isAvailable: boolean('is_available').notNull().default(true),
   createdAt: utcTimestamp('created_at').notNull(),
 }, (table) => [
   uniqueIndex('daily_menu_items_menu_food_uidx').on(table.dailyMenuId, table.foodId),
   check('daily_menu_items_capacity_check', sql`${table.capacityPortions} >= 0`),
+  check('daily_menu_items_leftover_check', sql`${table.leftoverPortions} IS NULL OR ${table.leftoverPortions} >= 0`),
   check('daily_menu_items_sold_check', sql`${table.soldPortions} >= 0 AND ${table.soldPortions} <= ${table.capacityPortions}`),
   check('daily_menu_items_price_check', sql`${table.price} >= 0`),
   check('daily_menu_items_discount_price_check', sql`${table.discountPrice} IS NULL OR (${table.discountPrice} > 0 AND ${table.discountPrice} < ${table.price})`),

@@ -39,6 +39,8 @@ import type {
   NotificationLogItemDto,
   StaffUserDto,
   CourierCashHandoverDto,
+  LeftoverItemDto,
+  LeftoverWriteRequest,
   CourierCashHandoverWriteRequest,
   StaffCreateRequest,
   StaffUpdateRequest,
@@ -424,6 +426,8 @@ export const adminApi = {
     orders: Array<{ id: number; orderNumber: string; customerFullName: string; totalAmount: number; status: number }>
   }>('orders.since', { afterId }),
   productionSheet: (date: string) => socialInvoke<ProductionSheetDto>('kitchen.sheet', { date }),
+  leftovers: (date: string) => socialInvoke<LeftoverItemDto[]>('kitchen.leftovers', { date }),
+  saveLeftovers: (value: LeftoverWriteRequest) => socialInvoke<LeftoverItemDto[]>('kitchen.saveLeftovers', { value }, true),
   auditLog: (query: { entityType?: string | null; search?: string | null; page?: number; pageSize?: number }) =>
     socialInvoke<PagedResult<AuditLogEntryDto>>('audit.list', query),
   createPayment: (value: PaymentWriteRequest) => request<{ id: number }>('/api/admin/payments', 'POST', value),

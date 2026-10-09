@@ -5,6 +5,8 @@ import {
   type PackingOrderDto,
   type PaymentMethod,
   type ProductionSheetDto,
+  type LeftoverItemDto,
+  type LeftoverWriteRequest,
 } from '@kafgir/contracts'
 import { sqlClient } from '../db/client'
 import { orderServiceDate } from '../db/service-date'
@@ -139,4 +141,43 @@ export async function getProductionSheet(date: string): Promise<ProductionSheetD
     orders: orders.sort((a, b) =>
       slots.get(a.slotKey)!.sort.localeCompare(slots.get(b.slotKey)!.sort) || a.orderNumber.localeCompare(b.orderNumber)),
   }
+}
+
+type LeftoverRow = Omit<LeftoverItemDto, 'recordedAt'> & { recordedAt: Date | null }
+
+/** The day's dishes with what is recorded as left over; empty when the day has no menu. */
+export async function getLeftovers(date: string): Promise<LeftoverItemDto[]> {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(date)) throw new AppError('تاریخ معتبر نیست.')
+  const rows = await sqlClient<LeftoverRow[]>`
+    SELECT i.id AS "dailyMenuItemId", f.name AS "foodName", i.capacity_portions AS "capacityPortions",
+           i.sold_portions AS "soldPortions", i.leftover_portions AS "leftoverPortions",
+           i.leftover_recorded_at AS "recordedAt"
+    FROM daily_menu_items i
+    JOIN daily_menus m ON m.id = i.daily_menu_id
+    JOIN foods f ON f.id = i.food_id
+    WHERE m.menu_date = ${date}::date
+    ORDER BY f.is_persian_rice, f.name
+  `
+  return rows.map((row) => ({ ...row, recordedAt: row.recordedAt ? new Date(row.recordedAt).toISOString() : null }))
+}
+
+/** Saves the closing count. Only items of that day's menu are touched. */
+export async function saveLeftovers(input: LeftoverWriteRequest, userId: number): Promise<LeftoverItemDto[]> {
+  await sqlClient.begin(async (tx) => {
+    for (const item of input.items) {
+      const updated = await tx`
+        UPDATE daily_menu_items i
+        SET leftover_portions = ${item.leftoverPortions},
+            leftover_recorded_at = CASE WHEN ${item.leftoverPortions}::int IS NULL THEN NULL ELSE NOW() END
+        FROM daily_menus m
+        WHERE i.id = ${item.dailyMenuItemId} AND m.id = i.daily_menu_id AND m.menu_date = ${input.date}::date
+        RETURNING i.id`
+      if (updated.length === 0) throw new AppError('یکی از غذاها در منوی این روز نیست.')
+    }
+    const total = input.items.reduce((sum, item) => sum + (item.leftoverPortions ?? 0), 0)
+    await tx`
+      INSERT INTO audit_logs (action, entity_type, entity_id, user_id, details, created_at)
+      VALUES ('menu.leftovers', 'menu', NULL, ${userId}, ${`${input.date}: ${total} پرس`}, NOW())`
+  })
+  return getLeftovers(input.date)
 }

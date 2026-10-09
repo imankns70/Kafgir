@@ -82,6 +82,8 @@ export const adminOperations = [
   'payments.reconciliation',
   'audit.list',
   'kitchen.sheet',
+  'kitchen.leftovers',
+  'kitchen.saveLeftovers',
   'orders.since',
   'reports.customers',
   'customers.search',

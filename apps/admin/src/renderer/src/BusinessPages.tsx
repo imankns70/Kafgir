@@ -399,6 +399,8 @@ export function SalesAnalysis({ analysis }: { analysis: SalesAnalysisDto }) {
       <article className="metric"><span>میانگین پرس در هر سفارش</span><strong>{analysis.averagePortions === null ? '—' : formatNumber(analysis.averagePortions)}</strong></article>
       <article className="metric"><span>نرخ لغو</span><strong>{percentText(analysis.cancellationPercent)}</strong>
         <small>{formatNumber(analysis.cancelledOrders)} لغو از {formatNumber(analysis.cancelledOrders + analysis.deliveredOrders)}</small></article>
+      {analysis.leftoverPortions > 0 && <article className="metric"><span>پرس باقی‌مانده</span><strong>{formatNumber(analysis.leftoverPortions)}</strong>
+        <small>{percentText(analysis.leftoverPercent)} از پخته‌شده در روزهای شمرده‌شده</small></article>}
     </div>
     <ShareTable title="فروش غذا" rows={analysis.dishes} label={(row) => row.foodName}
       extra={{ header: 'پرس', value: (row) => formatNumber(row.portions) }}

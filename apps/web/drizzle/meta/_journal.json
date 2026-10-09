@@ -225,6 +225,13 @@
       "when": 1791520000000,
       "tag": "0031_food_estimated_cost",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791530000000,
+      "tag": "0032_menu_leftovers",
+      "breakpoints": true
     }
   ]
 }

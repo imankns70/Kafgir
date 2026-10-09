@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { ProductionSheetDto } from '@kafgir/contracts'
+import type { LeftoverItemDto, ProductionSheetDto } from '@kafgir/contracts'
 import { DeliveryMethod, OrderStatus, PaymentMethod } from '@kafgir/contracts'
 import { adminApi } from './api'
 import { DateField, Message, PageFrame } from './admin-ui'
@@ -12,7 +12,7 @@ import { todayJalali, toIsoDate } from './persian-calendar'
  * bag label. Everything comes from orders whose service day is the chosen date.
  */
 
-type View = 'cook' | 'slots' | 'pack'
+type View = 'cook' | 'slots' | 'pack' | 'leftover'
 
 const statusLabel: Record<number, string> = {
   [OrderStatus.PendingConfirmation]: 'در انتظار تأیید',
@@ -54,11 +54,11 @@ export function KitchenPage() {
 
   return <PageFrame title="برگه آشپزخانه و بسته‌بندی"
     description="چه چیزی، چند پرس، برای کدام بازه؛ و یک برچسب برای هر کیسه."
-    actions={<button type="button" className="primary" onClick={print} disabled={!sheet}>چاپ این بخش</button>}>
+    actions={view !== 'leftover' && <button type="button" className="primary" onClick={print} disabled={!sheet}>چاپ این بخش</button>}>
     <section className="toolbar kitchen-toolbar">
       <DateField label="روز سرویس" value={date} onChange={setDate} />
       <div className="payment-view-tabs" role="tablist">
-        {([['cook', 'پخت'], ['slots', 'بازه‌های ارسال'], ['pack', 'بسته‌بندی و برچسب']] as Array<[View, string]>).map(([key, label]) =>
+        {([['cook', 'پخت'], ['slots', 'بازه‌های ارسال'], ['pack', 'بسته‌بندی و برچسب'], ['leftover', 'باقی‌مانده روز']] as Array<[View, string]>).map(([key, label]) =>
           <button type="button" role="tab" key={key} aria-selected={view === key} className={view === key ? 'active' : ''}
             onClick={() => setView(key)}>{label}</button>)}
       </div>
@@ -66,7 +66,8 @@ export function KitchenPage() {
         onChange={(event) => setIncludePending(event.target.checked)} />سفارش‌های در انتظار تأیید هم</label>}
     </section>
     <Message error={error} />
-    {sheet && <div className={`kitchen-print kitchen-print-${view}`}>
+    {view === 'leftover' && <LeftoverPanel date={date} />}
+    {sheet && view !== 'leftover' && <div className={`kitchen-print kitchen-print-${view}`}>
       <h2 className="kitchen-print-title">{formatPersianDate(sheet.date)} — {view === 'cook' ? 'برگه پخت' : view === 'slots' ? 'بازه‌های ارسال' : 'بسته‌بندی'}</h2>
 
       {view === 'cook' && <section className="panel kitchen-cook">
@@ -120,4 +121,68 @@ export function KitchenPage() {
       </section>}
     </div>}
   </PageFrame>
+}
+
+/** Closing count: what of each dish was cooked but not sold. Feeds the month's leftover rate. */
+function LeftoverPanel({ date }: { date: string }) {
+  const [items, setItems] = useState<LeftoverItemDto[] | null>(null)
+  const [drafts, setDrafts] = useState<Record<number, string>>({})
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const show = (rows: LeftoverItemDto[]) => {
+    setItems(rows)
+    setDrafts(Object.fromEntries(rows.map((row) => [row.dailyMenuItemId, row.leftoverPortions == null ? '' : String(row.leftoverPortions)])))
+  }
+  useEffect(() => {
+    setItems(null)
+    setNotice(null)
+    void adminApi.leftovers(date).then(show).catch((reason) => setError(reason instanceof Error ? reason.message : String(reason)))
+  }, [date])
+
+  const parsed = (text: string) => {
+    const digits = text.trim().replace(/[۰-۹]/gu, (digit) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+    if (!digits) return null
+    const value = Number(digits)
+    return Number.isInteger(value) && value >= 0 ? value : Number.NaN
+  }
+
+  const save = async () => {
+    if (!items) return
+    const values = items.map((item) => ({ dailyMenuItemId: item.dailyMenuItemId, leftoverPortions: parsed(drafts[item.dailyMenuItemId] ?? '') }))
+    if (values.some((value) => Number.isNaN(value.leftoverPortions))) { setError('تعداد باقی‌مانده باید عدد صحیح و نامنفی باشد.'); return }
+    setBusy(true)
+    setError(null)
+    try {
+      show(await adminApi.saveLeftovers({ date, items: values }))
+      setNotice('باقی‌مانده روز ثبت شد.')
+    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    finally { setBusy(false) }
+  }
+
+  const total = items?.reduce((sum, item) => sum + (parsed(drafts[item.dailyMenuItemId] ?? '') || 0), 0) ?? 0
+  return <section className="panel kitchen-leftovers">
+    <Message error={error} />
+    {notice && <Message>{notice}</Message>}
+    {!items ? <p className="list-state">در حال دریافت…</p>
+      : items.length === 0 ? <p className="list-state">برای این روز منویی ثبت نشده است.</p>
+      : <>
+        <p className="muted">پایان روز، پرس‌هایی که پخته شد ولی فروش نرفت را بشمارید. خالی یعنی هنوز شمرده نشده.</p>
+        <table>
+          <thead><tr><th>غذا</th><th>ظرفیت</th><th>فروخته</th><th>باقی‌مانده (پرس)</th><th>ثبت</th></tr></thead>
+          <tbody>{items.map((item) => <tr key={item.dailyMenuItemId}>
+            <td className="kitchen-dish">{item.foodName}</td>
+            <td>{formatNumber(item.capacityPortions)}</td>
+            <td>{formatNumber(item.soldPortions)}</td>
+            <td><input className="leftover-input" inputMode="numeric" aria-label={`باقی‌مانده ${item.foodName}`}
+              value={drafts[item.dailyMenuItemId] ?? ''} placeholder="—"
+              onChange={(event) => setDrafts({ ...drafts, [item.dailyMenuItemId]: event.target.value })} /></td>
+            <td className="muted">{item.recordedAt ? new Date(item.recordedAt).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tehran' }) : '—'}</td>
+          </tr>)}</tbody>
+          <tfoot><tr><td>جمع</td><td /><td /><td><strong>{formatNumber(total)}</strong></td><td /></tr></tfoot>
+        </table>
+        <div className="action-row"><button type="button" className="primary" disabled={busy} onClick={() => void save()}>{busy ? 'در حال ثبت…' : 'ثبت باقی‌مانده'}</button></div>
+      </>}
+  </section>
 }

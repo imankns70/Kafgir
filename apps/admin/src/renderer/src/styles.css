@@ -958,3 +958,5 @@ td.text-cell { min-width: 170px; max-width: 420px; white-space: normal; text-ali
 .margin-negative{color:var(--error);font-weight:700}
 .sales-cost-hint{margin:-4px 0 0;font-size:12px}
 .food-cost-field{max-width:360px}
+.kitchen-leftovers{display:grid;gap:12px}.kitchen-leftovers p.muted{margin:0;font-size:13px}
+.leftover-input{width:90px;min-height:36px;border:1px solid var(--border);border-radius:8px;padding:4px 8px;text-align:center;background:#fff}

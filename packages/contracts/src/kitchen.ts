@@ -58,4 +58,25 @@ export const productionSheetSchema = z.object({
 })
 
 export type ProductionSheetDto = z.infer<typeof productionSheetSchema>
+
+/** One dish of the day with what the kitchen counted as left over at closing. */
+export const leftoverItemSchema = z.object({
+  dailyMenuItemId: z.number().int().positive(),
+  foodName: z.string(),
+  capacityPortions: portions,
+  soldPortions: portions,
+  leftoverPortions: portions.nullable(),
+  recordedAt: z.string().nullable(),
+})
+
+export const leftoverWriteSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+  items: z.array(z.object({
+    dailyMenuItemId: z.number().int().positive(),
+    leftoverPortions: portions.max(10_000).nullable(),
+  })).max(200),
+})
+
+export type LeftoverItemDto = z.infer<typeof leftoverItemSchema>
+export type LeftoverWriteRequest = z.infer<typeof leftoverWriteSchema>
 export type PackingOrderDto = z.infer<typeof packingOrderSchema>

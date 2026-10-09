@@ -8,6 +8,8 @@ import {
   getDashboard,
   getMonthPurchases,
   getMonthlyReport,
+  getLeftovers,
+  saveLeftovers,
   jalaliMonthRange,
   saveCourierDeliveryDay,
   updateOrderStatus,
@@ -242,6 +244,17 @@ integration.sequential('monthly business summary', () => {
     // Once the dish has a cost, the month shows portions × cost.
     await sql`UPDATE foods SET estimated_cost_per_portion = 180000 WHERE id = ${foodId}`
     expect((await getMonthlyReport(year, month)).analysis.dishes[0]!.estimatedCost).toBe(360_000)
+
+    // The kitchen counts three portions left at closing; two were sold that day.
+    const items = await getLeftovers(firstDay)
+    expect(items.map((item) => item.soldPortions)).toEqual([2])
+    await saveLeftovers({ date: firstDay, items: [{ dailyMenuItemId: menuItemId, leftoverPortions: 3 }] }, adminUserId)
+    expect((await getLeftovers(firstDay))[0]!.leftoverPortions).toBe(3)
+    const withLeftovers = (await getMonthlyReport(year, month)).analysis
+    expect(withLeftovers.leftoverPortions).toBe(3)
+    expect(withLeftovers.leftoverPercent).toBe(60)
+    await expect(saveLeftovers({ date: lastDay, items: [{ dailyMenuItemId: menuItemId, leftoverPortions: 1 }] }, adminUserId))
+      .rejects.toThrow(/منوی این روز/u)
     expect(analysis.slots).toEqual([{ label: 'بدون بازه ارسال', orders: 1, sales: 1_000_000 }])
     expect(analysis.paymentMethods).toEqual([{ paymentMethod: PaymentMethod.Cash, orders: 1, sales: 1_000_000 }])
   })
