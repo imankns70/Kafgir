@@ -25,6 +25,8 @@ const actionLabel: Record<string, string> = {
   'backup.export': 'تهیه نسخه پشتیبان',
   'settings.pendingOrders': 'قانون لغو خودکار',
   'menu.leftovers': 'ثبت باقی‌مانده روز',
+  'menu.open': 'باز کردن سفارش‌گیری',
+  'menu.close': 'بستن سفارش‌گیری',
   'courier.cash': 'دریافت نقدی از پیک',
   'order.courier': 'تغییر پیک سفارش',
   'payment.create': 'ثبت پرداخت',

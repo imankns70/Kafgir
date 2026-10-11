@@ -256,7 +256,7 @@ export async function dispatchAdminOperation(
       return setFoodActive(numberField(body, 'id'), Boolean(body.isActive))
     case 'menus.get': return getMenuByDate(textField(body, 'date'))
     case 'menus.settings':
-      return updateMenuSettings(textField(body, 'date'), updateDailyMenuSettingsSchema.parse(body.value))
+      return updateMenuSettings(textField(body, 'date'), updateDailyMenuSettingsSchema.parse(body.value), principal.userId)
     case 'menus.addItem':
       return addMenuItem(textField(body, 'date'), dailyMenuItemWriteSchema.parse(body.value))
     case 'menus.updateItem':

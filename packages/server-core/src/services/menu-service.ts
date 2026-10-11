@@ -441,13 +441,31 @@ async function ensureMenu(menuDate: string, isOpen = false, note: string | null 
   return rows[0]!.id
 }
 
-export async function updateMenuSettings(menuDate: string, request: UpdateDailyMenuSettingsRequest) {
+/**
+ * Opening or closing a day is the one switch every customer cart and checkout obeys, so each real
+ * change is audited: "ordering was closed" must always be answerable with who and when.
+ */
+export async function updateMenuSettings(
+  menuDate: string,
+  request: UpdateDailyMenuSettingsRequest,
+  userId: number | null = null,
+) {
   await ensureMenu(menuDate, request.isOpen, request.note ?? null)
-  await sqlClient`
-    UPDATE daily_menus
-    SET is_open = ${request.isOpen}, note = ${request.note ?? null}
-    WHERE menu_date = ${menuDate}::date
-  `
+  await sqlClient.begin(async (tx) => {
+    const previous = await tx<{ isOpen: boolean }[]>`
+      SELECT is_open AS "isOpen" FROM daily_menus WHERE menu_date = ${menuDate}::date FOR UPDATE
+    `
+    await tx`
+      UPDATE daily_menus
+      SET is_open = ${request.isOpen}, note = ${request.note ?? null}
+      WHERE menu_date = ${menuDate}::date
+    `
+    if (previous[0]?.isOpen !== request.isOpen) {
+      await tx`
+        INSERT INTO audit_logs (action, entity_type, entity_id, user_id, details, created_at)
+        VALUES (${request.isOpen ? 'menu.open' : 'menu.close'}, 'menu', NULL, ${userId}, ${menuDate}, NOW())`
+    }
+  })
   return (await getMenuByDate(menuDate))!
 }
 

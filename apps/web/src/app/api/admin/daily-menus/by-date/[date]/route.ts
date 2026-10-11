@@ -18,9 +18,9 @@ export async function GET(request: NextRequest, context: Context) {
 
 export async function PATCH(request: NextRequest, context: Context) {
   try {
-    await requireAdmin(request)
+    const principal = await requireAdmin(request)
     const date = (await context.params).date
-    return NextResponse.json(await updateMenuSettings(date, await readJson(request, updateDailyMenuSettingsSchema)))
+    return NextResponse.json(await updateMenuSettings(date, await readJson(request, updateDailyMenuSettingsSchema), principal.userId))
   } catch (error) {
     return routeError(error)
   }

@@ -73,10 +73,12 @@ export async function getFoodDetail(
         SELECT i.*
         FROM daily_menu_items i
         JOIN daily_menus selected_menu ON selected_menu.id = i.daily_menu_id
+        -- A requested row wins only while its day is current. A link to a past day's row (history,
+        -- a shared link) falls back to this food on today's or the next menu instead of reporting
+        -- yesterday's closed menu as "ordering is closed".
         WHERE i.food_id = f.id
-          AND (${menuItemId}::int IS NULL OR i.id = ${menuItemId})
-          AND (${menuItemId}::int IS NOT NULL OR selected_menu.menu_date >= ${today}::date)
-        ORDER BY selected_menu.menu_date, i.id
+          AND selected_menu.menu_date >= ${today}::date
+        ORDER BY (i.id = ${menuItemId}::int) IS TRUE DESC, selected_menu.menu_date, i.id
         LIMIT 1
       ) mi ON true
       LEFT JOIN daily_menus m ON m.id = mi.daily_menu_id

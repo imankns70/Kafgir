@@ -1456,13 +1456,26 @@ export function DailyMenuPage({ planning = false, onSetup }: {
     ? Math.round((1 - discountPrice / price) * 100)
     : 0
   // Opening or closing today's ordering is a single switch the whole kitchen reacts to; without a
-  // pending state a slow round-trip invites a second click that flips it straight back.
-  const toggle = () => void toggleAction.run(async () => {
-    try {
-      setMenu(await adminApi.menuSettings(date, !(menu?.isOpen ?? false), menu?.note))
-      setError(null)
-    } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
-  })
+  // pending state a slow round-trip invites a second click that flips it straight back. Closing
+  // immediately refuses every customer cart and checkout, so it is never a single stray click.
+  const toggle = () => {
+    const nextOpen = !(menu?.isOpen ?? false)
+    if (!nextOpen && !window.confirm('سفارش‌گیری امروز بسته شود؟ مشتریان تا باز شدن دوباره نمی‌توانند سفارش ثبت کنند.')) return
+    void toggleAction.run(async () => {
+      try {
+        setMenu(await adminApi.menuSettings(date, nextOpen, menu?.note))
+        setError(null)
+      } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)) }
+    })
+  }
+  // Another operator may open or close the day; refresh on focus so the switch never shows a stale
+  // state.
+  useEffect(() => {
+    if (planning) return
+    const refresh = () => void adminApi.menu(date).then(setMenu).catch(() => undefined)
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [date, planning])
   const removeItem = (id: number) => {
     setRemovingId(id)
     void removeAction.run(async () => {
@@ -1497,11 +1510,14 @@ export function DailyMenuPage({ planning = false, onSetup }: {
     <Pager {...pagedMenu} />
   </PageFrame>
 
-  return <PageFrame title="منوی امروز" actions={
+  // The state and the action are shown apart: a button labelled with the current state read like a
+  // status badge, and clicking it to "check" silently closed ordering for every customer.
+  return <PageFrame title="منوی امروز" actions={<>
+    <span className={`badge ${menu?.isOpen ? 'open' : 'status-1'}`}>سفارش‌گیری {menu?.isOpen ? 'باز است' : 'بسته است'}</span>
     <button className={menu?.isOpen ? 'secondary' : 'primary'} disabled={toggleAction.busy} onClick={toggle}>
-      {toggleAction.busy ? 'در حال تغییر…' : <>سفارش‌گیری {menu?.isOpen ? 'باز است' : 'بسته است'}</>}
+      {toggleAction.busy ? 'در حال تغییر…' : menu?.isOpen ? 'بستن سفارش‌گیری' : 'باز کردن سفارش‌گیری'}
     </button>
-  }>
+  </>}>
     <Message error={error} />
     <form className="panel form-grid menu-form compact-entry-form" onSubmit={saveItem}>
       <label>غذا<select value={foodId} onChange={(event) => setFoodId(event.target.value)} required>
